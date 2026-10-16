@@ -11,7 +11,7 @@ Leitura complementar: `README.md` (arquitetura e princípios), `PLANO.md` (fases
 
 ## Estado atual
 
-- **Fase:** 0 concluída (esqueleto). Próximo passo: Etapa A de `docs/IMPLANTACAO.md` (teste no MacBook).
+- **Fase:** 0 concluída (esqueleto). Sprint 1 aberta (Etapa A, teste no MacBook): passos, modelos e passagem em `SPRINT.md` e `SPRINT_NOTAS.md`.
 - **Última atualização:** 2026-10-16, Claude Opus 5.5 (conversa no app do Claude).
 - **Testes:** 17 passando (`cd servidor && uv run pytest`), também validados contra Postgres 16 real.
 - **Não testado ainda:** build da imagem Docker (o ambiente onde foi escrito não tinha Docker rodando).
@@ -133,20 +133,6 @@ Vale para todo projeto longo dividido em fases, executado por modelos diferentes
 
 ## Prompt para a próxima etapa
 
-> **Modelo indicado:** Sonnet (no Claude Code, no MacBook). Use Opus só se travar em algo de arquitetura.
->
-> Leia `CONTEXTO.md`, `README.md`, `CLAUDE.md` e `docs/IMPLANTACAO.md`. Vamos executar a
-> **Etapa A (teste no MacBook)** junto com o Leonardo, passo a passo, marcando `[x]` em
-> `docs/IMPLANTACAO.md` conforme cada item for concluído.
->
-> - Comece pelo A1–A3: confirme Docker e rode `cd servidor && uv sync && uv run pytest`.
-> - No A8 (`docker compose up -d --build`), se o build falhar, corrija o `servidor/Dockerfile`
->   ou o `docker-compose.yml` e rode de novo. Não mude a arquitetura.
-> - Os passos de Tailscale (A4–A5), GitHub OAuth App (A6) e conector no claude.ai (A9) são
->   feitos pelo Leonardo; guie e confira (`curl <URL>/.well-known/oauth-protected-resource/mcp`
->   deve responder 200).
-> - Nunca coloque segredos no git; o `.env` fica fora.
->
-> **Pronto quando:** pelo iPhone, registrar um gasto, consultar e desfazer funciona.
-> Ao terminar, atualize `CONTEXTO.md` (histórico, pendências, estado) e escreva o prompt da
-> Etapa B, seguindo a "Regra de passagem".
+Enquanto houver sprint aberta, o prompt de abertura e o passo atual ficam em `SPRINT.md`
+(§ Prompt de abertura) e `SPRINT_NOTAS.md` (§ Onde estamos). A "Regra de passagem" acima já
+foi levada para o vault em 2026-10-16 (`40-regras/programacao/registro-temporario-de-sprint-na-raiz.md`).

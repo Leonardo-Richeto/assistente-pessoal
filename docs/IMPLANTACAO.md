@@ -5,9 +5,9 @@ máquina dedicada. Marque `[x]` conforme avança.
 
 ## Etapa A — Teste no MacBook
 
-- [ ] A1. Instalar Docker Desktop (ou OrbStack) e confirmar `docker compose version`
-- [ ] A2. `git clone https://github.com/Leonardo-Richeto/assistente-pessoal && cd assistente-pessoal`
-- [ ] A3. Rodar os testes: `cd servidor && uv sync && uv run pytest` (devem passar todos)
+- [x] A1. Instalar Docker Desktop (ou OrbStack) e confirmar `docker compose version`
+- [x] A2. `git clone https://github.com/Leonardo-Richeto/assistente-pessoal && cd assistente-pessoal`
+- [x] A3. Rodar os testes: `cd servidor && uv sync && uv run pytest` (devem passar todos)
 - [ ] A4. Instalar o Tailscale (se a versão da App Store não aceitar Funnel, usar a standalone);
       no painel, habilitar HTTPS e Funnel para o Mac
 - [ ] A5. `tailscale funnel --bg 8000` → anotar a URL `https://<mac>.<tailnet>.ts.net`
