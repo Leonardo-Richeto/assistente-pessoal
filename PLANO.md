@@ -86,6 +86,8 @@ A sequência de **teste no MacBook → produção no i7** está em `docs/IMPLANT
 - Todos os canais falam com o MESMO servidor MCP; nenhum acesso novo ao banco por fora dele.
 
 ## Ideias sem data
+- Monitor de rede em casa (o que é acessado, consumo, bloqueio pelo agente).
+- Central de acesso às câmeras de monitoramento.
 - Ligação pela operadora (alerta por voz: liga, fala a mensagem, desliga) — avaliar VoIP/SIP + Asterisk. Ideia inicial, ver depois.
 - Conversa por voz em tempo real por telefone — exigiria API paga; só se valer o custo.
 

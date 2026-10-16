@@ -64,6 +64,38 @@ Leitura complementar: `README.md` (arquitetura e princípios), `PLANO.md` (fases
 
 ---
 
+## O que já se sabe (dito pelo Leonardo, ainda não conferido nas máquinas)
+
+**Máquinas**
+- **i7-6700**, 16 GB DDR4, SSD SATA 240 GB, sem GPU → dedicada só ao assistente pessoal (produção).
+- **i5-3330**, 16 GB, SSD SATA 240 GB + HD 500 GB, sem GPU → roda Proxmox com a VM do atendente de
+  WhatsApp (projeto comercial à parte, em Python) e uma VM de serviços de rede. WireGuard já
+  configurado ali, parado desde a mudança de casa. Também vai receber o backup e outros serviços.
+- Um segundo HD de 500 GB está livre. Compra armazenamento se precisar.
+- **MacBook**: ambiente de teste (Etapa A).
+
+**Premissas que guiam as decisões**
+- Não pagar nada além do que já paga (plano Pro do Claude). Por isso Tailscale e não domínio.
+- O servidor é particular justamente para guardar dados sensíveis, inclusive de trabalho, sob controle dele.
+- Quer registrar tudo o que for possível; ferramentas e categorias novas surgem com o uso.
+- Evolução do banco dirigida pelo uso: quando ele pedir para registrar algo que não existe, um
+  modelo competente cria modelo + migração Alembic + ferramentas (ver "Dado novo" no README).
+- Execução por modelos: um modelo superior estrutura cada fase, um modelo competente executa cada tarefa.
+
+**Peças que já existem fora deste repo**
+- Vault do Obsidian particular, já no modelo "contexto no vault, números no banco", com uma
+  prévia de estrutura que ele quer manter ou melhorar. Será migrado para o servidor (fase 2).
+- Documento antigo "Assistente Pessoal de IA — Projeto de Implementação" (Claude Docs): era o
+  plano vivo do modo antigo. **Este repo passa a ser a fonte da verdade.**
+- Ele já usou o **Jev** (TypeSafe AI) como seletor de modelo; entra no gateway do WhatsApp (fase 6).
+
+**Ideias futuras (sem data, só registro)**
+- Monitor de rede em casa: ver o que é acessado, consumo, bloquear pelo agente.
+- Centralizar o acesso às câmeras de monitoramento.
+- Ligação pela operadora (alerta por voz).
+
+---
+
 ## Inventário das máquinas (fazer em casa)
 
 Juntar as especificações de **todas** as máquinas e salvar no vault (e um resumo em
