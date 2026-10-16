@@ -64,7 +64,7 @@ Convenções do código estão em `CLAUDE.md`.
 
 ## Fase 8 — Canais próprios
 - [ ] 8.1 Celular Android barato dedicado, com chip próprio, ligado no carregador e no Wi-Fi de casa (número só do agente)
-- [ ] ⚑ 8.2 API própria de WhatsApp, parecida com o WAHA, a partir de engenharia reversa de um projeto open source do GitHub (definir qual), rodando em casa; substitui o WAHA da fase 6
+- [ ] ⚑ 8.2 API própria de WhatsApp, parecida com o WAHA, usando o repositório "reverse engineering anything" (REA) do GitHub como base para a engenharia reversa, rodando em casa; substitui o WAHA da fase 6
 - [ ] 8.3 Envio e recebimento de áudio (TTS local, ex.: Piper; transcrição), imagens e arquivos
 - [ ] 8.4 Canal Telegram (bot oficial, allowlist do Leonardo)
 - [ ] 8.5 Canal Discord (bot, servidor privado)
