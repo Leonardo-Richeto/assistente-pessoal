@@ -30,8 +30,11 @@ Princípios (não mude sem decidir de novo):
 | `servidor/alembic/` | Migrações |
 | `deploy/postgres/01-papeis.sh` | Cria os usuários de leitura e escrita |
 | `PLANO.md` | Próximas fases, quebradas em tarefas |
+| `docs/IMPLANTACAO.md` | Passo a passo: teste no MacBook → produção no i7 |
 
-## Subir na máquina de casa
+## Subir (referência)
+
+Sequência completa com checklist em `docs/IMPLANTACAO.md`.
 
 1. **Docker** instalado (`docker compose version` funcionando).
 2. **Tailscale** no host, logado na sua tailnet. No painel do Tailscale, habilite HTTPS

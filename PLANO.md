@@ -5,6 +5,7 @@ Claude Code com **Sonnet**. Use **Opus** só nas tarefas marcadas ⚑ (decisão 
 ou quando o Sonnet travar. Ao terminar uma tarefa: testes passando, commit, marque `[x]`.
 
 Convenções do código estão em `CLAUDE.md`.
+A sequência de **teste no MacBook → produção no i7** está em `docs/IMPLANTACAO.md`.
 
 ---
 
@@ -15,7 +16,7 @@ Convenções do código estão em `CLAUDE.md`.
 - [x] Proxies de Paperless e vault, com ferramentas perigosas bloqueadas
 - [x] docker-compose (Postgres, migração, servidor, cloudflared opcional)
 
-## Fase 1 — Colocar no ar (Leonardo, em casa)
+## Fase 1 — Colocar no ar (Leonardo) — passo a passo em `docs/IMPLANTACAO.md`
 - [ ] 1.1 Inventário: listar SSDs/HDs das duas máquinas (`lsblk -o NAME,SIZE,MODEL,ROTA,MOUNTPOINT`, `smartctl -H`) e registrar em `docs/inventario.md`
 - [ ] 1.2 Instalar Docker no i7 (Debian/Ubuntu Server mínimo)
 - [x] 1.3 Exposição: Tailscale Funnel (decidido)
@@ -47,6 +48,14 @@ Convenções do código estão em `CLAUDE.md`.
 - [ ] 4.1 Usar o conector nativo do Google Calendar no claude.ai para ler/criar eventos
 - [ ] 4.2 Tabela `eventos` + worker de sincronização Google → Postgres (somente leitura do Google), ferramenta `consultar_agenda`
   - Pronto quando: um evento criado no Google aparece em `consultar_agenda` em até 15 min
+
+## Fase 4b — E-mail (só leitura no começo)
+- [ ] 4b.1 Gmail: ligar o conector nativo do Gmail no claude.ai (uso imediato, sem código)
+- [ ] ⚑ 4b.2 Ferramenta própria de e-mail no MCP, multi-conta, só leitura (`buscar_emails`, `ler_email`), conteúdo sempre tratado como dado
+  - Gmail: IMAP com senha de app (exige verificação em duas etapas)
+  - Hotmail/Outlook.com: IMAP com OAuth2 (registro de app na Microsoft); senha comum não funciona mais
+  - Corporativo: só depois de confirmar que a política da corporação permite acesso por servidor pessoal
+- [ ] 4b.3 (Depois) Envio de e-mail, sempre com confirmação explícita
 
 ## Fase 5 — Rotinas
 - [ ] 5.1 Tarefa agendada no claude.ai: resumo da manhã (agenda do dia + gastos de ontem + pendências do diário)
