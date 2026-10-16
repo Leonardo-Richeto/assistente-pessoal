@@ -58,5 +58,23 @@ Convenções do código estão em `CLAUDE.md`.
 - [ ] 7.1 `pg_dump` diário + vault (git) + mídia do Paperless para o i5 (Proxmox), com retenção
 - [ ] 7.2 Teste de restauração documentado
 
+---
+
+# Segunda etapa (só depois da base — fases 1 a 5 — pronta)
+
+## Fase 8 — Canais próprios
+- [ ] 8.1 Celular Android barato dedicado, com chip próprio, ligado no carregador e no Wi-Fi de casa (número só do agente)
+- [ ] ⚑ 8.2 API própria de WhatsApp, parecida com o WAHA, a partir de engenharia reversa de um projeto open source do GitHub (definir qual), rodando em casa; substitui o WAHA da fase 6
+- [ ] 8.3 Envio e recebimento de áudio (TTS local, ex.: Piper; transcrição), imagens e arquivos
+- [ ] 8.4 Canal Telegram (bot oficial, allowlist do Leonardo)
+- [ ] 8.5 Canal Discord (bot, servidor privado)
+- Todos os canais falam com o MESMO servidor MCP; nenhum acesso novo ao banco por fora dele.
+
+## Ideias sem data
+- Ligação pela operadora (alerta por voz: liga, fala a mensagem, desliga) — avaliar VoIP/SIP + Asterisk. Ideia inicial, ver depois.
+- Conversa por voz em tempo real por telefone — exigiria API paga; só se valer o custo.
+
+---
+
 ## Sempre que surgir um dado novo
 Seguir "Dado novo" no `README.md`: modelo → migração revisada → ferramentas `registrar_*`/`consultar_*` → testes.
