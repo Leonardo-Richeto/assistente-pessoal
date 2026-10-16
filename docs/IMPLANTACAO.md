@@ -30,7 +30,7 @@ Observações do teste:
 
 Só começa com a Etapa A estável.
 
-- [ ] B1. Inventário dos discos das duas máquinas (`lsblk -o NAME,SIZE,MODEL,ROTA,MOUNTPOINT`) → `docs/inventario.md`
+- [ ] B1. Inventário completo de **todas** as máquinas (specs, configuração, saúde SMART dos discos, VMs) → nota no vault + resumo em `docs/inventario.md` (roteiro em `CONTEXTO.md`)
 - [ ] B2. Instalar Debian ou Ubuntu Server mínimo no i7, Docker e Git
 - [ ] B3. Clonar o repo no i7
 - [ ] B4. Tailscale no i7, HTTPS + Funnel habilitados, `tailscale funnel --bg 8000` → nova URL

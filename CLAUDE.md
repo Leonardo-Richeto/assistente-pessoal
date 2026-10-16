@@ -1,7 +1,14 @@
 # Convenções do projeto
 
-Leia `README.md` (arquitetura e princípios) e pegue a próxima tarefa aberta em `PLANO.md`.
+**Leia `CONTEXTO.md` primeiro** (estado atual, histórico, pendências e o prompt da próxima etapa).
+Depois `README.md` (arquitetura e princípios) e a próxima tarefa aberta em `PLANO.md`.
 Uma tarefa por vez; ao terminar, testes passando, `[x]` no plano e commit.
+
+## Passagem entre modelos (obrigatório)
+Ao terminar uma tarefa ou fase, atualize `CONTEXTO.md`: o que foi feito, o que mudou e por quê,
+decisões, pendências, o que não foi testado e o estado atual. Em seguida, substitua a seção
+"Prompt para a próxima etapa" por um prompt completo para o próximo modelo. Nada importante
+fica só na conversa.
 
 ## Regras que não se negociam
 - Nunca criar ferramenta de SQL livre ou que execute comando arbitrário no servidor.

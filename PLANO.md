@@ -4,7 +4,7 @@ Cada tarefa é pequena e tem critério de pronto, para ser executada uma por vez
 Claude Code com **Sonnet**. Use **Opus** só nas tarefas marcadas ⚑ (decisão de arquitetura)
 ou quando o Sonnet travar. Ao terminar uma tarefa: testes passando, commit, marque `[x]`.
 
-Convenções do código estão em `CLAUDE.md`.
+Convenções do código estão em `CLAUDE.md`. Estado e histórico do processo em `CONTEXTO.md`.
 A sequência de **teste no MacBook → produção no i7** está em `docs/IMPLANTACAO.md`.
 
 ---
@@ -17,7 +17,7 @@ A sequência de **teste no MacBook → produção no i7** está em `docs/IMPLANT
 - [x] docker-compose (Postgres, migração, servidor, cloudflared opcional)
 
 ## Fase 1 — Colocar no ar (Leonardo) — passo a passo em `docs/IMPLANTACAO.md`
-- [ ] 1.1 Inventário: listar SSDs/HDs das duas máquinas (`lsblk -o NAME,SIZE,MODEL,ROTA,MOUNTPOINT`, `smartctl -H`) e registrar em `docs/inventario.md`
+- [ ] 1.1 Inventário completo de todas as máquinas: especificações, configuração, saúde SMART de cada HD/SSD, VMs → nota no vault + resumo em `docs/inventario.md` (roteiro em `CONTEXTO.md`)
 - [ ] 1.2 Instalar Docker no i7 (Debian/Ubuntu Server mínimo)
 - [x] 1.3 Exposição: Tailscale Funnel (decidido)
 - [ ] 1.3b Instalar Tailscale no i7, habilitar HTTPS + Funnel, `tailscale funnel --bg 8000`
@@ -34,6 +34,7 @@ A sequência de **teste no MacBook → produção no i7** está em `docs/IMPLANT
 - [ ] 2.1 Subir Paperless-ngx com o compose oficial (rede Docker compartilhada com este stack); gerar token; preencher `PAPERLESS_URL`/`PAPERLESS_API_KEY`
   - Pronto quando: "me mostra o último documento que entrou" funciona pelo app
 - [ ] 2.2 Migrar o vault para `/srv/vault` no i7, `git init`, Syncthing com Mac/iPhone; preencher `VAULT_PATH`
+- [ ] 2.2b Levar para o vault a "Regra de passagem" (`CONTEXTO.md`) e a nota de inventário das máquinas
 - [ ] 2.3 Job diário de commit do vault (`git add -A && git commit`) para ter histórico de tudo que a IA escrever
 - [ ] ⚑ 2.4 Definir o envio de arquivos para o servidor (pasta "consumir" do Paperless sincronizada pelo Syncthing é o caminho mais simples)
 
