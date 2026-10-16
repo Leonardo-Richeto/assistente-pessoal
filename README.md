@@ -2,10 +2,11 @@
 
 Servidor MCP que roda em casa (máquina i7) e dá "mãos" ao Claude: o app do Claude
 (iPhone/Mac/web) conecta nele como **conector personalizado** e passa a registrar gastos,
-ponto e diário, ler o vault e buscar documentos no Paperless.
+ponto e diário, ler o vault e buscar documentos no Paperless. Qualquer outro cliente MCP
+(ex.: ChatGPT) conecta do mesmo jeito: o contexto fica aqui, não no modelo.
 
 ```
-App do Claude ──► tunnel (HTTPS) ──► servidor MCP (OAuth GitHub, só seu login)
+App do Claude ──► Tailscale Funnel ──► servidor MCP (login GitHub/Google, só quem está na lista)
                                        ├─ banco      → Postgres (código nosso)
                                        ├─ paperless  → paperless-mcp (pronto)
                                        └─ vault      → mcpvault (pronto)
@@ -24,7 +25,7 @@ Princípios (não mude sem decidir de novo):
 |---|---|
 | `servidor/assistente/banco.py` | Ferramentas de domínio (gastos, ponto, diário, desfazer, auditoria) |
 | `servidor/assistente/servidor.py` | Endpoint único: monta banco + proxies de Paperless e vault; lista de ferramentas bloqueadas |
-| `servidor/assistente/auth.py` | OAuth via GitHub com trava por login |
+| `servidor/assistente/auth.py` | Login via GitHub ou Google com lista de permitidos |
 | `servidor/assistente/modelos.py` | Tabelas (SQLAlchemy) |
 | `servidor/alembic/` | Migrações |
 | `deploy/postgres/01-papeis.sh` | Cria os usuários de leitura e escrita |
@@ -33,27 +34,41 @@ Princípios (não mude sem decidir de novo):
 ## Subir na máquina de casa
 
 1. **Docker** instalado (`docker compose version` funcionando).
-2. **Endereço público** para o MCP — escolha um:
-   - *Tem domínio no Cloudflare:* crie um tunnel em Zero Trust → Networks → Tunnels,
-     aponte um hostname (ex.: `mcp.seudominio.com.br`) para `http://servidor:8000`
-     e copie o token para `CLOUDFLARE_TUNNEL_TOKEN`.
-   - *Sem domínio (grátis):* Tailscale Funnel no host:
-     `tailscale funnel --bg 8000` → URL `https://<maquina>.<tailnet>.ts.net`.
-3. **GitHub OAuth App** (GitHub → Settings → Developer settings → OAuth Apps → New):
-   - Homepage URL: o endereço público
-   - Authorization callback URL: `<endereço público>/auth/callback`
-   - Copie Client ID e gere um Client secret.
-4. `cp .env.example .env` e preencha (senhas com `openssl rand -base64 32`).
+2. **Tailscale** no host, logado na sua tailnet. No painel do Tailscale, habilite HTTPS
+   e Funnel para a máquina. Depois:
+   ```bash
+   tailscale funnel --bg 8000          # -> https://<maquina>.<tailnet>.ts.net
+   ```
+   Esse endereço é o `PUBLIC_BASE_URL`.
+3. **Login** — crie as credenciais do provedor escolhido em `AUTH_PROVEDOR`.
+   Callback (nos dois): `<PUBLIC_BASE_URL>/auth/callback`.
+   - *GitHub:* Settings → Developer settings → OAuth Apps → New. Homepage = `PUBLIC_BASE_URL`.
+     Preencha `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` e `GITHUB_LOGINS_PERMITIDOS`.
+   - *Google:* console.cloud.google.com → novo projeto → "Tela de consentimento OAuth"
+     (tipo Externo, adicione o e-mail como usuário de teste) → Credenciais → Criar ID do
+     cliente OAuth → Aplicativo da Web → URI de redirecionamento = callback acima.
+     Preencha `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` e `GOOGLE_EMAILS_PERMITIDOS`.
+4. `cp .env.example .env` e preencha (senhas e `JWT_SIGNING_KEY` com `openssl rand -base64 32`).
 5. Subir:
    ```bash
-   docker compose up -d --build                         # Tailscale Funnel
-   docker compose --profile cloudflare up -d --build    # Cloudflare Tunnel
+   docker compose up -d --build
    docker compose logs -f servidor
    ```
 6. **Conectar no Claude:** claude.ai → Configurações → Conectores → adicionar conector
-   personalizado → URL `<endereço público>/mcp`. Ele abre o login do GitHub; entre com a
-   conta listada em `GITHUB_LOGINS_PERMITIDOS`. Vale também no app do iPhone.
+   personalizado → URL `<PUBLIC_BASE_URL>/mcp`. Abre o login do provedor; entre com a conta
+   permitida. Vale também no app do iPhone. Outro cliente MCP (ex.: ChatGPT em modo
+   desenvolvedor) usa a mesma URL.
 7. Teste: "registre um gasto de 10 reais de café" → "quanto gastei hoje?" → "desfaz".
+
+### Segunda instância na mesma máquina (ex.: esposa)
+
+Banco, vault e login separados — nada é compartilhado.
+```bash
+git clone <este repo> ~/assistente-esposa && cd ~/assistente-esposa
+cp .env.example .env    # NOME_USUARIO, PORTA_HOST=8001, AUTH_PROVEDOR=google, VAULT_PATH próprio
+tailscale funnel --bg --https=8443 8001          # PUBLIC_BASE_URL=https://<maquina>...ts.net:8443
+docker compose -p assistente-esposa up -d --build
+```
 
 ## Desenvolvimento
 

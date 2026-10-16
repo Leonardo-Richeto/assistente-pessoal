@@ -4,7 +4,7 @@
 - paperless → MCP pronto `paperless-mcp` (PyPI), via stdio
 - vault     → MCP pronto `@bitbonsai/mcpvault` (npm), via stdio, limitado à pasta do vault
 
-Só este endpoint vai para a internet (via Cloudflare Tunnel). Paperless e vault nunca ficam expostos.
+Só este endpoint vai para a internet (via Tailscale Funnel). Paperless e vault nunca ficam expostos.
 """
 
 import logging
@@ -12,7 +12,7 @@ import logging
 from fastmcp import FastMCP
 from fastmcp.server import create_proxy
 
-from .auth import GitHubRestrito
+from .auth import GitHubRestrito, GoogleRestrito
 from .banco import criar_servidor_banco
 from .config import Config, config
 from .db import Bancos
@@ -34,7 +34,7 @@ BLOQUEADAS = {
 }
 
 INSTRUCOES = """\
-Assistente pessoal do Leonardo (São Paulo, fuso America/Sao_Paulo).
+Assistente pessoal de {nome} (fuso {fuso}).
 - Números e registros (gastos, ponto, diário) vêm SEMPRE das ferramentas do banco.
 - O vault guarda contexto e narrativa; não duplique números lá.
 - Documentos estão no Paperless.
@@ -46,24 +46,25 @@ def _auth(cfg: Config):
     if cfg.auth_desativada:
         log.warning("AUTH DESATIVADA — use só em teste local, nunca com o tunnel ligado.")
         return None
-    faltando = [n for n in ("github_client_id", "github_client_secret", "jwt_signing_key") if not getattr(cfg, n)]
+    p = cfg.auth_provedor
+    exigidos = [f"{p}_client_id", f"{p}_client_secret", "jwt_signing_key"]
+    faltando = [n.upper() for n in exigidos if not getattr(cfg, n)]
     if faltando:
-        raise SystemExit(f"Configuração de OAuth incompleta: {', '.join(faltando)}")
-    return GitHubRestrito(
-        logins_permitidos=cfg.github_logins_permitidos,
-        client_id=cfg.github_client_id,
-        client_secret=cfg.github_client_secret,
-        base_url=cfg.public_base_url,
-        jwt_signing_key=cfg.jwt_signing_key,
-    )
+        raise SystemExit(f"Configuração de login ({p}) incompleta: {', '.join(faltando)}")
+    comum = dict(base_url=cfg.public_base_url, jwt_signing_key=cfg.jwt_signing_key)
+    if p == "google":
+        return GoogleRestrito(emails_permitidos=cfg.google_emails_permitidos,
+                              client_id=cfg.google_client_id, client_secret=cfg.google_client_secret, **comum)
+    return GitHubRestrito(logins_permitidos=cfg.github_logins_permitidos,
+                          client_id=cfg.github_client_id, client_secret=cfg.github_client_secret, **comum)
 
 
 def criar_app(cfg: Config | None = None) -> FastMCP:
     cfg = cfg or config()
     bancos = Bancos.de_urls(cfg.database_url_leitura, cfg.database_url_escrita)
 
-    app = FastMCP("assistente-pessoal", instructions=INSTRUCOES, auth=_auth(cfg))
-    app.mount(criar_servidor_banco(bancos, cfg.tz))
+    app = FastMCP("assistente-pessoal", instructions=INSTRUCOES.format(nome=cfg.nome_usuario, fuso=cfg.fuso), auth=_auth(cfg))
+    app.mount(criar_servidor_banco(bancos, cfg.tz, cfg.nome_usuario))
 
     if cfg.paperless_url and cfg.paperless_api_key:
         app.mount(

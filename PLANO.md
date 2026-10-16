@@ -9,7 +9,7 @@ Convenções do código estão em `CLAUDE.md`.
 ---
 
 ## Fase 0 — Esqueleto ✅
-- [x] Servidor MCP único com OAuth GitHub restrito por login
+- [x] Servidor MCP único com login GitHub ou Google restrito por lista
 - [x] Ferramentas de domínio: gastos, ponto, diário, desfazer, auditoria
 - [x] Usuários de banco leitura/escrita + migração inicial (testado em Postgres 16)
 - [x] Proxies de Paperless e vault, com ferramentas perigosas bloqueadas
@@ -18,11 +18,16 @@ Convenções do código estão em `CLAUDE.md`.
 ## Fase 1 — Colocar no ar (Leonardo, em casa)
 - [ ] 1.1 Inventário: listar SSDs/HDs das duas máquinas (`lsblk -o NAME,SIZE,MODEL,ROTA,MOUNTPOINT`, `smartctl -H`) e registrar em `docs/inventario.md`
 - [ ] 1.2 Instalar Docker no i7 (Debian/Ubuntu Server mínimo)
-- [ ] ⚑ 1.3 Escolher exposição: Cloudflare Tunnel (precisa domínio) ou Tailscale Funnel (grátis)
+- [x] 1.3 Exposição: Tailscale Funnel (decidido)
+- [ ] 1.3b Instalar Tailscale no i7, habilitar HTTPS + Funnel, `tailscale funnel --bg 8000`
 - [ ] 1.4 Criar GitHub OAuth App, preencher `.env`, `docker compose up -d --build`
   - Pronto quando: `docker compose ps` tudo saudável e `curl <url>/.well-known/oauth-protected-resource/mcp` responde
 - [ ] 1.5 Adicionar conector personalizado no claude.ai e testar do iPhone: registrar → consultar → desfazer
 - [ ] 1.6 Criar um Projeto no claude.ai "Assistente" com instruções de uso (quando registrar, tom das confirmações)
+
+## Fase 1b — Instância da esposa (opcional, depois da sua estar estável)
+- [ ] 1b.1 Segunda instância (README → "Segunda instância"), login Google, porta 8001 / Funnel 8443
+- [ ] 1b.2 Ela pede ao GPT para despejar no vault tudo o que ele sabe dela; depois conecta o Claude dela e confirma que ele usa esse contexto
 
 ## Fase 2 — Documentos e vault
 - [ ] 2.1 Subir Paperless-ngx com o compose oficial (rede Docker compartilhada com este stack); gerar token; preencher `PAPERLESS_URL`/`PAPERLESS_API_KEY`

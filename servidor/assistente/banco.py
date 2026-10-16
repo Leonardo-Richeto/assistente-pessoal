@@ -76,11 +76,11 @@ def horas_por_dia(registros: list[Ponto], tz: ZoneInfo) -> dict[str, float]:
     return resultado
 
 
-def criar_servidor_banco(bancos: Bancos, tz: ZoneInfo) -> FastMCP:
+def criar_servidor_banco(bancos: Bancos, tz: ZoneInfo, nome: str = "Leonardo") -> FastMCP:
     mcp = FastMCP(
         "banco",
         instructions=(
-            "Banco pessoal do Leonardo: gastos, ponto e diário. É a fonte da verdade para números "
+            f"Banco pessoal de {nome}: gastos, ponto e diário. É a fonte da verdade para números "
             "e registros — consulte aqui em vez de confiar na memória. Depois de registrar, "
             "devolva a confirmação curta e ofereça desfazer."
         ),
@@ -115,7 +115,7 @@ def criar_servidor_banco(bancos: Bancos, tz: ZoneInfo) -> FastMCP:
         data: Annotated[date | None, Field(description="Padrão: hoje")] = None,
         forma_pagamento: str | None = None,
     ) -> dict:
-        """Registra um gasto feito pelo Leonardo."""
+        """Registra um gasto feito pelo dono do assistente."""
         data = data or _agora().date()
         categoria = categoria.strip().lower()
         valor = valor.quantize(Decimal("0.01"))
@@ -207,7 +207,7 @@ def criar_servidor_banco(bancos: Bancos, tz: ZoneInfo) -> FastMCP:
         tags: Annotated[list[str] | None, Field(description="Ex.: ['trabalho', 'estudo']")] = None,
         momento: Annotated[datetime | None, Field(description="Padrão: agora")] = None,
     ) -> dict:
-        """Registra no diário algo que o Leonardo fez."""
+        """Registra no diário algo que o dono do assistente fez."""
         momento = momento or _agora()
         if momento.tzinfo is None:
             momento = momento.replace(tzinfo=tz)
