@@ -4,6 +4,7 @@ ENV PYTHONUNBUFFERED=1 \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     UV_TOOL_BIN_DIR=/usr/local/bin \
+    UV_TOOL_DIR=/opt/uv-tools \
     PATH="/app/.venv/bin:$PATH"
 
 # Node só para o MCP do vault (mcpvault é um pacote npm).

@@ -43,6 +43,7 @@ services:
       DATABASE_URL_ESCRITA: postgresql+psycopg://assistente_escrita:${SENHA_ESCRITA}@postgres/assistente
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?defina PUBLIC_BASE_URL no .env}
       AUTH_PROVEDOR: ${AUTH_PROVEDOR:-github}
+      AUTH_DESATIVADA: ${AUTH_DESATIVADA:-false}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
       GITHUB_LOGINS_PERMITIDOS: ${GITHUB_LOGINS_PERMITIDOS:-}

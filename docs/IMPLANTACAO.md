@@ -13,11 +13,11 @@ máquina dedicada. Marque `[x]` conforme avança.
 - [ ] A5. `tailscale funnel --bg 8000` → anotar a URL `https://<mac>.<tailnet>.ts.net`
 - [ ] A6. Criar um GitHub OAuth App **de teste**
       - Homepage: URL do A5 · Callback: `<URL do A5>/auth/callback`
-- [ ] A7. `cp .env.example .env` e preencher:
+- [x] A7 (parcial, 2026-10-16: `.env` local de teste com `AUTH_DESATIVADA=true`, sem credenciais GitHub; refazer no Passo 5). `cp .env.example .env` e preencher:
       senhas e `JWT_SIGNING_KEY` (`openssl rand -base64 32`), `PUBLIC_BASE_URL` (A5),
       `AUTH_PROVEDOR=github`, credenciais do A6, `GITHUB_LOGINS_PERMITIDOS=Leonardo-Richeto`.
       Vault e Paperless vazios por enquanto.
-- [ ] A8. `docker compose up -d --build` e `docker compose logs -f servidor` (erro no build → guardar o log)
+- [x] A8 (2026-10-16, MacBook arm64). `docker compose up -d --build` e `docker compose logs -f servidor` (erro no build → guardar o log)
 - [ ] A9. claude.ai → Configurações → Conectores → conector personalizado → `<URL do A5>/mcp` → login GitHub
 - [ ] A10. Teste pelo iPhone: registrar gasto → consultar → desfazer; registrar ponto → consultar horas
 - [ ] A11. (Opcional) Testar o vault com uma **cópia** do vault em `VAULT_PATH`
