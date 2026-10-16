@@ -1,0 +1,67 @@
+# Stack do assistente pessoal (máquina i7).
+#   docker compose up -d                          -> Postgres + migração + servidor MCP
+#   docker compose --profile cloudflare up -d     -> idem + Cloudflare Tunnel
+# O servidor MCP só escuta em 127.0.0.1:8000; quem expõe para a internet é o tunnel.
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: assistente
+      POSTGRES_USER: assistente_dono
+      POSTGRES_PASSWORD: ${SENHA_DONO:?defina SENHA_DONO no .env}
+      SENHA_LEITURA: ${SENHA_LEITURA:?defina SENHA_LEITURA no .env}
+      SENHA_ESCRITA: ${SENHA_ESCRITA:?defina SENHA_ESCRITA no .env}
+      TZ: America/Sao_Paulo
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./deploy/postgres/01-papeis.sh:/docker-entrypoint-initdb.d/01-papeis.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U assistente_dono -d assistente"]
+      interval: 5s
+      retries: 10
+
+  # Roda as migrações com o usuário dono e termina. O servidor só sobe depois.
+  migracao:
+    build: ./servidor
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL_MIGRACAO: postgresql+psycopg://assistente_dono:${SENHA_DONO}@postgres/assistente
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+
+  servidor:
+    build: ./servidor
+    restart: unless-stopped
+    # Variáveis listadas uma a uma de propósito: a senha do dono do banco não entra aqui.
+    environment:
+      DATABASE_URL_LEITURA: postgresql+psycopg://assistente_leitura:${SENHA_LEITURA}@postgres/assistente
+      DATABASE_URL_ESCRITA: postgresql+psycopg://assistente_escrita:${SENHA_ESCRITA}@postgres/assistente
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?defina PUBLIC_BASE_URL no .env}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      GITHUB_LOGINS_PERMITIDOS: ${GITHUB_LOGINS_PERMITIDOS}
+      JWT_SIGNING_KEY: ${JWT_SIGNING_KEY}
+      VAULT_PATH: ${VAULT_PATH:+/vault}
+      PAPERLESS_URL: ${PAPERLESS_URL:-}
+      PAPERLESS_API_KEY: ${PAPERLESS_API_KEY:-}
+      TZ: America/Sao_Paulo
+    volumes:
+      # Pasta do vault no host (sincronizada por Syncthing, versionada com git).
+      - ${VAULT_PATH:-./vazio}:/vault
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      migracao: { condition: service_completed_successfully }
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: ["cloudflare"]
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "run", "--token", "${CLOUDFLARE_TUNNEL_TOKEN}"]
+    depends_on: [servidor]
+
+volumes:
+  pgdata:
