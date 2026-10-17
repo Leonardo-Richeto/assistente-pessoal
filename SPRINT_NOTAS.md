@@ -9,25 +9,40 @@
 vivos" e "Prompt do próximo passo". Os blocos em "Passos feitos" são histórico: abra só o do passo
 que precisar.
 
-- **Sprint 1 (Etapa A, teste no MacBook):** Passos 1 a 8d Feitos e commitados, sem push. 174 testes. Migração no banco: `0003`.
+- **Sprint 1 (Etapa A, teste no MacBook):** Passos 1 a 8d e 8c Feitos e commitados, sem push
+  (8c: revisor rodou e as correções estão feitas, 2026-10-17). 248 testes.
+  Migração no banco: `0004`.
 - **No ar no Mac:** postgres + servidor MCP em `127.0.0.1:8000`, login Google (só o e-mail do
   Leonardo), Funnel ligado (URL: `tailscale funnel status`), vault de **cópia** em
   `~/assistente-teste/vault`. Conector "Assistente (teste Mac)" conectado no claude.ai; testes
   pelo iPhone OK (gasto, desfazer, ponto, horas, vault, apagar recusado).
-- **O que o servidor tem:** 10 ferramentas do banco (gastos, ponto, atividades, desfazer,
-  auditoria, chamadas) + 15 do vault (lista de permitidas). Toda chamada vai para a tabela
+- **O que o servidor tem:** 11 ferramentas do banco (gastos, ponto, atividades, desfazer,
+  auditoria, chamadas, `vincular_nota`) + 15 do vault (lista de permitidas). Toda chamada vai para a tabela
   `chamadas`; escritas de peça e tentativas negadas vão também para `auditoria`.
 - **Ficha 1** (`docs/regras-de-negocio.md`, instruções do Projeto "Assistente"): **aprovada**
-  inteira, inclusive as 3 linhas do 8b3. Falta criar o Projeto no claude.ai (depois do 8c).
+  inteira, inclusive as 3 linhas do 8b3 e as 4 mudanças do 8c (aprovadas e aplicadas em 2026-10-17). Fato com parte
+  subjetiva conta como pedido de nota (decisão do Leonardo). Próximo: criar o Projeto no claude.ai com esse texto.
 - **Coleta do clientInfo: encerrada** (Passo 8d). iPhone e web chegam idênticos (cliente
   `Anthropic/ClaudeAI`, versão `1.0.0`, protocolo `2026-07-28`, sem sessão, `user_agent=Claude-User`);
   não dá para diferenciar. Log `DescobertaCliente` desligado e removido.
-- **Próximo:** Passo 8c (vínculo banco → nota do vault), depois criar o Projeto no claude.ai, Passo 9
+- **Próximo:** commit do 8c (orquestrador), criar o Projeto no claude.ai (Leonardo, guiado), Passo 9
   (usar alguns dias) e 10 (fechar a sprint). Sprint 2 (i7) só depois. Ficha 2 (retenção de `chamadas`)
   aprovada: guardar tudo (Leonardo, 2026-10-17).
-- **Última atualização:** 2026-10-17, Opus 5.5 (orquestrador, depois do revisor do 8d), MacBook Air.
+- **Última atualização:** 2026-10-17, Opus 5.5 (executor do Passo 8c, depois do revisor), MacBook Air.
 
 ## Avisos vivos
+
+- **Desde 2026-10-17 (Passo 8c): gasto, ponto e atividade têm `nota_vault`** (migração `0004`, só ADD COLUMN).
+  - `registrar_*` aceitam `nota_vault`; `vincular_nota(tipo, id, caminho)` liga ou troca a nota, com linha
+    `vincular` na `auditoria` (`dados`: `caminho` e, se havia, `anterior`). Devolve `vinculo` (id dessa linha) e
+    `desfazer: {"tipo": "vinculo", "id": N}`; **sem campo `id`**, de propósito.
+  - Desfazer o vínculo: `desfazer_registro(tipo="vinculo", id=N)`. Volta à nota anterior, grava `desfazer_vinculo`;
+    o registro continua valendo. Só o vínculo em vigor mais novo do registro pode ser desfeito (pilha).
+  - Caminho: só o formato é conferido (`caminho_da_nota` em `banco.py`, NFC gravado, NFKC conferido); o servidor
+    não abre o vault.
+  - O downgrade da 0004 é recusado se algum registro tem `nota_vault`, e em modo `--sql`.
+  - Mensagens com o gênero do tipo: "o gasto", "a atividade" (`_o`, `_ao`, `_do`, `_desfeito` em `banco.py`).
+  - `consultar_auditoria` devolve o `id` de cada linha desde o 8c.
 
 - **Desde 2026-10-17 (Passos 8b e 8b2): toda chamada de ferramenta fica registrada** (`servidor/assistente/registro.py`).
   - Só é leitura o que está em `LEITURAS_PECAS` (`servidor.py`) ou `LEITURAS_BANCO` (`banco.py`). Leitura: só log
@@ -1031,46 +1046,141 @@ que precisar.
 
 - **Pendente (sai deste passo):** item 8 do revisor do 8b (teste por prefixo) continua; retenção resolvida (Ficha 2: guardar tudo, nada a implementar).
 
+### Passo 8c — Vínculo banco → nota do vault (2026-10-17, Opus 5.5, executor)
+
+- **Resultado:** gasto, ponto e atividade guardam o caminho da nota do vault (`nota_vault`); `vincular_nota` liga ou
+  troca a nota com auditoria, e `desfazer_registro` com tipo `vinculo` volta à nota anterior. Sem commit: o
+  orquestrador roda o revisor e faz o commit.
+- **Mudou:**
+  - `servidor/alembic/versions/0004_nota_vault.py` (nova, à mão): `ADD COLUMN nota_vault VARCHAR(300)` nula nas 3
+    tabelas; GRANTs intocados. Downgrade recusa (RuntimeError) se houver valor; vazio, tira a coluna.
+  - `servidor/assistente/modelos.py:25`: `nota_vault` em `_Registro`; comentário das ações de `Auditoria`.
+  - `servidor/assistente/banco.py`:
+    - `caminho_da_nota` (`:69`): formato do caminho; vazio = sem nota.
+    - `NotaVault` (`:43`): parâmetro opcional nas 3 `registrar_*` (`:161`, `:221`, `:264`); o `criar` da auditoria leva o caminho.
+    - Consultas devolvem `nota_vault` (`:201`, `:252`, `:293`); `consultar_auditoria` devolve `id` (`:409`).
+    - `vincular_nota` (`:300`): `ESCRITA`, `modelo`, linha `vincular`; mesmo caminho = "Nada mudou", sem auditoria.
+    - `_desfazer_vinculo` (`:337`) e `desfazer_registro` com `TipoDesfazer` (`:32`, `:371`). `ESCRITAS_BANCO` com `vincular_nota` (`:54`).
+  - `servidor/tests/test_nota_vault.py` (novo, 41 testes; 74 depois do revisor). Ajustes: `test_bloqueadas.py` (lista do banco),
+    `test_registro.py` (chave `id` na auditoria), `test_chamadas.py` (teste da 0003 sobe até `0003`, não `head`).
+  - `docs/regras-de-negocio.md`: ficha 1 ganhou "Mudança do Passo 8c", status **proposta** (4 trechos do texto).
+- **Verificado:**
+  - `cd servidor && chflags -R nohidden .venv; uv run pytest -q` = `215 passed` (174 antes).
+  - Prova de falha, um item por vez, só `test_nota_vault.py`: sem checar `..` = 6 falhas; `vincular` sem auditoria = 5;
+    sem checar "já desfeito" = 2; sem checar troca posterior = 1; vincular registro desfeito = 1; downgrade sem
+    recusa = 1; consulta sem `nota_vault` = 2. Código restaurado e conferido com `cmp`.
+  - Banco de rascunho `teste_8c` no Postgres (criado e apagado por mim, com os privilégios padrão do `01-papeis.sh`):
+    `0003` → gasto antigo → `0004`; como `assistente_escrita`, `registrar_gasto` com nota, `vincular_nota`,
+    desfazer, desfazer de novo ("já estava desfeito") e caminho `../fora.md` recusado. `SELECT ... FOR UPDATE` e a
+    leitura da auditoria funcionaram com os GRANTs atuais. Downgrade com valor: recusado (`gastos: 1`); sem valor:
+    desceu, 2 gastos e 3 linhas de auditoria intactos.
+  - `docker compose up -d --build`: `migracao` rodou `0003 -> 0004` e saiu com 0; servidor sem traceback.
+    `alembic_version = 0004`; `nota_vault` `varchar(300)` nula nas 3 tabelas; `\dp` igual (`assistente_escrita=arw`,
+    `assistente_leitura=r`). As 24 linhas de `auditoria` continuam.
+  - `POST /mcp` sem token = 401 (local), depois do `up`.
+- **Não verificado:**
+  - Pelo app (claude.ai): o texto do Projeto ainda não fala de `vincular_nota`; sem a proposta aprovada, o Claude não
+    usa o vínculo. Risco: o Claude seguir a regra antiga "desfazer_registro com o tipo e o id" depois de
+    `vincular_nota` e desfazer o gasto em vez do vínculo. O retorno traz `tipo: vinculo` e a docstring diz o que fazer.
+  - A 401 pela URL do Funnel (só conferi local).
+- **Decidi sozinho:**
+  - Desfazer o vínculo por `desfazer_registro` com tipo `vinculo` e o id da linha `vincular` da auditoria. É uma
+    ferramenta só para desfazer; a confirmação termina em "Desfazer?" como as outras. Alternativa recusada:
+    `vincular_nota` com o caminho anterior. Ela exigiria aceitar caminho vazio para tirar o vínculo, e o modelo teria
+    de lembrar o caminho antigo.
+  - `vincular_nota` devolve como `id` o id da linha da auditoria: o vínculo não tem linha própria. Se o modelo chamar
+    `desfazer_registro(gasto, id)` por engano, desfaz o gasto com aquele número. O retorno traz `tipo: vinculo`, a
+    docstring e a proposta da ficha dizem o tipo certo; o risco só some com o texto aprovado (ver Decisão sua do 8c).
+  - "Já desfeito" é conferido pela linha `desfazer_vinculo` que aponta para o vínculo (`dados.vinculo`), não pelo valor
+    atual. Desfazer um vínculo antigo depois de outra troca é recusado (não desfaz o vínculo errado).
+  - Voltar a "sem nota" grava `NULL` na coluna. O caminho continua nas linhas `vincular` e `desfazer_vinculo`.
+  - Registro desfeito: `vincular_nota` e o desfazer do vínculo recusam. Desfazer o registro não mexe em `nota_vault`.
+  - Mesmo caminho: "Nada mudou", `id` vazio, sem linha na auditoria.
+  - Caminho: recusa `..` em qualquer lugar (inclusive `a..b.md`), barra invertida, caractere de controle, pasta vazia
+    ou `.`, e `.md` sozinho como nome. Espaços nas pontas saem; vazio = sem nota.
+  - `consultar_auditoria` devolve `id` de cada linha: é o caminho para achar o id de um vínculo antigo. Aditivo.
+  - Ações novas `vincular` e `desfazer_vinculo` (em vez de reaproveitar `desfazer`), para `consultar_auditoria` não
+    confundir desfazer o vínculo com desfazer o registro.
+  - `SELECT ... FOR UPDATE` no registro, em `vincular_nota` e no desfazer: duas trocas ao mesmo tempo não perdem o anterior.
+  - Não mexi em `CONTEXTO.md`: na sprint, a passagem fica aqui; o Passo 10 consolida.
+- **Pendente:** commit do orquestrador.
+
+#### Revisor do Passo 8c e correções (2026-10-17, Opus 5.5, executor)
+
+Os números de linha e o retorno de `vincular_nota` citados acima são da primeira versão; valem os daqui.
+
+- **Corrigido (erro): desfazer pulava vínculo.** Com v1 nenhuma→a, v2 a→b, v3 b→a, desfazer v1 passava (o valor
+  atual era `a`). Agora `_desfazer_vinculo` (`banco.py:381`) só desfaz o vínculo em vigor mais novo do registro.
+  Recusa se houver `vincular` mais novo da mesma tabela e registro que não esteja em `dados.vinculo` de uma
+  `desfazer_vinculo`. Teste: `test_desfazer_vinculo_so_o_mais_novo_mesmo_com_caminho_repetido`.
+- **Corrigido (erro): gênero.** "Nota ligada à atividade 3", "A atividade 3 ficou sem nota", "está desfeita",
+  "já está ligada". `_GENERO` e os auxiliares em `banco.py:44`. A mensagem antiga de `desfazer_registro`
+  ("O atividade N já estava desfeito") também saiu certa agora. Testes cobrem gasto e atividade.
+- **Corrigido (risco): retorno de `vincular_nota` sem `id`.** Agora `vinculo: N` e `desfazer: {"tipo": "vinculo",
+  "id": N}`; a confirmação diz "(desfazer: tipo vinculo, id N). Desfazer?". "Nada mudou" devolve os dois vazios e
+  "Nada a desfazer.".
+- **Corrigido: formato do caminho** (`caminho_da_nota`, `banco.py:98`). Grava em NFC; confere também em NFKC
+  (`．．`, `․․`, `／`, `＼`, `：`). Recusa `:`, `~` no início, nome começando com `.` (`.obsidian`), espaço no começo
+  ou no fim de um nome, byte nulo e unidade do Windows. O limite de 300 vale no caminho sem os espaços das pontas;
+  `max_length` saiu do schema.
+- **Corrigido: annotations de `vincular_nota`** (`banco.py:340`): `destructiveHint=True`, `idempotentHint=True`, no
+  estilo de `desfazer_registro`.
+- **Corrigido: 0004.** O downgrade dá `LOCK TABLE gastos, ponto, atividades IN ACCESS EXCLUSIVE MODE` no Postgres
+  antes de contar, e recusa em modo `--sql` (sem banco não há como contar).
+- **Ficha 1:** o Leonardo aprovou as 4 mudanças (2026-10-17); aplicadas no texto, com o retorno novo, o caso "Nada
+  mudou" e a linha "Nota nova" ajustada (fato com parte subjetiva = pedido de nota).
+- **Verificado:**
+  - `uv run pytest -q` = `248 passed`.
+  - Prova de falha, um item por vez, só `test_nota_vault.py`: sem a regra do mais novo = 2 falhas; sem NFKC = 8;
+    sem NFC = 1; sem pasta oculta = 8; sem espaço em nome = 4; sem `:` = 4; sem `~` = 2; offline sem recusa = 1.
+    Código restaurado e conferido com `cmp`.
+  - Banco de rascunho `teste_8c2` no Postgres (criado e apagado por mim): o downgrade com o `LOCK` recusou com valor
+    (`atividades: 1`) e desceu sem valor.
+  - `docker compose up -d --build servidor`: subiu sem traceback, código novo no container, `alembic_version = 0004`,
+    `POST /mcp` sem token = 401.
+- **Não corrigido (pendente):**
+  - Downgrade da 0002 em modo `--sql`: ainda chama `.scalar()` offline e quebra. Fica para outro passo.
+  - `FOR UPDATE` sob concorrência no Postgres: o comando roda (rascunho `teste_8c`), mas duas trocas ao mesmo tempo
+    não foram testadas.
+- **Decidi sozinho:**
+  - Sem `id` no retorno de `vincular_nota`: desvio consciente da convenção "retorno traz id". O id seria da linha
+    da auditoria e convidaria `desfazer_registro(gasto, id)`, que desfaz outro gasto.
+  - Downgrade da 0004 em `--sql` recusa em vez de gerar o `DROP COLUMN` sem contar.
+  - Mensagem nova para vínculo velho: "O vínculo N não é o mais novo do gasto 12: desfaça antes o vínculo M." A
+    conferência do valor atual ficou como defesa.
+
 ## Prompt do próximo passo
 
-> **Passo 8c — Vínculo banco → nota do vault.** Tier A · Opus 5.5 · effort alto · supervisionado.
+> **Antes (orquestrador, Opus 5.5):** confira o Passo 8c e faça o commit.
 >
-> **Objetivo:** dar ao banco o caminho da nota do vault que conta a parte subjetiva de um registro
-> (ficha 1, item 6; decisão D16 do vault: a nota leva `registro: <tipo>-<id>` no frontmatter e o banco
-> guarda o caminho). Gasto, ponto e atividade ganham a coluna `nota_vault`.
+> **Criar o Projeto "Assistente" no claude.ai.** Tier D · Leonardo (o orquestrador guia, Sonnet 5.5 basta) ·
+> supervisionado.
 >
-> **Leia antes:** este arquivo (Onde estamos, Avisos vivos, blocos 8b3 e 8d), `CLAUDE.md`,
-> `docs/regras-de-negocio.md` (ficha 1, item 6 e "Decisões do Leonardo"), `servidor/assistente/{banco,modelos,registro}.py`,
-> `servidor/alembic/versions/` (0001 a 0003, para o estilo e os GRANTs) e `servidor/tests/`.
+> **Objetivo:** o Projeto existe no claude.ai com o texto da ficha 1, e o conector "Assistente (teste Mac)" está
+> ligado nele.
 >
-> **Faça:**
-> 1. Coluna `nota_vault` (texto, caminho relativo da nota, opcional, até 300 caracteres) em `gastos`,
->    `ponto` e `atividades`. Migração `0004` **aditiva**, escrita à mão: só `ADD COLUMN` nulo, sem mexer
->    nos GRANTs nem nos dados; downgrade que não apaga dado (recuse se houver valor, como a 0002).
-> 2. Parâmetro opcional `nota_vault` em `registrar_gasto`, `registrar_ponto` e `registrar_atividade`.
->    Valide o formato: caminho relativo, sem `..`, sem barra inicial, termina em `.md`, até 300 caracteres.
->    O servidor não confere se a nota existe (o vault é outra peça).
-> 3. Ferramenta `vincular_nota(tipo, id, caminho)`: grava ou troca o caminho num registro existente. É
->    escrita auditada: linha em `auditoria` (`acao` própria, `dados` = só o caminho; a anterior vai junto
->    ao trocar), em `ESCRITAS_BANCO`, com `annotations` de escrita, retorno com `id` e `confirmacao`
->    terminando em "Desfazer?" (desfazer = voltar ao caminho anterior; nada é apagado). Registro desfeito ou
->    inexistente: erro claro.
-> 4. As consultas (`consultar_gastos`, `consultar_ponto`, `consultar_atividades`) devolvem `nota_vault`.
-> 5. Atualize a ficha 1 (lista de ferramentas do texto do Projeto) como **proposta** e peça aprovação antes
->    de aplicar no texto. Nada de ficha nova aprovada sem o Leonardo.
-> 6. Testes com `fastmcp.Client` em memória; teste de migração com o harness Alembic (sobe, desce sem
->    apagar, recusa descer com valor); teste de que `vincular_nota` audita e de que caminho inválido é recusado.
-> 7. Atualize `SPRINT_NOTAS.md` (bloco "Passo 8c"), `SPRINT.md` e o prompt do passo seguinte.
+> **Leia antes:** este arquivo (Onde estamos, Avisos vivos, bloco 8c e "Revisor do Passo 8c"), `CLAUDE.md`, a
+> ficha 1 inteira (`docs/regras-de-negocio.md`).
 >
-> **Critério de pronto:** testes passando (`cd servidor && chflags -R nohidden .venv; uv run pytest`),
-> `docker compose up -d --build` com a `migracao` saindo em 0 e o banco em `alembic_version = 0004`,
-> `POST /mcp` sem token = 401 (`curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:8000/mcp`;
-> se der outra coisa, `docker compose stop servidor` na hora e reporte). **Mudança de schema exige o
-> revisor independente (sem o contexto da conversa) antes do commit:** peça ao orquestrador; corrija o
-> erro claro e deixe o resto em "Revisor apontou".
+> **Faça (guiando o Leonardo):**
+> 1. Copie o bloco "Texto proposto (colar no Projeto)" da ficha 1. Lembre o Leonardo de trocar "o dono" por
+>    "Leonardo" ao colar (item 9).
+> 2. No claude.ai: criar o Projeto "Assistente", colar o texto nas instruções, ligar o conector.
+> 3. Teste curto numa conversa do Projeto: "gastei 1 real de teste" → confirmação → "sim" desfaz.
+> 4. Marque na ficha 1: "Onde vive" com a data em que o texto entrou no Projeto.
 >
-> **Restrições:** não leia valores do `.env` (nem `cat`, nem `grep` de valores); não aponte nada para o
-> vault real `~/Desktop/Projetos/Obsidian` (só a cópia em `~/assistente-teste/vault`); não desligue o
-> login; não faça commit nem push (o orquestrador faz o commit); não grave URL do Funnel, e-mail nem
-> segredo no repo (repo público); nada de SQL livre; consultas por `bancos.leitura`, escritas por
-> `_gravar` ou `bancos.escrita` com linha em `auditoria`; nada é apagado.
+> **Critério de pronto:** o Projeto existe; o teste curto passou; `POST /mcp` sem token = 401.
+>
+> **Depois: Passo 9 — Usar alguns dias** (Tier D, Leonardo). Usar pelo iPhone e pela web e anotar o que faltou em
+> `docs/IMPLANTACAO.md` (A12). Roteiro mínimo:
+> 1. Gasto com categoria existente; "sim" desfaz; gasto sem valor gera pergunta.
+> 2. Ponto do dia e "quantas horas trabalhei hoje?".
+> 3. Fato com as duas partes ("estudei Postgres 1 h e aprendi X"): atividade com `nota_vault` e nota nova em
+>    `00-inbox` da **cópia**, com `registro: atividade-<id>`; o Claude diz onde criou a nota. Conferir no banco:
+>    `select id, descricao, nota_vault from atividades order by id desc limit 3`.
+> 4. "Liga a nota X ao gasto Y" e "sim": `vincular_nota` e `desfazer_registro` com tipo `vinculo`. O gasto **não**
+>    fica desfeito; a auditoria tem `vincular` e `desfazer_vinculo`.
+> 5. "Apague a nota X" é recusado; nota com instrução embutida é ignorada.
+>
+> **Restrições:** não leia valores do `.env`; vault só a cópia `~/assistente-teste/vault`; não desligue o login; não
+> grave URL do Funnel, e-mail nem segredo no repo; commit só pelo orquestrador; nada é apagado.

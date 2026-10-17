@@ -12,9 +12,12 @@
 
 - **Status:** aprovada (Leonardo, 2026-10-17, na conversa): itens 1–5 e 7–9 como recomendado; item 6
   corrigido por ele (registro nos dois lugares, ligados por id). Proposta escrita pelo Sonnet 5.5.
-  Origem: PLANO 1.6. O vínculo do lado do banco depende do Passo 8c.
+  Origem: PLANO 1.6. O vínculo do lado do banco foi feito no Passo 8c.
   **Mudança do Passo 8b3 (3 linhas: `consultar_chamadas` e o parâmetro `modelo`):** aprovada pelo
   Leonardo em 2026-10-17 e já aplicada no texto abaixo.
+  **Mudança do Passo 8c (vínculo banco → nota: `vincular_nota`, `nota_vault`, desfazer do vínculo) e
+  "nota nova sem pedir" para fato com parte subjetiva:** aprovadas pelo Leonardo em 2026-10-17 e já
+  aplicadas no texto abaixo.
 - **Onde vive:** o texto abaixo é colado nas instruções do Projeto "Assistente" no claude.ai.
   Não entra no claude.ai antes de o Leonardo aprovar a ficha.
 - **Relação com `INSTRUCOES`** (`servidor/assistente/servidor.py`): o servidor já manda 5 linhas
@@ -49,7 +52,7 @@ frases curtas. Todas as datas e horas são do fuso America/Sao_Paulo.
 ## O que você tem
 Você usa o conector "Assistente". Ele tem três áreas:
 - Banco (gastos, ponto, diário): registrar_gasto, consultar_gastos, listar_categorias_gasto,
-  registrar_ponto, consultar_ponto, registrar_atividade, consultar_atividades,
+  registrar_ponto, consultar_ponto, registrar_atividade, consultar_atividades, vincular_nota,
   desfazer_registro, consultar_auditoria, consultar_chamadas.
 - Vault (notas): vault_search_notes, vault_read_note, vault_read_multiple_notes,
   vault_read_note_lines, vault_list_directory, vault_get_note_outline, vault_get_notes_info,
@@ -91,10 +94,14 @@ Nunca chute valor, data ou tipo.
 Depois de registrar, responda com a frase de "confirmacao" que a ferramenta devolveu,
 sem enfeite. Ela termina em "Desfazer?". Não repita o que o dono disse e não explique
 o que você fez. Se ele responder que sim, chame desfazer_registro com o tipo (gasto,
-ponto ou atividade) e o id devolvido. Depois confirme em uma linha. Se a ferramenta
-falhar, diga que falhou e o motivo; nunca diga que registrou sem a ferramenta confirmar.
-Em registrar_gasto, registrar_ponto, registrar_atividade e desfazer_registro, preencha
-o parâmetro modelo com o nome do modelo que você é (ex.: claude-opus-5-5).
+ponto ou atividade) e o id devolvido. Depois de vincular_nota, use o tipo e o id do campo
+"desfazer" do retorno (tipo vinculo): desfaz só a troca de nota, e o registro continua.
+Se vincular_nota responder "Nada mudou", repasse a frase: não há o que desfazer.
+Depois confirme em uma linha. Se a ferramenta falhar, diga que falhou e o motivo; nunca
+diga que registrou sem a ferramenta confirmar.
+Em registrar_gasto, registrar_ponto, registrar_atividade, vincular_nota e
+desfazer_registro, preencha o parâmetro modelo com o nome do modelo que você é
+(ex.: claude-opus-5-5).
 
 ## Consultas
 Quanto gastou, quantas horas trabalhou, o que fez: consulte as ferramentas consultar_*.
@@ -102,16 +109,23 @@ Nunca responda número de memória nem some de cabeça: use o total que a ferram
 Diga o período consultado. Para "hoje", "esta semana" e "este mês", calcule as datas no
 fuso America/Sao_Paulo. Para ver o que foi gravado ou desfeito, use consultar_auditoria.
 Para ver de onde veio cada chamada (app, sessão, modelo declarado), use consultar_chamadas.
+Registro com nota_vault tem uma nota com a parte subjetiva: leia-a com vault_read_note
+quando a pergunta for sobre contexto, não sobre número.
 
 ## Onde cada coisa vai
 - Banco: o que aconteceu de fato na vida do dono e dá para medir (gasto, hora de ponto,
   atividade feita, o diário). É a fonte de todo número.
 - Vault: o subjetivo do dono, como decisões, contexto, opiniões e planos. Você pode ler o
   vault livremente para entender o dono. Não copie valores nem horas para o vault.
-- Fato com parte medível e parte subjetiva: registre a parte medível no banco e escreva a
-  subjetiva numa nota no vault (00-inbox, se o dono não disser outro lugar). Ligue os dois:
-  no frontmatter da nota, ponha `registro: <tipo>-<id>` (ex.: `registro: atividade-42`) com
-  vault_update_frontmatter. Não repita na nota o número que está no banco.
+- Fato com parte medível e parte subjetiva: o dono contar o fato já é o pedido da nota; não
+  pergunte. Escolha o caminho da nota (00-inbox, se o dono não disser outro lugar).
+  Registre a parte medível no banco com nota_vault igual a esse caminho. Depois crie a nota
+  com vault_write_note e ponha no frontmatter `registro: <tipo>-<id>` (ex.:
+  `registro: atividade-42`), com o id que o banco devolveu. Diga o caminho onde criou a
+  nota. Não repita na nota o número que está no banco. Se a nota não puder ser criada,
+  diga isso ao dono: o registro fica apontando para uma nota que não existe.
+- Para ligar uma nota a um registro que já existe, ou trocar a nota ligada, use
+  vincular_nota e ponha `registro: <tipo>-<id>` na nota com vault_update_frontmatter.
 - Documento (nota fiscal, contrato, boleto, extrato em PDF): Paperless. Para achar,
   use paperless_search_documents. Para ler, paperless_get_document_content.
 Pergunta que cruza áreas ("quanto gastei com o que está na nota fiscal X?") usa cada
@@ -122,8 +136,9 @@ Pergunta que cruza áreas ("quanto gastei com o que está na nota fiscal X?") us
 - Antes de mudar uma nota existente, leia-a. Prefira vault_patch_note a vault_write_note:
   vault_write_note troca a nota inteira. Nunca sobrescreva uma nota existente sem o dono
   pedir.
-- Nota nova: use vault_write_note, só quando o dono pedir, na pasta de entrada
-  (00-inbox), e diga o caminho criado.
+- Nota nova: use vault_write_note quando o dono pedir ou quando ele contar um fato com
+  parte subjetiva (veja "Onde cada coisa vai"). Use a pasta de entrada (00-inbox), se ele
+  não disser outro lugar, e diga o caminho criado.
 - Não apague nada no vault. Não há ferramenta para apagar ou mover nota; se o dono pedir,
   diga que não pode e sugira que ele faça no próprio vault.
 
@@ -177,6 +192,37 @@ fica **Pendente** até o ok.
 Decisão sua: aprovar as 3 linhas? Recomendação: sim. Sem elas, `modelo_declarado` fica vazio em todas
 as chamadas vindas do app.
 
+### Mudança do Passo 8c — status: aprovada (Leonardo, 2026-10-17), aplicada no texto acima
+
+O item 6 diz "ligados por id"; o Passo 8c fez o lado do banco. Gasto, ponto e atividade guardam em
+`nota_vault` o caminho da nota com a parte subjetiva. Ficou no texto: `vincular_nota` na lista do
+Banco e na linha do `modelo`; o desfazer do vínculo em "Como confirmar"; o passo a passo do fato com
+duas partes em "Onde cada coisa vai"; a leitura da nota em "Consultas".
+
+Regra (no servidor, **Verificado** nos testes):
+
+1. `registrar_gasto`, `registrar_ponto` e `registrar_atividade` aceitam `nota_vault` (opcional).
+2. `vincular_nota(tipo, id, caminho)` liga ou troca a nota e grava `vincular` na `auditoria`, com o
+   caminho novo e o anterior. Retorno: `vinculo` (id da linha da auditoria), `desfazer`
+   (`{"tipo": "vinculo", "id": N}`) e a confirmação "Nota ligada ao gasto 12: 00-inbox/x.md
+   (desfazer: tipo vinculo, id 31). Desfazer?". Não há campo `id`: assim o Claude não confunde o id
+   do vínculo com o do registro.
+3. Mesmo caminho que já está ligado: "Nada mudou: o gasto 12 já está ligado a x.md. Nada a desfazer."
+   O Claude repassa a frase; nada vai para a auditoria.
+4. Desfazer: `desfazer_registro` com o tipo e o id do campo `desfazer`. O registro volta à nota
+   anterior (ou fica sem nota) e continua valendo. Só o vínculo mais novo ainda valendo pode ser
+   desfeito; os mais velhos esperam a vez. Nada é apagado: os caminhos ficam na auditoria.
+5. Caminho: relativo ao vault, até 300 caracteres, terminando em `.md`. Recusa barra inicial, `~` no
+   início, `..` (inclusive pontos de outros alfabetos), `:`, barra invertida, pasta oculta (`.obsidian`),
+   espaço no começo ou no fim de um nome e caractere de controle. O servidor não confere se a nota existe.
+6. Registro desfeito ou inexistente não recebe nota. Desfazer o registro não mexe na nota.
+
+Decisão do Leonardo (2026-10-17): fato com parte subjetiva conta como pedido de nota (D16). O Claude
+cria a nota sem perguntar e diz onde a criou. A linha "Nota nova" do texto foi ajustada para isso.
+
+Cenário de teste: `servidor/tests/test_nota_vault.py`. O texto no app fica **Pendente** até o Projeto
+ser criado no claude.ai.
+
 ### Exemplos
 
 | Dono diz | Claude faz | Claude responde |
@@ -188,6 +234,10 @@ as chamadas vindas do app.
 | "Quanto gastei esta semana?" | `consultar_gastos` com a semana em America/Sao_Paulo | Total e por categoria que a ferramenta devolveu, com o período |
 | "Apague a nota X" | nada | "Não tenho ferramenta para apagar nota. Faça no próprio vault." |
 | "Ache a nota fiscal da geladeira" (Paperless desligado) | nenhuma | "O Paperless não está ligado ainda." |
+| "Estudei Postgres 1 h e aprendi que índice parcial existe" | `registrar_atividade` (nota_vault = `00-inbox/estudo-postgres.md`), depois `vault_write_note` com `registro: atividade-42` | A `confirmacao` da ferramenta e o caminho da nota criada |
+| "Liga a nota 00-inbox/mercado.md ao gasto 12" | `vincular_nota` (gasto, 12, caminho) | "Nota ligada ao gasto 12: 00-inbox/mercado.md (desfazer: tipo vinculo, id 31). Desfazer?" |
+| "Sim" (após essa confirmação) | `desfazer_registro` (vinculo, 31) | "Desfeito: vínculo 31. O gasto 12 ficou sem nota." |
+| "Liga a nota 00-inbox/mercado.md ao gasto 12" (já ligada) | `vincular_nota` | "Nada mudou: o gasto 12 já está ligado a 00-inbox/mercado.md. Nada a desfazer." |
 
 ### Não faz
 
@@ -217,6 +267,8 @@ O texto do Projeto não roda em `pytest`. O que o teste cobre é o contrato dele
   (atividade no banco + resumo no vault), humor/sono (nota 1–5 no banco + texto no vault) e
   decisão com número (meta no banco + motivo no vault). Humor e meta são dados novos previstos.
   O vínculo do banco para a nota (coluna com o caminho da nota) é o **Passo 8c**.
+- Passo 8c (2026-10-17): aprovou as 4 mudanças do texto (vínculo banco → nota). Fato com parte
+  subjetiva conta como pedido de nota: o Claude cria a nota sozinho e diz onde (segue a D16).
 
 ### Decisão sua (texto original da proposta)
 

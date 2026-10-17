@@ -116,7 +116,7 @@ async def test_so_permitidas_aparecem_nas_pecas(app):
     assert visiveis - das_pecas == {
         "consultar_atividades", "consultar_auditoria", "consultar_chamadas", "consultar_gastos", "consultar_ponto",
         "desfazer_registro",
-        "listar_categorias_gasto", "registrar_atividade", "registrar_gasto", "registrar_ponto",
+        "listar_categorias_gasto", "registrar_atividade", "registrar_gasto", "registrar_ponto", "vincular_nota",
     }
 
 

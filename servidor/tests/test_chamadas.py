@@ -242,7 +242,7 @@ def test_migracao_0003_sobe_e_desce_sem_apagar(tmp_path):
     with engine.begin() as cx:
         cx.execute(text("INSERT INTO auditoria (momento, ferramenta, tabela, registro_id, acao, dados) "
                         "VALUES (CURRENT_TIMESTAMP, 'vault_write_note', 'vault', NULL, 'escrever', '{}')"))
-    _alembic(url, "upgrade", "head")
+    _alembic(url, "upgrade", "0003")
     engine.dispose()
     with engine.begin() as cx:
         assert cx.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0003"
@@ -258,7 +258,7 @@ def test_migracao_0003_sobe_e_desce_sem_apagar(tmp_path):
             ("vault_write_note", "ok", 1)]
         assert cx.execute(text("SELECT count(*) FROM auditoria")).scalar() == 1
 
-    _alembic(url, "upgrade", "head")  # reaproveita a tabela que ficou
+    _alembic(url, "upgrade", "0003")  # reaproveita a tabela que ficou
     engine.dispose()
     with engine.connect() as cx:
         assert cx.execute(text("SELECT version_num FROM alembic_version")).scalar() == "0003"

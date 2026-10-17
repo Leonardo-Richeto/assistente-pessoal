@@ -7,6 +7,7 @@ Regras:
 - Não existe SQL livre.
 """
 
+import unicodedata
 from collections import defaultdict
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
@@ -28,12 +29,50 @@ ESCRITA = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentH
 
 TipoPonto = Literal["entrada", "saida", "pausa_inicio", "pausa_fim"]
 TipoRegistro = Literal["gasto", "ponto", "atividade"]
+# "vinculo": desfaz uma troca de nota feita por vincular_nota (id = o que vincular_nota devolveu).
+TipoDesfazer = Literal["gasto", "ponto", "atividade", "vinculo"]
 TabelaAuditoria = Literal["gastos", "ponto", "atividades", "vault", "paperless", "ferramenta"]
-AcaoAuditoria = Literal["criar", "desfazer", "escrever", "ok", "erro", "cancelado", "negado"]
+AcaoAuditoria = Literal["criar", "desfazer", "vincular", "desfazer_vinculo", "escrever", "ok", "erro", "cancelado",
+                        "negado"]
 # Só o registro (registro.py) lê este parâmetro: valida (^[A-Za-z0-9 ._-]{1,60}$) e grava em
 # `chamadas.modelo_declarado`; inválido é descartado sem falhar a chamada. A ferramenta não usa.
 Modelo = Annotated[str | None, Field(description="Nome do modelo em uso (ex.: claude-opus-5-5). Fica registrado como declarado.")]
 _MODELOS = {"gasto": Gasto, "ponto": Ponto, "atividade": Atividade}
+_TIPOS = {classe.__tablename__: tipo for tipo, classe in _MODELOS.items()}
+# Artigo, contrações com "a" e "de" e terminação do adjetivo de cada tipo: "o gasto", "ao gasto",
+# "do gasto", "desfeito"; "a atividade", "à atividade", "da atividade", "desfeita".
+_GENERO = {"gasto": ("o", "ao", "do", "o"), "ponto": ("o", "ao", "do", "o"), "atividade": ("a", "à", "da", "a")}
+
+
+def _o(tipo: str, id: int) -> str:
+    """'o gasto 12' ou 'a atividade 3'."""
+    return f"{_GENERO[tipo][0]} {tipo} {id}"
+
+
+def _ao(tipo: str, id: int) -> str:
+    """'ao gasto 12' ou 'à atividade 3'."""
+    return f"{_GENERO[tipo][1]} {tipo} {id}"
+
+
+def _do(tipo: str, id: int) -> str:
+    """'do gasto 12' ou 'da atividade 3'."""
+    return f"{_GENERO[tipo][2]} {tipo} {id}"
+
+
+def _desfeito(tipo: str) -> str:
+    return "desfeit" + _GENERO[tipo][3]
+
+
+def _maiuscula(texto: str) -> str:
+    return texto[:1].upper() + texto[1:]
+
+
+TAMANHO_NOTA = 300  # = String(300) em _Registro.nota_vault (modelos.py), contado no caminho já limpo
+# Sem max_length no schema: o limite vale depois de tirar os espaços das pontas (caminho_da_nota).
+_DESCRICAO_CAMINHO = ("Caminho relativo da nota no vault, ex.: 00-inbox/estudo-postgres.md. Sem barra inicial, "
+                      "sem '..', sem ':', sem pasta oculta, terminando em .md, até 300 caracteres.")
+NotaVault = Annotated[str | None, Field(
+    description=_DESCRICAO_CAMINHO + " Nota com a parte subjetiva do registro. Vazio = sem nota.")]
 
 
 # Nomes das ferramentas abaixo, para o registro (registro.py): leitura só vai para o log; as
@@ -41,7 +80,7 @@ _MODELOS = {"gasto": Gasto, "ponto": Ponto, "atividade": Atividade}
 # como escrita de fora (linha `escrever` a mais); test_registro.py confere as listas.
 LEITURAS_BANCO = {"consultar_gastos", "listar_categorias_gasto", "consultar_ponto", "consultar_atividades",
                   "consultar_auditoria", "consultar_chamadas"}
-ESCRITAS_BANCO = {"registrar_gasto", "registrar_ponto", "registrar_atividade", "desfazer_registro"}
+ESCRITAS_BANCO = {"registrar_gasto", "registrar_ponto", "registrar_atividade", "desfazer_registro", "vincular_nota"}
 
 
 def _autor() -> str | None:
@@ -54,6 +93,39 @@ def _local(momento: datetime | None, tz: ZoneInfo) -> str | None:
     if momento is None:
         return None
     return (momento if momento.tzinfo else momento.replace(tzinfo=timezone.utc)).astimezone(tz).isoformat()
+
+
+def caminho_da_nota(caminho: str | None) -> str | None:
+    """Confere só o formato do caminho (o vault é outra peça; não confere se a nota existe). Vazio = None.
+
+    Grava em NFC. Confere também a forma NFKC, em que '．．' e '․․' viram '..', '／' vira '/' e '：' vira ':'.
+    """
+    if caminho is None or not caminho.strip():
+        return None
+    caminho = unicodedata.normalize("NFC", caminho.strip())
+    conferir = unicodedata.normalize("NFKC", caminho)
+    partes = conferir.split("/")
+    if len(caminho) > TAMANHO_NOTA:
+        motivo = f"tem mais de {TAMANHO_NOTA} caracteres"
+    elif not caminho.isprintable():
+        motivo = "tem caractere de controle"
+    elif conferir.startswith(("/", "~")):
+        motivo = "começa com barra ou '~'; use o caminho relativo ao vault"
+    elif ".." in conferir:
+        motivo = "tem '..'"
+    elif "\\" in conferir or ":" in conferir:
+        motivo = "tem barra invertida ou ':'"
+    elif "" in partes:
+        motivo = "tem pasta vazia"
+    elif any(p.startswith(".") for p in partes):
+        motivo = "tem pasta ou nome começando com '.'"
+    elif any(p != p.strip() for p in partes):
+        motivo = "tem espaço no começo ou no fim de um nome"
+    elif not caminho.endswith(".md"):
+        motivo = "não termina em .md"
+    else:
+        return caminho
+    raise ToolError(f"Caminho de nota inválido ({motivo}): use algo como 00-inbox/nota.md.")
 
 
 def _brl(v: Decimal) -> str:
@@ -125,18 +197,21 @@ def criar_servidor_banco(bancos: Bancos, tz: ZoneInfo, nome: str = "Leonardo") -
         categoria: Annotated[str, Field(description="Ex.: mercado, combustível, lazer. Reaproveite categorias já usadas.")],
         data: Annotated[date | None, Field(description="Padrão: hoje")] = None,
         forma_pagamento: str | None = None,
+        nota_vault: NotaVault = None,
         modelo: Modelo = None,
     ) -> dict:
         """Registra um gasto feito pelo dono do assistente."""
+        nota_vault = caminho_da_nota(nota_vault)
         data = data or _agora().date()
         categoria = categoria.strip().lower()
         valor = valor.quantize(Decimal("0.01"))
         gid = _gravar(
-            Gasto(data=data, valor=valor, descricao=descricao.strip(), categoria=categoria, forma_pagamento=forma_pagamento),
+            Gasto(data=data, valor=valor, descricao=descricao.strip(), categoria=categoria, forma_pagamento=forma_pagamento,
+                  nota_vault=nota_vault),
             "registrar_gasto",
             "gastos",
             {"data": data.isoformat(), "valor": str(valor), "descricao": descricao, "categoria": categoria,
-             "forma_pagamento": forma_pagamento},
+             "forma_pagamento": forma_pagamento, "nota_vault": nota_vault},
         )
         return {
             "id": gid,
@@ -161,7 +236,8 @@ def criar_servidor_banco(bancos: Bancos, tz: ZoneInfo, nome: str = "Leonardo") -
             "por_categoria": {k: str(v) for k, v in sorted(por_categoria.items(), key=lambda kv: -kv[1])},
             "gastos": [
                 {"id": g.id, "data": g.data.isoformat(), "valor": str(g.valor), "descricao": g.descricao,
-                 "categoria": g.categoria, "forma_pagamento": g.forma_pagamento, "origem": g.origem}
+                 "categoria": g.categoria, "forma_pagamento": g.forma_pagamento, "origem": g.origem,
+                 "nota_vault": g.nota_vault}
                 for g in gastos
             ],
         }
@@ -181,17 +257,19 @@ def criar_servidor_banco(bancos: Bancos, tz: ZoneInfo, nome: str = "Leonardo") -
         tipo: TipoPonto,
         momento: Annotated[datetime | None, Field(description="Padrão: agora. Sem fuso = horário de Brasília.")] = None,
         observacao: str | None = None,
+        nota_vault: NotaVault = None,
         modelo: Modelo = None,
     ) -> dict:
         """Registra entrada, saída ou pausa do trabalho."""
+        nota_vault = caminho_da_nota(nota_vault)
         momento = momento or _agora()
         if momento.tzinfo is None:
             momento = momento.replace(tzinfo=tz)
         pid = _gravar(
-            Ponto(momento=momento, tipo=tipo, observacao=observacao),
+            Ponto(momento=momento, tipo=tipo, observacao=observacao, nota_vault=nota_vault),
             "registrar_ponto",
             "ponto",
-            {"momento": momento.isoformat(), "tipo": tipo, "observacao": observacao},
+            {"momento": momento.isoformat(), "tipo": tipo, "observacao": observacao, "nota_vault": nota_vault},
         )
         local = momento.astimezone(tz)
         return {"id": pid, "confirmacao": f"Registrado: {tipo.replace('_', ' ')} às {local:%H:%M} de {local:%d/%m}. Desfazer?"}
@@ -209,7 +287,8 @@ def criar_servidor_banco(bancos: Bancos, tz: ZoneInfo, nome: str = "Leonardo") -
             "horas_por_dia": horas,
             "total_horas": round(sum(horas.values()), 2),
             "registros": [
-                {"id": r.id, "momento": r.momento.astimezone(tz).isoformat(), "tipo": r.tipo, "observacao": r.observacao}
+                {"id": r.id, "momento": r.momento.astimezone(tz).isoformat(), "tipo": r.tipo, "observacao": r.observacao,
+                 "nota_vault": r.nota_vault}
                 for r in regs
             ],
         }
@@ -221,18 +300,20 @@ def criar_servidor_banco(bancos: Bancos, tz: ZoneInfo, nome: str = "Leonardo") -
         descricao: str,
         tags: Annotated[list[str] | None, Field(description="Ex.: ['trabalho', 'estudo']")] = None,
         momento: Annotated[datetime | None, Field(description="Padrão: agora")] = None,
+        nota_vault: NotaVault = None,
         modelo: Modelo = None,
     ) -> dict:
         """Registra no diário algo que o dono do assistente fez."""
+        nota_vault = caminho_da_nota(nota_vault)
         momento = momento or _agora()
         if momento.tzinfo is None:
             momento = momento.replace(tzinfo=tz)
         tags_txt = ",".join(t.strip().lower() for t in tags) if tags else None
         aid = _gravar(
-            Atividade(momento=momento, descricao=descricao.strip(), tags=tags_txt),
+            Atividade(momento=momento, descricao=descricao.strip(), tags=tags_txt, nota_vault=nota_vault),
             "registrar_atividade",
             "atividades",
-            {"momento": momento.isoformat(), "descricao": descricao, "tags": tags_txt},
+            {"momento": momento.isoformat(), "descricao": descricao, "tags": tags_txt, "nota_vault": nota_vault},
         )
         return {"id": aid, "confirmacao": f"Anotado no diário de {momento.astimezone(tz):%d/%m}. Desfazer?"}
 
@@ -248,22 +329,113 @@ def criar_servidor_banco(bancos: Bancos, tz: ZoneInfo, nome: str = "Leonardo") -
             regs = s.scalars(q.order_by(Atividade.momento)).all()
         return [
             {"id": a.id, "momento": a.momento.astimezone(tz).isoformat(), "descricao": a.descricao,
-             "tags": a.tags.split(",") if a.tags else []}
+             "tags": a.tags.split(",") if a.tags else [], "nota_vault": a.nota_vault}
             for a in regs
         ]
+
+    # ---------------- Vínculo com a nota do vault ----------------
+
+    # Troca o caminho anterior (que fica na auditoria): destrutiva no sentido do MCP. Repetir com o mesmo
+    # caminho não muda nada: idempotente.
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False))
+    def vincular_nota(
+        tipo: TipoRegistro,
+        id: Annotated[int, Field(description="Id do gasto, ponto ou atividade")],
+        caminho: Annotated[str, Field(description=_DESCRICAO_CAMINHO)],
+        modelo: Modelo = None,
+    ) -> dict:
+        """Liga um registro do banco à nota do vault com a parte subjetiva dele, ou troca a nota ligada.
+
+        O servidor não confere se a nota existe. Para desfazer, chame desfazer_registro com o tipo e o id
+        do campo `desfazer` do retorno (tipo vinculo): volta à nota anterior e o registro continua.
+        """
+        novo = caminho_da_nota(caminho)
+        if novo is None:
+            raise ToolError("Informe o caminho da nota, ex.: 00-inbox/nota.md.")
+        classe = _MODELOS[tipo]
+        with bancos.escrita.begin() as s:
+            reg = s.get(classe, id, with_for_update=True)
+            if reg is None:
+                raise ToolError(f"Não achei {tipo} com id {id}.")
+            if reg.desfeito:
+                raise ToolError(f"{_maiuscula(_o(tipo, id))} está {_desfeito(tipo)}; não dá para ligar nota.")
+            anterior = reg.nota_vault
+            if anterior == novo:
+                return {"vinculo": None, "desfazer": None,
+                        "confirmacao": f"Nada mudou: {_o(tipo, id)} já está ligad{_GENERO[tipo][3]} a {novo}. "
+                                       "Nada a desfazer."}
+            reg.nota_vault = novo
+            dados = {"caminho": novo} if anterior is None else {"caminho": novo, "anterior": anterior}
+            auditoria = Auditoria(ferramenta="vincular_nota", tabela=classe.__tablename__, registro_id=id,
+                                  acao="vincular", dados=dados, autor=_autor())
+            s.add(auditoria)
+            s.flush()
+        anotar_auditoria(auditoria.id)
+        antes = f" (antes: {anterior})" if anterior else ""
+        # Sem campo `id` de propósito: o id é da linha da auditoria, não do registro. Com `id`, o modelo
+        # poderia chamar desfazer_registro(tipo="gasto", id=...) e desfazer outro gasto.
+        return {"vinculo": auditoria.id, "desfazer": {"tipo": "vinculo", "id": auditoria.id},
+                "confirmacao": f"Nota ligada {_ao(tipo, id)}: {novo}{antes} "
+                               f"(desfazer: tipo vinculo, id {auditoria.id}). Desfazer?"}
+
+    def _desfazer_vinculo(id: int) -> str:
+        """Volta o registro à nota anterior ao vínculo `id` (linha `vincular` da auditoria). Nada é apagado.
+
+        Só desfaz o vínculo em vigor mais novo do registro: os mais novos que ele, ainda não desfeitos,
+        vêm antes (como uma pilha).
+        """
+        with bancos.escrita.begin() as s:
+            vinculo = s.get(Auditoria, id)
+            if vinculo is None or vinculo.acao != "vincular" or vinculo.tabela not in _TIPOS:
+                raise ToolError(f"Não achei vínculo de nota com id {id}.")
+            tipo = _TIPOS[vinculo.tabela]
+            reg = s.get(_MODELOS[tipo], vinculo.registro_id, with_for_update=True)
+            if reg is None:
+                raise ToolError(f"Não achei {tipo} com id {vinculo.registro_id}.")
+            historico = s.execute(select(Auditoria.id, Auditoria.acao, Auditoria.dados).where(
+                Auditoria.tabela == vinculo.tabela, Auditoria.registro_id == reg.id,
+                Auditoria.acao.in_(("vincular", "desfazer_vinculo")))).all()
+            desfeitos = {d.get("vinculo") for _, acao, d in historico if acao == "desfazer_vinculo"}
+            if id in desfeitos:
+                return f"O vínculo {id} já estava desfeito."
+            if reg.desfeito:
+                raise ToolError(f"{_maiuscula(_o(tipo, reg.id))} está {_desfeito(tipo)}; o vínculo não muda.")
+            mais_novos = sorted(i for i, acao, _ in historico if acao == "vincular" and i > id and i not in desfeitos)
+            if mais_novos:
+                raise ToolError(f"O vínculo {id} não é o mais novo {_do(tipo, reg.id)}: desfaça antes o vínculo "
+                                f"{mais_novos[-1]}.")
+            caminho, anterior = vinculo.dados.get("caminho"), vinculo.dados.get("anterior")
+            if reg.nota_vault != caminho:  # defesa: não deveria acontecer se toda troca passa por aqui
+                raise ToolError(f"{_maiuscula(_o(tipo, reg.id))} não aponta mais para {caminho} (hoje: "
+                                f"{reg.nota_vault or 'nenhuma'}). Use vincular_nota.")
+            reg.nota_vault = anterior
+            auditoria = Auditoria(ferramenta="desfazer_registro", tabela=vinculo.tabela, registro_id=reg.id,
+                                  acao="desfazer_vinculo", dados={"vinculo": id, "caminho": anterior, "anterior": caminho},
+                                  autor=_autor())
+            s.add(auditoria)
+            s.flush()
+        anotar_auditoria(auditoria.id)
+        volta = f"voltou para {anterior}" if anterior else "ficou sem nota"
+        return f"Desfeito: vínculo {id}. {_maiuscula(_o(tipo, reg.id))} {volta}."
 
     # ---------------- Desfazer e auditoria ----------------
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False))
-    def desfazer_registro(tipo: TipoRegistro, id: int, modelo: Modelo = None) -> str:
-        """Desfaz um registro (gasto, ponto ou atividade). O dado fica no banco marcado como desfeito."""
+    def desfazer_registro(tipo: TipoDesfazer, id: int, modelo: Modelo = None) -> str:
+        """Desfaz um registro (gasto, ponto ou atividade). O dado fica no banco marcado como desfeito.
+
+        Com tipo vinculo e o id do campo `desfazer` de vincular_nota, desfaz só a troca de nota: o registro volta à
+        nota anterior (ou fica sem nota) e continua valendo.
+        """
+        if tipo == "vinculo":
+            return _desfazer_vinculo(id)
         classe = _MODELOS[tipo]
         with bancos.escrita.begin() as s:
             reg = s.get(classe, id)
             if reg is None:
                 raise ToolError(f"Não achei {tipo} com id {id}.")
             if reg.desfeito:
-                return f"O {tipo} {id} já estava desfeito."
+                return f"{_maiuscula(_o(tipo, id))} já estava {_desfeito(tipo)}."
             reg.desfeito = True
             auditoria = Auditoria(ferramenta="desfazer_registro", tabela=classe.__tablename__, registro_id=id,
                                   acao="desfazer", dados={}, autor=_autor())
@@ -287,7 +459,7 @@ def criar_servidor_banco(bancos: Bancos, tz: ZoneInfo, nome: str = "Leonardo") -
         with bancos.leitura() as s:
             regs = s.scalars(q.order_by(Auditoria.id.desc()).limit(limite)).all()
         return [
-            {"momento": a.momento.astimezone(tz).isoformat() if a.momento else None, "ferramenta": a.ferramenta,
+            {"id": a.id, "momento": a.momento.astimezone(tz).isoformat() if a.momento else None, "ferramenta": a.ferramenta,
              "tabela": a.tabela, "registro_id": a.registro_id, "acao": a.acao, "dados": a.dados, "autor": a.autor}
             for a in regs
         ]

@@ -20,6 +20,9 @@ class _Registro:
     id: Mapped[int] = mapped_column(primary_key=True)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     desfeito: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Caminho relativo da nota do vault com a parte subjetiva do registro (Passo 8c, ficha 1 item 6).
+    # A nota leva `registro: <tipo>-<id>` no frontmatter. O servidor não confere se a nota existe.
+    nota_vault: Mapped[str | None] = mapped_column(String(300))
 
 
 class Gasto(_Registro, Base):
@@ -68,7 +71,8 @@ class Auditoria(Base):
     # Banco: id do gasto, ponto ou atividade. Linha ok | erro | cancelado | negado depois de uma
     # `escrever`: o id dessa linha `escrever` (auditoria.id). Vazio na `escrever` e na negada sem ela.
     registro_id: Mapped[int | None]
-    # Banco: criar | desfazer. Fora do banco: escrever (antes) e ok | erro | cancelado (depois).
+    # Banco: criar | desfazer; vincular | desfazer_vinculo (caminho da nota, Passo 8c).
+    # Fora do banco: escrever (antes) e ok | erro | cancelado (depois).
     # Negada: negado.
     acao: Mapped[str] = mapped_column(String(20))
     # Banco: os dados gravados. Vault: só o caminho da nota. Paperless: só ids inteiros. Nunca texto.

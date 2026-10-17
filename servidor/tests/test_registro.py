@@ -419,7 +419,7 @@ async def test_consultar_auditoria_mostra_as_linhas_novas(app, url):
             await c.call_tool("vault_delete_note", {"path": "a.md", "confirmPath": "a.md"})
         aud = (await c.call_tool("consultar_auditoria", {})).data
     assert [a["acao"] for a in aud] == ["negado", "escrever", "ok", "escrever", "criar"]
-    chaves = {"momento", "ferramenta", "tabela", "registro_id", "acao", "dados", "autor"}
+    chaves = {"id", "momento", "ferramenta", "tabela", "registro_id", "acao", "dados", "autor"}
     assert all(set(a) == chaves for a in aud)
     # ids: 1 criar (registro_id = gasto 1), 2 escrever, 3 ok -> 2, 4 escrever, 5 negado -> 4.
     assert [a["registro_id"] for a in aud] == [4, None, 2, None, 1]
