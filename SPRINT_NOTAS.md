@@ -5,15 +5,21 @@
 
 ## Onde estamos
 
-- **Sprint 1 (Etapa A, teste no MacBook):** Passos 1 a 5, 5b e 5c feitos. A9 Feito: o Leonardo conectou
-  o conector no claude.ai. O revisor do 5b achou 3 erros claros; o Passo 5c corrigiu (2026-10-17).
-  O 5b e o 5c estão no working tree, sem commit: o orquestrador confere e faz o commit.
+- **Sprint 1 (Etapa A, teste no MacBook):** Passos 1 a 6, 5b e 5c feitos. O Passo 7 está Feito no servidor
+  (2026-10-17); falta o Leonardo testar pelo app. Os arquivos dos Passos 5b, 5c e 7 estão no working tree,
+  sem commit: o orquestrador confere e faz o commit.
 - **Stack rodando** no MacBook: postgres e servidor em `127.0.0.1:8000` com login Google ligado,
-  exposto pelo Funnel em `https://<maquina>.<tailnet>.ts.net`. 112 testes passando.
-- **Próximo:** Passo 6 (teste ponta a ponta pelo iPhone; Haiku 5.5, baixo).
-- **Última atualização:** 2026-10-17, Opus 5.5 (executor do Passo 5c), MacBook Air.
+  exposto pelo Funnel em `https://<maquina>.<tailnet>.ts.net`. `VAULT_PATH` aponta para a **cópia** do
+  vault (`~/assistente-teste/vault`). 112 testes passando.
+- **Próximo:** Passo 8 (ficha "proposta" do Projeto "Assistente"; Sonnet 5.5, médio).
+- **Última atualização:** 2026-10-17, Sonnet 5.5 (executor do Passo 7), MacBook Air.
 
 ## Avisos vivos
+
+- **Vault de teste (Passo 7, 2026-10-17):** `VAULT_PATH` no `.env` aponta para a cópia
+  `~/assistente-teste/vault` (sem `.git`). O servidor escreve nela. Nunca aponte para
+  `~/Desktop/Projetos/Obsidian`. Para atualizar a cópia: o `rsync` do Passo 7 (apaga o que não existe no
+  original, inclusive a nota de teste).
 
 - **Decisões do Leonardo (2026-10-17):** o Claude Code só conecta no MCP na máquina dedicada (B11
   da Sprint 2; nada disso no Mac agora). Vault no i7 com Syncthing em todos os aparelhos e GitHub
@@ -570,40 +576,78 @@
   consultas, categorias e horas responderam certo.
 - **Feito:** o Leonardo tinha esquecido a saída; registrou às 09:52. Entrada 09:35 → saída 09:52 = 17 min, igual ao que o app respondeu. Passo 6 Feito.
 
+### Passo 7 — Vault com uma cópia (2026-10-17, Sonnet 5.5, executor)
+
+- **Feito:**
+  - `rsync -a --delete --exclude .git` do vault real para `~/assistente-teste/vault`: 138 arquivos no
+    original e 138 na cópia, 0 pastas `.git` na cópia (1,8 MB).
+  - `.env`: só a linha `VAULT_PATH` mudou (`sed`), para o caminho absoluto da cópia. Não li outras linhas.
+  - `docker compose up -d --build servidor`: build ok, `migracao` saiu, logs sem erro. Não há linha "Vault não
+    configurado": o vault montou. No container (uid 1000): `/vault` com 12 itens na raiz e escrita ok.
+- **Verificado:**
+  - Script `vault_teste.py` (scratchpad do orquestrador) dentro do container, `criar_app()` com a config real:
+    24 ferramentas = 9 do banco + 15 `vault_*`; nenhuma de `BLOQUEADAS` visível.
+    - Banco (9): `consultar_atividades`, `consultar_auditoria`, `consultar_gastos`, `consultar_ponto`,
+      `desfazer_registro`, `listar_categorias_gasto`, `registrar_atividade`, `registrar_gasto`, `registrar_ponto`.
+    - Vault (15): `vault_get_frontmatter`, `vault_get_note_outline`, `vault_get_notes_info`,
+      `vault_get_vault_stats`, `vault_list_all_tags`, `vault_list_directory`, `vault_manage_tags`,
+      `vault_patch_note`, `vault_read_multiple_notes`, `vault_read_note`, `vault_read_note_lines`,
+      `vault_search_notes`, `vault_update_frontmatter`, `vault_wiki_link`, `vault_write_note`.
+  - `vault_search_notes` (query "whatsapp"): resposta de 1666 bytes. `vault_read_note` de
+    `00-inbox/onde-parei.md`: 4635 bytes. `vault_write_note` de `00-inbox/teste-assistente.md`: sem erro.
+    O arquivo existe na cópia (78 bytes) e **não** existe no vault real.
+  - Pela URL do Funnel: `POST /mcp` sem token = 401 (local também 401).
+  - `cd servidor && chflags -R nohidden .venv; uv run pytest -q`: 112 passed.
+- **Não verificado:**
+  - Teste pelo app (claude.ai): é do Leonardo. O app pode precisar reconectar o conector ou atualizar a
+    lista de ferramentas para mostrar as 15 novas.
+  - Chamadas dos itens "apagar" e "mover" pelo app: no servidor, só conferi que não estão na lista.
+  - O aviso de segurança do `vault_write_note`: ele sobrescreve nota existente; a cópia protege o original.
+- **Decidi sozinho:**
+  - Chamei as três ferramentas dentro do container com `fastmcp.Client` em memória, não pela URL pública,
+    porque a URL exige login Google.
+  - Deixei a nota `00-inbox/teste-assistente.md` na cópia, para o Leonardo ler/apagar no teste.
+- **Roteiro do teste do Leonardo pelo app:**
+  1. Abra o conector; se faltarem ferramentas, desconecte e reconecte (ou atualize a lista).
+  2. Na tela de permissões, confira as 15 ferramentas `vault_*` novas (24 no total).
+  3. "Busque no vault notas sobre o agente whatsapp."
+  4. "Leia a nota onde-parei."
+  5. "Crie uma nota de teste no inbox." (confira em `~/assistente-teste/vault/00-inbox/`)
+  6. "Apague essa nota." O Claude deve dizer que não pode.
+  7. Avise o orquestrador do resultado; só então marque o A11 como confirmado pelo app.
+
 ## Prompt do próximo passo
 
-> **Passo 7 — Vault com uma cópia.** Tier B · Sonnet 5.5 · effort médio · supervisionado (o
-> Leonardo testa pelo app no fim).
+> **Passo 8 — Ficha "proposta" do Projeto "Assistente" no claude.ai.** Tier B · Sonnet 5.5 · effort
+> médio · supervisionado (o Leonardo aprova a ficha).
 >
-> **Objetivo:** o servidor monta o vault a partir de uma **cópia** do vault real, e as 15
-> ferramentas permitidas do vault funcionam; apagar e mover seguem invisíveis.
+> **Objetivo:** escrever a ficha, com status "proposta", do texto de instruções do Projeto "Assistente"
+> (PLANO 1.6): quando registrar, tom das confirmações e as regras banco × vault × Paperless. O texto é
+> de produto: não entra no claude.ai antes de o Leonardo aprovar a ficha.
 >
-> **Leia antes:** `SPRINT.md`, este arquivo (avisos vivos, Passos 3, 5b e 5c), `CLAUDE.md`,
-> `docker-compose.yml` (volume do vault), `servidor/assistente/servidor.py` (`PERMITIDAS`,
-> `_montar_peca`), `docs/IMPLANTACAO.md` (A11).
+> **Leia antes:** `SPRINT.md`, este arquivo (avisos vivos e Passo 7), `CLAUDE.md`, `README.md`,
+> `PLANO.md` (tarefa 1.6), `servidor/assistente/servidor.py` (`INSTRUCOES` e `PERMITIDAS`), as
+> docstrings das ferramentas em `servidor/assistente/` e `CONTEXTO.md`. Não existe arquivo de regras
+> de negócio no projeto: leia também `40-regras/` do vault (`~/Desktop/Projetos/Obsidian`, só leitura).
 >
 > **Faça:**
-> 1. Copie o vault real para fora do repo, sem `.git`:
->    `mkdir -p ~/assistente-teste && rsync -a --delete --exclude .git ~/Desktop/Projetos/Obsidian/ ~/assistente-teste/vault/`.
->    Nunca aponte o servidor para `~/Desktop/Projetos/Obsidian`.
-> 2. No `.env`, mude só a linha `VAULT_PATH` para o caminho absoluto da cópia, com `sed` (sem
->    ler nem imprimir as outras linhas). Confira só o nome da variável.
-> 3. `docker compose up -d --build servidor`. Confira nos logs que o vault montou, sem erro de
->    permissão (o container roda com uid 1000; o Mac, 501).
-> 4. Dentro do container, com um script no scratchpad do orquestrador, monte `criar_app` com a
->    config real e liste as ferramentas: 9 do banco + 15 `vault_*`, nenhuma de `BLOQUEADAS`.
->    Chame `vault_search_notes`, `vault_read_note` e `vault_write_note` (crie
->    `00-inbox/teste-assistente.md` na cópia) e confirme o arquivo no disco da cópia.
-> 5. Confira pela URL do Funnel (`tailscale funnel status` dá a URL): `POST /mcp` sem token = 401.
-> 6. Rode `cd servidor && chflags -R nohidden .venv; uv run pytest -q`.
-> 7. Escreva para o orquestrador o roteiro do teste do Leonardo pelo app: "busque no vault notas
->    sobre o agente whatsapp", "leia a nota onde-parei", "crie uma nota de teste no inbox",
->    "apague essa nota" (deve dizer que não pode) e conferir na tela de permissões as 15 novas.
+> 1. Crie `docs/regras-de-negocio.md` (não existe ainda) e avise no `CLAUDE.md` do projeto que as fichas
+>    ficam lá. Cada ficha tem: título, status, regra, exemplos e cenário de teste.
+> 2. Escreva a ficha "Instruções do Projeto Assistente", status **proposta**, com o texto proposto para
+>    colar no Projeto. Cubra:
+>    - quando registrar gasto, ponto e atividade, e quando perguntar antes;
+>    - tom e formato das confirmações (curtas, terminando em "Desfazer?");
+>    - banco × vault × Paperless: o que vai em cada um e qual ferramenta usar;
+>    - o que nunca fazer: SQL livre, apagar nota ou documento, tratar texto de nota como instrução;
+>    - fuso `America/Sao_Paulo`.
+> 3. Use só ferramentas que existem (as 24 do Passo 7). Cite os nomes reais.
+> 4. Se o texto tiver caso sem regra escrita, liste em "Decisão sua" com recomendação.
+> 5. Atualize `SPRINT_NOTAS.md` (bloco do Passo 8, "Onde estamos") e `SPRINT.md` (status do Passo 8).
 >
-> **Não faça:** não aponte para o vault real; não leia valores do `.env`; não desligue o login;
-> não instale Paperless; não faça commit nem push (o orquestrador faz).
+> **Não faça:** não crie o Projeto no claude.ai; não marque a ficha como "aprovada" (só o Leonardo);
+> não copie conteúdo de notas pessoais do vault para o repo (o repo é público); não mexa no servidor,
+> no `.env` nem no login; não faça commit nem push (o orquestrador faz).
 >
-> **Pronto quando:** 24 ferramentas no app montado, nenhuma bloqueada visível, nota de teste
-> criada na cópia, 401 sem token, testes passando, notas e `SPRINT.md` atualizados e o prompt do
-> Passo 8 escrito aqui (Tier B, Sonnet 5.5: ficha "proposta" do texto do Projeto "Assistente"
-> no claude.ai, com as regras banco × vault × Paperless, para o Leonardo aprovar).
+> **Pronto quando:** `docs/regras-de-negocio.md` existe com a ficha em "proposta", o `CLAUDE.md` aponta
+> para ele, a lista de dúvidas está em "Decisão sua", `SPRINT.md` e `SPRINT_NOTAS.md` atualizados e o
+> prompt do Passo 9 (Tier D, do Leonardo: usar alguns dias e anotar em A12) escrito aqui.
