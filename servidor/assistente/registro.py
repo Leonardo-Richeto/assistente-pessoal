@@ -202,6 +202,10 @@ class RegistroChamadas(Middleware):
         # manage_tags com operation=list só lê.
         return not (nome == "vault_manage_tags" and argumentos.get("operation") == "list")
 
+    def _nivel(self, nome: str, escrita: bool) -> int:
+        """Leitura (inclusive manage_tags list) loga em DEBUG: o caminho da nota e a conta não ficam no log INFO."""
+        return logging.INFO if escrita or nome in self._auditadas else logging.DEBUG
+
     def _inserir(self, nome: str, tabela: str, acao: str, dados: dict, autor: str,
                  registro_id: int | None = None) -> int:
         with self._bancos.escrita.begin() as s:
@@ -289,78 +293,17 @@ class RegistroChamadas(Middleware):
             # Cancelamento (CancelledError e afins) não é Exception: a escrita pode ter acontecido.
             situacao = "erro" if isinstance(e, Exception) else "cancelado"
             chamada["resultado"] = situacao
-            log.info("Chamada %s: %s autor=%s %s", nome, situacao, autor, dados)
+            log.log(self._nivel(nome, escrita), "Chamada %s: %s autor=%s %s",
+                    nome, situacao, autor, dados)
             if escrita:
                 await self._gravar_sem_falhar(nome, tabela, situacao, dados, autor, id_escrita)
             raise
 
         situacao = "erro" if getattr(resultado, "is_error", False) else "ok"
         chamada["resultado"] = situacao
-        log.info("Chamada %s: %s autor=%s %s", nome, situacao, autor, dados)
+        # Leitura: caminho da nota e e-mail só em DEBUG (o registro durável é a tabela `chamadas`).
+        log.log(self._nivel(nome, escrita), "Chamada %s: %s autor=%s %s",
+                nome, situacao, autor, dados)
         if escrita:
             await self._gravar_sem_falhar(nome, tabela, situacao, dados, autor, id_escrita)
         return resultado
-
-
-# ---------------- Descoberta (TEMPORÁRIO, Passo 8b3, 2026-10-17) ----------------
-# Mostra no log o que o claude.ai manda de verdade, para conferir o desenho de `chamadas`.
-# Só nomes de cabeçalho e de chaves do `_meta`, nunca valores; de valor, só clientInfo, versão do
-# protocolo, id da sessão MCP e User-Agent. Nunca argumento, token, cookie nem Authorization.
-# Para desligar: tire a linha `DescobertaCliente()` de servidor.py (criar_app) e esta classe.
-log_descoberta = logging.getLogger("assistente.descoberta")
-NOME_CHAVE = re.compile(r"[A-Za-z0-9._/-]{1,80}")
-MAX_CHAVES = 40
-
-
-def nomes_seguros(chaves, minusculo: bool = True) -> list[str]:
-    """Só os nomes (sem caractere estranho), sem repetir, até 40. Cabeçalho em minúsculo; chave do `_meta`, não."""
-    validos = {c for c in chaves if isinstance(c, str) and NOME_CHAVE.fullmatch(c)}
-    return sorted({c.lower() for c in validos} if minusculo else validos)[:MAX_CHAVES]
-
-
-def _cabecalhos() -> tuple[list[str], str | None, str | None]:
-    requisicao = _requisicao_http()
-    if requisicao is None:
-        return [], None, None
-    cab = requisicao.headers
-    return (nomes_seguros(cab.keys()), _texto(cab.get("user-agent"), TAMANHO_USER_AGENT),
-            _texto(cab.get("mcp-session-id"), TAMANHO_SESSAO))
-
-
-class DescobertaCliente(Middleware):
-    """Log INFO a cada `initialize` e `tools/call`: quem é o cliente e quais cabeçalhos chegam."""
-
-    async def on_initialize(self, context, call_next):
-        try:
-            params = context.message.params if context.message is not None else None
-            info = params.client_info if params is not None else None
-            nomes, user_agent, _ = _cabecalhos()
-            try:
-                sessao = _texto(context.fastmcp_context.session_id, TAMANHO_SESSAO)
-            except Exception:
-                sessao = None
-            log_descoberta.info(
-                "Descoberta initialize: cliente=%r versao=%r protocolo=%r sessao=%r user_agent=%r cabecalhos=%s "
-                "meta=%s", _texto(getattr(info, "name", None), TAMANHO_CLIENTE),
-                _texto(getattr(info, "version", None), TAMANHO_VERSAO),
-                _texto(getattr(params, "protocol_version", None), 40), sessao, user_agent, nomes,
-                nomes_seguros((getattr(params, "meta", None) or {}).keys(), minusculo=False) if params is not None else [])
-        except Exception:
-            log_descoberta.exception("Descoberta initialize: falha ao montar o log")
-        return await call_next(context)
-
-    async def on_call_tool(self, context, call_next):
-        try:
-            cliente, versao = _cliente(context)
-            nomes, user_agent, sessao = _cabecalhos()
-            try:
-                protocolo = _texto(context.fastmcp_context.session.protocol_version, 40)
-            except Exception:
-                protocolo = None
-            log_descoberta.info(
-                "Descoberta tools/call %s: cliente=%r versao=%r protocolo=%r sessao=%r user_agent=%r "
-                "cabecalhos=%s meta=%s", nome_seguro(context.message.name), cliente, versao, protocolo, sessao,
-                user_agent, nomes, nomes_seguros(_meta(context).keys(), minusculo=False))
-        except Exception:
-            log_descoberta.exception("Descoberta tools/call: falha ao montar o log")
-        return await call_next(context)

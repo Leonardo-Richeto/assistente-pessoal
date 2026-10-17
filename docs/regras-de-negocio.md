@@ -246,3 +246,53 @@ O texto do Projeto não roda em `pytest`. O que o teste cobre é o contrato dele
    nunca os copia para outra nota. Confirme.
 9. **O nome do dono no texto.** O texto usa "o dono" para o repo público não carregar dados
    pessoais. Recomendação: manter assim; o Leonardo pode trocar por "Leonardo" ao colar no Projeto.
+
+---
+
+## Ficha 2 — Retenção da tabela `chamadas`
+
+- **Status:** aprovada (Leonardo, 2026-10-17, na conversa): **guardar tudo**, a alternativa abaixo.
+  A regra proposta de resumir e apagar ficou recusada; revisitar no i7 se a tabela crescer além da
+  estimativa. Nada a implementar: a tabela já guarda tudo, sem prazo.
+- **Contexto:** `chamadas` (migração `0003`) recebe uma linha por chamada de ferramenta, inclusive
+  leitura. Ela tem só INSERT e SELECT. Não guarda argumento nem conteúdo, só quem chamou, quando,
+  com que resultado e quanto demorou.
+- **Conflito com uma regra fixa:** `CLAUDE.md` diz "Nada é apagado". Qualquer prazo que apague o
+  detalhe abre uma exceção a essa regra. Só o Leonardo decide.
+
+### Quanto cresce
+
+Estimativa (cerca de 300 bytes por linha, com o índice de `momento`):
+
+| Uso | Linhas por dia | Linhas por ano | Tamanho por ano |
+|---|---|---|---|
+| Leve (alguns pedidos por dia) | 50 | ~18 mil | ~5 MB |
+| Normal (várias conversas, leituras do vault) | 200 | ~73 mil | ~22 MB |
+| Pesado (rotinas e workers chamando o tempo todo) | 1.000 | ~365 mil | ~110 MB |
+
+Mesmo no cenário pesado, 5 anos dão menos de 600 MB num Postgres que já guarda o resto. O custo de
+guardar tudo é pequeno. O custo real é outro: com o tempo, a tabela vira um histórico detalhado de
+tudo o que o dono pediu (qual ferramenta, a que hora), que é dado pessoal.
+
+### Regra aprovada
+
+Guardar tudo: nenhuma linha de `chamadas` é apagada nem resumida, em linha com "Nada é apagado".
+Nenhum job novo. Revisitar no i7 se a tabela passar da estimativa do uso pesado (~110 MB por ano).
+
+### Exemplos
+
+| Situação | Resultado |
+|---|---|
+| Chamada de 2026-10-17, consultada hoje | Detalhe completo na tabela. |
+| Mesma chamada consultada em 2030 | Detalhe completo na tabela. |
+
+### Não faz
+
+Não muda `auditoria`. Não guarda argumento nem conteúdo.
+
+### Recusada (histórico)
+
+Proposta do Passo 8d, recusada pelo Leonardo em 2026-10-17: guardar o detalhe por 1 ano, depois
+resumir por dia (ferramenta, resultado, cliente, contagem, soma da duração) e apagar o detalhe por
+um job mensal com usuário de banco próprio. Motivo da recusa: o custo de guardar é pequeno e a
+exceção a "Nada é apagado" não compensa.

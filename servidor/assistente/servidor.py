@@ -17,7 +17,7 @@ from .auth import GitHubRestrito, GoogleRestrito
 from .banco import ESCRITAS_BANCO, LEITURAS_BANCO, criar_servidor_banco
 from .config import Config, config
 from .db import Bancos
-from .registro import DescobertaCliente, RegistroChamadas
+from .registro import RegistroChamadas
 
 log = logging.getLogger("assistente")
 
@@ -172,9 +172,6 @@ def criar_app(cfg: Config | None = None) -> FastMCP:
     # conhecidas e das escritas do banco (que já se auditam), grava `escrever` antes da chamada.
     # Também grava cada chamada (inclusive leitura) em `chamadas`, com a origem (Passo 8b3).
     app.add_middleware(RegistroChamadas(bancos, leituras=LEITURAS_PECAS | LEITURAS_BANCO, auditadas=ESCRITAS_BANCO))
-    # TEMPORÁRIO (Passo 8b3, 2026-10-17): log do que o cliente manda (clientInfo, nomes de cabeçalho).
-    # Tirar quando o orquestrador conferir as chamadas reais do iPhone e da web (SPRINT_NOTAS.md).
-    app.add_middleware(DescobertaCliente())
     return app
 
 

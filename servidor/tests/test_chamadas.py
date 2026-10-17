@@ -196,7 +196,7 @@ async def test_consultar_chamadas_filtra_e_limita(app, url, http_simulado):
             await c.call_tool("consultar_chamadas", {"inicio": "2026-10-17", "fim": "2026-10-16"})
     # A linha da própria consulta só entra no fim da chamada: ela aparece na consulta seguinte.
     assert [c["ferramenta"] for c in todas] == ["registrar_gasto", "vault_read_note"]
-    chaves = {"momento", "ferramenta", "resultado", "autor", "cliente", "versao_cliente", "sessao", "user_agent",
+    chaves = {"id", "momento", "ferramenta", "resultado", "autor", "cliente", "versao_cliente", "sessao", "user_agent",
               "modelo_declarado", "duracao_ms", "auditoria_id"}
     assert all(set(c) == chaves for c in todas)
     assert so_gasto[0]["modelo_declarado"] == "opus" and so_gasto[0]["auditoria_id"] == 1
@@ -232,32 +232,7 @@ async def test_pelo_http_grava_cliente_sessao_e_user_agent(tmp_path, url, recebi
     assert (linha.ferramenta, linha.resultado, linha.cliente, linha.versao_cliente, linha.sessao, linha.user_agent) == (
         "vault_write_note", "ok", "Anthropic/ClaudeAI", "1.0.0", sessao, "Claude-User/9.9")
     _sem_segredo([linha])
-    # Log de descoberta (temporário): nomes de cabeçalho, nunca valores (só o User-Agent).
-    descoberta = [r.getMessage() for r in caplog.records if r.name == "assistente.descoberta"]
-    assert len(descoberta) == 2
-    assert descoberta[0].startswith("Descoberta initialize: cliente='Anthropic/ClaudeAI' versao='1.0.0' "
-                                    f"protocolo='2025-06-18' sessao='{sessao}' user_agent='Claude-User/9.9'")
-    assert descoberta[1].startswith("Descoberta tools/call vault_write_note: cliente='Anthropic/ClaudeAI'")
-    assert "'cookie'" in descoberta[1] and "'x-segredo'" in descoberta[1] and "'mcp-session-id'" in descoberta[1]
     assert SEGREDO not in caplog.text
-
-
-async def test_descoberta_nao_loga_token_nem_argumento(app, monkeypatch, caplog):
-    monkeypatch.setattr(registro, "get_http_request", lambda: SimpleNamespace(headers=CABECALHOS))
-    with caplog.at_level(logging.INFO, logger="assistente.descoberta"):
-        async with Client(app, client_info=CLIENTE) as c:
-            await c.call_tool("vault_write_note", {"path": "a.md", "content": SEGREDO}, meta={"_modelo": SEGREDO})
-    (msg,) = [r.getMessage() for r in caplog.records if r.name == "assistente.descoberta"]
-    assert "cliente='claude-ai' versao='1.2.3'" in msg and "protocolo='2026-07-28'" in msg
-    assert "'authorization'" in msg and "'_modelo'" in msg and "'io.modelcontextprotocol/clientInfo'" in msg
-    assert SEGREDO not in msg and "a.md" not in msg
-
-
-def test_nomes_seguros():
-    assert registro.nomes_seguros(["User-Agent", "user-agent", "X-Y", "a b", "a\nb", 3, "c" * 81]) == ["user-agent", "x-y"]
-    assert len(registro.nomes_seguros([f"h{i}" for i in range(100)])) == 40
-    assert registro.nomes_seguros(["_modelo", "io.modelcontextprotocol/clientInfo"], minusculo=False) == [
-        "_modelo", "io.modelcontextprotocol/clientInfo"]
 
 
 def test_migracao_0003_sobe_e_desce_sem_apagar(tmp_path):
@@ -309,3 +284,44 @@ def test_migracao_0003_da_so_insert_e_select():
     # Nenhuma outra tabela é tocada.
     outras = [linha for linha in sql if linha.startswith(("ALTER TABLE", "DROP", "UPDATE", "DELETE"))]
     assert outras == ["UPDATE alembic_version SET version_num='0003' WHERE alembic_version.version_num = '0002'"]
+
+
+async def test_consultar_chamadas_pagina_por_antes_id(app, url):
+    dias = {"inicio": "2020-01-01", "fim": "2099-12-31"}
+    async with Client(app, client_info=CLIENTE) as c:
+        for _ in range(5):
+            await c.call_tool("listar_categorias_gasto", {})
+        pagina1 = (await c.call_tool("consultar_chamadas", {**dias, "limite": 2})).data
+        pagina2 = (await c.call_tool("consultar_chamadas", {**dias, "limite": 2, "antes_id": pagina1[-1]["id"]})).data
+        pagina3 = (await c.call_tool("consultar_chamadas", {**dias, "limite": 2, "antes_id": pagina2[-1]["id"]})).data
+        vazia = (await c.call_tool("consultar_chamadas", {**dias, "antes_id": 1})).data
+        with pytest.raises(ToolError):
+            await c.call_tool("consultar_chamadas", {**dias, "antes_id": 0})
+    ids = [x["id"] for x in pagina1 + pagina2 + pagina3]
+    assert ids == [5, 4, 3, 2, 1] and pagina3[-1]["id"] == 1 and len(pagina3) == 1
+    assert vazia == []
+
+
+@pytest.mark.parametrize("vazio", ["", "   ", "\t"])
+async def test_consultar_chamadas_filtro_vazio_nao_filtra(app, url, vazio):
+    dias = {"inicio": "2020-01-01", "fim": "2099-12-31"}
+    async with Client(app, client_info=CLIENTE) as c:
+        await c.call_tool("listar_categorias_gasto", {})
+        await c.call_tool("consultar_gastos", {"inicio": "2026-10-01", "fim": "2026-10-31"})
+        sem = (await c.call_tool("consultar_chamadas", dias)).data
+        com = (await c.call_tool("consultar_chamadas", {**dias, "ferramenta": vazio, "cliente": vazio})).data
+    # Sem filtro, a consulta `com` vê as 2 de antes e a própria consulta `sem`; com filtro real, não veria.
+    assert len(sem) == 2 and [x["ferramenta"] for x in com] == ["consultar_chamadas", "consultar_gastos", "listar_categorias_gasto"]
+
+
+async def test_consultar_chamadas_acha_a_chamada_das_22h_locais(app, url):
+    """22h em Brasília = 01h UTC do dia seguinte: o dia local tem de achá-la, e o dia seguinte não."""
+    momento = datetime(2026, 10, 18, 1, 0, tzinfo=ZoneInfo("UTC"))  # 2026-10-17 22:00 em America/Sao_Paulo
+    with Session(create_engine(url)) as s, s.begin():
+        s.add(Chamada(momento=momento, ferramenta="registrar_gasto", resultado="ok", duracao_ms=1))
+    async with Client(app, client_info=CLIENTE) as c:
+        dia = (await c.call_tool("consultar_chamadas", {"inicio": "2026-10-17", "fim": "2026-10-17"})).data
+        seguinte = (await c.call_tool("consultar_chamadas", {"inicio": "2026-10-18", "fim": "2026-10-18"})).data
+    assert [x["ferramenta"] for x in dia] == ["registrar_gasto"]
+    assert dia[0]["momento"] == "2026-10-17T22:00:00-03:00"
+    assert seguinte == []

@@ -9,8 +9,7 @@
 vivos" e "Prompt do próximo passo". Os blocos em "Passos feitos" são histórico: abra só o do passo
 que precisar.
 
-- **Sprint 1 (Etapa A, teste no MacBook):** Passos 1 a 8b3 Feitos e commitados, sem push (último
-  commit de código `a3d9048`). 170 testes. Migração no banco: `0003`.
+- **Sprint 1 (Etapa A, teste no MacBook):** Passos 1 a 8d Feitos e commitados, sem push. 174 testes. Migração no banco: `0003`.
 - **No ar no Mac:** postgres + servidor MCP em `127.0.0.1:8000`, login Google (só o e-mail do
   Leonardo), Funnel ligado (URL: `tailscale funnel status`), vault de **cópia** em
   `~/assistente-teste/vault`. Conector "Assistente (teste Mac)" conectado no claude.ai; testes
@@ -20,21 +19,20 @@ que precisar.
   `chamadas`; escritas de peça e tentativas negadas vão também para `auditoria`.
 - **Ficha 1** (`docs/regras-de-negocio.md`, instruções do Projeto "Assistente"): **aprovada**
   inteira, inclusive as 3 linhas do 8b3. Falta criar o Projeto no claude.ai (depois do 8c).
-- **Coleta do clientInfo:** chamada pelo iPhone feita (2026-10-17 18:29). O claude.ai manda
-  `cliente=Anthropic/ClaudeAI`, `versao=1.0.0`, protocolo `2026-07-28`, **sem sessão**,
-  `user_agent=Claude-User`; autor gravado = e-mail do Leonardo (correção do 8b2 confirmada).
-  **Falta:** uma chamada pela web ("liste as categorias de gasto") para ver se dá para diferenciar
-  iPhone × web. Depois, desligar o log `DescobertaCliente`.
-- **Próximo:** Passo 8d (fechar a coleta e as pendências pequenas), depois 8c (vínculo banco →
-  nota do vault), depois criar o Projeto no claude.ai, Passo 9 (usar alguns dias) e 10 (fechar a
-  sprint). Sprint 2 (i7) só depois.
-- **Última atualização:** 2026-10-17, Opus 5.5 (orquestrador), MacBook Air.
+- **Coleta do clientInfo: encerrada** (Passo 8d). iPhone e web chegam idênticos (cliente
+  `Anthropic/ClaudeAI`, versão `1.0.0`, protocolo `2026-07-28`, sem sessão, `user_agent=Claude-User`);
+  não dá para diferenciar. Log `DescobertaCliente` desligado e removido.
+- **Próximo:** Passo 8c (vínculo banco → nota do vault), depois criar o Projeto no claude.ai, Passo 9
+  (usar alguns dias) e 10 (fechar a sprint). Sprint 2 (i7) só depois. Ficha 2 (retenção de `chamadas`)
+  aprovada: guardar tudo (Leonardo, 2026-10-17).
+- **Última atualização:** 2026-10-17, Opus 5.5 (orquestrador, depois do revisor do 8d), MacBook Air.
 
 ## Avisos vivos
 
 - **Desde 2026-10-17 (Passos 8b e 8b2): toda chamada de ferramenta fica registrada** (`servidor/assistente/registro.py`).
   - Só é leitura o que está em `LEITURAS_PECAS` (`servidor.py`) ou `LEITURAS_BANCO` (`banco.py`). Leitura: só log
-    INFO (`assistente.registro: Chamada <ferramenta>: ok autor=<conta> {'caminho': ...}`).
+    **DEBUG** desde o 8d (`assistente.registro: Chamada <ferramenta>: ok autor=<conta> {'caminho': ...}`); escrita e
+    negada continuam em INFO.
   - Escritas do banco (`ESCRITAS_BANCO`): só log; `_gravar` já grava a auditoria (`criar`, `desfazer`).
   - **Todo o resto** (escrita das peças, nome novo, bloqueada, inexistente, caminho `<hash12>_<nome>`): linha
     `escrever` **antes** da chamada e `ok`, `erro`, `cancelado` ou `negado` depois. Se a `escrever` não grava
@@ -48,7 +46,7 @@ que precisar.
     escrita (duas linhas a mais por chamada). Ferramenta nova no banco: ponha em `LEITURAS_BANCO` ou `ESCRITAS_BANCO`
     (o teste falha até isso).
 
-- **Desde 2026-10-17 (Passo 8b3): toda chamada também vira linha em `chamadas`** (`registro.py`, migração `0003`).
+- **Desde 2026-10-17 (Passo 8b3): toda chamada também vira linha em `chamadas`** (`registro.py`, migração `0003`). O log temporário `DescobertaCliente` foi removido no Passo 8d.
   - Uma linha por chamada, no fim, inclusive leitura: `momento` (início), `ferramenta`, `resultado`
     (`ok`/`erro`/`negado`/`cancelado`), `autor`, `cliente` e `versao_cliente` (clientInfo), `sessao`
     (cabeçalho `mcp-session-id`), `user_agent` (200 caracteres), `modelo_declarado`, `duracao_ms`, `auditoria_id`.
@@ -973,33 +971,106 @@ que precisar.
 - **Pendente:** paginação de `consultar_chamadas` (`antes_id`); teste de fuso no limite do dia;
   desligar o log `DescobertaCliente` depois da coleta do Leonardo; retenção da tabela `chamadas`.
 
+### Passo 8d — Fechar a coleta e pendências pequenas (2026-10-17, Sonnet 5.5, executor)
+
+- **Resultado:** coleta do clientInfo encerrada, log de descoberta removido, `consultar_chamadas` com paginação,
+  fuso do limite do dia corrigido, duas pendências do revisor do 8b fechadas e ficha de retenção escrita. Sem commit:
+  o orquestrador confere e faz o commit.
+- **Coleta (feita pelo orquestrador):** chamada pela web em 2026-10-17 18:35 (`listar_categorias_gasto`, respondeu
+  "mercado") chegou idêntica à do iPhone de 18:29: cliente `Anthropic/ClaudeAI`, versão `1.0.0`, protocolo
+  `2026-07-28`, sem sessão, `user_agent=Claude-User`, mesmos nomes de cabeçalho (inclui `x-anthropic-client`, valor
+  nunca registrado) e mesmas chaves de `_meta`. **iPhone e web não se diferenciam.** O Leonardo decidiu
+  (2026-10-17) encerrar sem investigar o valor de `x-anthropic-client`.
+- **Mudou:**
+  - `servidor/assistente/servidor.py`: sem `DescobertaCliente` (import e `add_middleware`).
+  - `servidor/assistente/registro.py`: classe `DescobertaCliente`, `nomes_seguros`, `_cabecalhos` e `log_descoberta`
+    removidos. Leitura loga em DEBUG (`_nivel`): caminho da nota e conta não aparecem mais no log INFO. Escrita das
+    peças, escrita do banco e negada continuam em INFO.
+  - `servidor/assistente/banco.py`: `consultar_chamadas` ganha `antes_id` (só `id < antes_id`, ordem decrescente) e
+    devolve `id` em cada linha (sem ele não há como paginar); `ferramenta` e `cliente` vazios ou só espaços = sem
+    filtro; parâmetros de texto com `Field(description=...)`. `consultar_chamadas` converte os limites para UTC (só ela; ver revisor).
+  - `servidor/alembic/versions/0002_auditoria_sem_registro.py`: o downgrade levanta `RuntimeError` claro se houver
+    linha com `registro_id` nulo; não faz mais UPDATE na auditoria.
+  - `servidor/tests/test_chamadas.py`: tirados os testes da descoberta; novos: paginação, filtro vazio (3 valores) e
+    limite do dia às 22h locais. `servidor/tests/test_registro.py`: leitura em DEBUG; teste de migração agora cobre
+    a recusa do downgrade.
+  - `docs/regras-de-negocio.md`: Ficha 2, retenção de `chamadas`, escrita como proposta; o Leonardo aprovou "guardar tudo"
+    (2026-10-17, orquestrador atualizou a ficha).
+- **Verificado:**
+  - `cd servidor && uv run pytest -q` = `173 passed` (170 antes: menos 3 da descoberta, mais 6 novos).
+  - Fuso: o teste do dia local falhava de verdade no SQLite, porque `_intervalo` mandava limites com fuso de Brasília e o
+    SQLite guarda o relógio sem fuso; a chamada das 22h locais (01h UTC) ficava fora. Convertido para UTC, que no
+    Postgres já era equivalente. Corrigido no código, não só no teste.
+  - Downgrade da 0002: coberto por `test_migracao_sobe_e_desce_sem_apagar` (harness Alembic em SQLite): com linha
+    vazia, falha com a mensagem e a auditoria fica intacta; sem linha vazia, desce.
+  - `docker compose up -d --build servidor`: `migracao` saiu com 0, servidor subiu sem traceback;
+    `POST /mcp` sem token = `401`.
+- **Não verificado:**
+  - O downgrade da 0002 no Postgres real: só rodou no SQLite dos testes. A consulta `COUNT(*) ... IS NULL` é SQL
+    padrão, risco baixo.
+  - O corte do dia no Postgres real com `inicio=fim`: a lógica é a mesma da consulta nos outros dias; não rodei contra o banco.
+  - O nível DEBUG da leitura no container (o servidor sobe com `INFO`, então não aparece); conferido só nos testes.
+- **Decidi sozinho:**
+  - `consultar_chamadas` devolve o campo `id`: necessário para `antes_id` fazer sentido; é aditivo.
+  - `antes_id` com `ge=1`: valor 0 ou negativo é recusado pelo schema.
+  - DEBUG vale para toda chamada que não é escrita nem escrita do banco (inclui `vault_manage_tags` com `list`).
+  - Downgrade da 0002 recusa com `RuntimeError`, sem opção de forçar; quem quiser descer trata as linhas à mão.
+
+### Revisor do Passo 8d (2026-10-17, Opus 5.5) e correção do orquestrador
+
+- **Erro claro, corrigido:** o executor pôs `_intervalo` em UTC para todas as consultas. Ponto e atividades gravam
+  `momento` com fuso de Brasília; no SQLite (sem fuso), registro entre 00h e 02h59 locais caía no dia anterior. No
+  Postgres (`timestamptz`) nada mudava. Correção: `_intervalo` voltou ao original; só `consultar_chamadas` converte os
+  limites para UTC, porque só `chamadas` grava em UTC. `consultar_gastos` usa coluna `date`, sem `_intervalo`.
+- **Corrigido também:** teste `test_escrita_continua_em_info` (escrita de peça e do banco em INFO); corpo da Ficha 2
+  reescrito (regra aprovada "guardar tudo"; a proposta recusada virou histórico).
+- **Não corrigido (aponto ao Leonardo):** leitura com `erro`/`cancelado` também vai para DEBUG (só fica em `chamadas`);
+  paginação por `antes_id` pode pular uma linha se duas transações fizerem commit fora da ordem do id (risco baixo,
+  um usuário só).
+- 174 testes passando.
+
+- **Pendente (sai deste passo):** item 8 do revisor do 8b (teste por prefixo) continua; retenção resolvida (Ficha 2: guardar tudo, nada a implementar).
+
 ## Prompt do próximo passo
 
-> **Passo 8d — Fechar a coleta e pendências pequenas.** Tier B · Sonnet 5.5 · effort médio ·
-> supervisionado (precisa de 1 chamada do Leonardo pela web).
+> **Passo 8c — Vínculo banco → nota do vault.** Tier A · Opus 5.5 · effort alto · supervisionado.
 >
-> **Leia antes:** este arquivo (Onde estamos, Avisos vivos, blocos 8b2, 8b3 e "Revisor do Passo
-> 8b3"), `CLAUDE.md`, `servidor/assistente/{registro,banco,servidor,db}.py`.
+> **Objetivo:** dar ao banco o caminho da nota do vault que conta a parte subjetiva de um registro
+> (ficha 1, item 6; decisão D16 do vault: a nota leva `registro: <tipo>-<id>` no frontmatter e o banco
+> guarda o caminho). Gasto, ponto e atividade ganham a coluna `nota_vault`.
+>
+> **Leia antes:** este arquivo (Onde estamos, Avisos vivos, blocos 8b3 e 8d), `CLAUDE.md`,
+> `docs/regras-de-negocio.md` (ficha 1, item 6 e "Decisões do Leonardo"), `servidor/assistente/{banco,modelos,registro}.py`,
+> `servidor/alembic/versions/` (0001 a 0003, para o estilo e os GRANTs) e `servidor/tests/`.
 >
 > **Faça:**
-> 1. Peça ao Leonardo uma chamada pela web: "liste as categorias de gasto". Compare com a do iPhone
->    (`docker compose logs servidor --since 2h | grep assistente.descoberta` e
->    `select * from chamadas order by id desc limit 5`). Registre se iPhone e web se diferenciam.
-> 2. Desligue o log de descoberta: tire `DescobertaCliente` de `servidor.py` e a classe de
->    `registro.py`, com os testes dela.
-> 3. `consultar_chamadas`: parâmetro `antes_id` para paginar; filtro vazio ou só espaços = sem filtro.
-> 4. Teste de fuso no limite do dia (chamada às 22h locais, `inicio=fim=` o dia local).
-> 5. Pendências do revisor do 8b: downgrade da 0002 recusa se houver `registro_id` nulo (em vez de
->    UPDATE na auditoria); log de leitura de nota em DEBUG (o INFO hoje tem o caminho e o e-mail).
-> 6. Retenção da tabela `chamadas`: **não implemente**; escreva a ficha "proposta" em
->    `docs/regras-de-negocio.md` (recomendação: guardar 1 ano, depois resumir por dia) e pergunte.
+> 1. Coluna `nota_vault` (texto, caminho relativo da nota, opcional, até 300 caracteres) em `gastos`,
+>    `ponto` e `atividades`. Migração `0004` **aditiva**, escrita à mão: só `ADD COLUMN` nulo, sem mexer
+>    nos GRANTs nem nos dados; downgrade que não apaga dado (recuse se houver valor, como a 0002).
+> 2. Parâmetro opcional `nota_vault` em `registrar_gasto`, `registrar_ponto` e `registrar_atividade`.
+>    Valide o formato: caminho relativo, sem `..`, sem barra inicial, termina em `.md`, até 300 caracteres.
+>    O servidor não confere se a nota existe (o vault é outra peça).
+> 3. Ferramenta `vincular_nota(tipo, id, caminho)`: grava ou troca o caminho num registro existente. É
+>    escrita auditada: linha em `auditoria` (`acao` própria, `dados` = só o caminho; a anterior vai junto
+>    ao trocar), em `ESCRITAS_BANCO`, com `annotations` de escrita, retorno com `id` e `confirmacao`
+>    terminando em "Desfazer?" (desfazer = voltar ao caminho anterior; nada é apagado). Registro desfeito ou
+>    inexistente: erro claro.
+> 4. As consultas (`consultar_gastos`, `consultar_ponto`, `consultar_atividades`) devolvem `nota_vault`.
+> 5. Atualize a ficha 1 (lista de ferramentas do texto do Projeto) como **proposta** e peça aprovação antes
+>    de aplicar no texto. Nada de ficha nova aprovada sem o Leonardo.
+> 6. Testes com `fastmcp.Client` em memória; teste de migração com o harness Alembic (sobe, desce sem
+>    apagar, recusa descer com valor); teste de que `vincular_nota` audita e de que caminho inválido é recusado.
+> 7. Atualize `SPRINT_NOTAS.md` (bloco "Passo 8c"), `SPRINT.md` e o prompt do passo seguinte.
 >
-> **Não faça:** não leia valores do `.env`; não aponte para o vault real; não desligue o login; não
-> faça push; não grave a URL do Funnel no repo (o repo é público).
+> **Critério de pronto:** testes passando (`cd servidor && chflags -R nohidden .venv; uv run pytest`),
+> `docker compose up -d --build` com a `migracao` saindo em 0 e o banco em `alembic_version = 0004`,
+> `POST /mcp` sem token = 401 (`curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:8000/mcp`;
+> se der outra coisa, `docker compose stop servidor` na hora e reporte). **Mudança de schema exige o
+> revisor independente (sem o contexto da conversa) antes do commit:** peça ao orquestrador; corrija o
+> erro claro e deixe o resto em "Revisor apontou".
 >
-> **Pronto quando:** coleta registrada, descoberta desligada, itens 3–5 com teste, ficha de
-> retenção proposta, testes passando, `docker compose up -d --build servidor` sem erro e 401 sem
-> token. Commit sem push. Depois, o prompt do **Passo 8c** aqui: coluna `nota_vault` (caminho da
-> nota, opcional) em gastos, ponto e atividades, migração 0004 aditiva, parâmetro nas ferramentas
-> `registrar_*` e ferramenta `vincular_nota(tipo, id, caminho)` auditada (ficha 1, item 6). Tier A,
-> Opus 5.5, alto.
+> **Restrições:** não leia valores do `.env` (nem `cat`, nem `grep` de valores); não aponte nada para o
+> vault real `~/Desktop/Projetos/Obsidian` (só a cópia em `~/assistente-teste/vault`); não desligue o
+> login; não faça commit nem push (o orquestrador faz o commit); não grave URL do Funnel, e-mail nem
+> segredo no repo (repo público); nada de SQL livre; consultas por `bancos.leitura`, escritas por
+> `_gravar` ou `bancos.escrita` com linha em `auditoria`; nada é apagado.

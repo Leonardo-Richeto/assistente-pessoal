@@ -177,9 +177,29 @@ async def test_leitura_so_vai_para_o_log(app, url, caplog):
             await c.call_tool("vault_manage_tags", {"path": "a.md", "operation": "list"})
             await c.call_tool("consultar_gastos", {"inicio": "2026-10-01", "fim": "2026-10-31"})
     assert _linhas(url) == []
+    # Leitura loga em DEBUG: com o logger em INFO (padrão do servidor), nem caminho nem autor aparecem.
+    assert "Chamada" not in caplog.text and "onde-parei" not in caplog.text
+    caplog.clear()
+    with caplog.at_level(logging.DEBUG, logger="assistente.registro"):
+        async with Client(app) as c:
+            await c.call_tool("vault_read_note", {"path": "00-inbox/onde-parei.md"})
+            await c.call_tool("vault_read_multiple_notes", {"paths": ["a.md", "b.md"]})
+            await c.call_tool("consultar_gastos", {"inicio": "2026-10-01", "fim": "2026-10-31"})
     assert "Chamada vault_read_note: ok autor=anonimo {'caminho': '00-inbox/onde-parei.md'}" in caplog.text
     assert "'caminhos': ['a.md', 'b.md']" in caplog.text
     assert "Chamada consultar_gastos: ok" in caplog.text
+    assert all(r.levelno == logging.DEBUG for r in caplog.records if r.getMessage().startswith("Chamada"))
+    assert SEGREDO not in caplog.text
+
+
+async def test_escrita_continua_em_info(app, caplog):
+    with caplog.at_level(logging.INFO, logger="assistente.registro"):
+        async with Client(app) as c:
+            await c.call_tool("vault_write_note", {"path": "a.md", "content": SEGREDO})
+            await c.call_tool("registrar_gasto", {"valor": 10, "descricao": "pão", "categoria": "mercado"})
+    for nome in ("vault_write_note", "registrar_gasto"):
+        regs = [r for r in caplog.records if r.getMessage().startswith(f"Chamada {nome}:")]
+        assert regs and all(r.levelno == logging.INFO for r in regs), nome
     assert SEGREDO not in caplog.text
 
 
@@ -452,12 +472,25 @@ def test_migracao_sobe_e_desce_sem_apagar(tmp_path):
         cx.execute(text("INSERT INTO auditoria (momento, ferramenta, tabela, registro_id, acao, dados) "
                         "VALUES (CURRENT_TIMESTAMP, 'vault_write_note', 'vault', NULL, 'ok', '{}')"))
 
+    # Com linha sem registro_id, a descida é recusada e a auditoria fica intacta (nada de UPDATE).
+    with pytest.raises(subprocess.CalledProcessError) as erro:
+        _alembic(url, "downgrade", "0001")
+    assert "Downgrade da 0002 recusado" in erro.value.stderr.decode()
+    engine.dispose()
+    assert _registro_id_aceita_vazio(engine)
+    with engine.connect() as cx:
+        assert cx.execute(text("SELECT ferramenta, registro_id FROM auditoria ORDER BY id")).all() == [
+            ("registrar_gasto", 5), ("vault_write_note", None)]
+
+    # Sem linha vazia, a descida funciona e não muda nenhuma linha.
+    with engine.begin() as cx:
+        cx.execute(text("DELETE FROM auditoria WHERE registro_id IS NULL"))  # só no banco de teste
     _alembic(url, "downgrade", "0001")
     engine.dispose()
     assert not _registro_id_aceita_vazio(engine)
     with engine.connect() as cx:
         assert cx.execute(text("SELECT ferramenta, registro_id FROM auditoria ORDER BY id")).all() == [
-            ("registrar_gasto", 5), ("vault_write_note", 0)]
+            ("registrar_gasto", 5)]
 
     _alembic(url, "upgrade", "head")
     engine.dispose()

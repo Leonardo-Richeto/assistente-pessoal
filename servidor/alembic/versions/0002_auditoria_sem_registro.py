@@ -27,8 +27,13 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Nada é apagado: as linhas sem registro ficam com registro_id = 0 (nenhum registro real
-    # tem id 0) e continuam identificáveis por tabela = vault | paperless | ferramenta.
-    op.execute("UPDATE auditoria SET registro_id = 0 WHERE registro_id IS NULL")
+    # Nada é apagado nem reescrito na auditoria: se já há linhas sem registro (vault, Paperless,
+    # negadas), voltar a NOT NULL exigiria inventar um valor. Nesse caso a descida é recusada.
+    ligacao = op.get_bind()
+    sem_registro = ligacao.execute(sa.text("SELECT COUNT(*) FROM auditoria WHERE registro_id IS NULL")).scalar()
+    if sem_registro:
+        raise RuntimeError(
+            f"Downgrade da 0002 recusado: {sem_registro} linha(s) de auditoria com registro_id vazio. "
+            "A auditoria não é apagada nem reescrita; mantenha a 0002 ou trate essas linhas à mão.")
     with op.batch_alter_table("auditoria") as t:
         t.alter_column("registro_id", existing_type=sa.Integer(), nullable=False)
