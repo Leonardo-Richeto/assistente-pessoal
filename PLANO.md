@@ -21,10 +21,10 @@ A sequência de **teste no MacBook → produção no i7** está em `docs/IMPLANT
 - [ ] 1.2 Instalar Docker no i7 (Debian/Ubuntu Server mínimo)
 - [x] 1.3 Exposição: Tailscale Funnel (decidido)
 - [ ] 1.3b Instalar Tailscale no i7, habilitar HTTPS + Funnel, `tailscale funnel --bg 8000`
-- [ ] 1.4 Criar GitHub OAuth App, preencher `.env`, `docker compose up -d --build`
+- [ ] 1.4 Criar o cliente OAuth do Google de produção (decisão de 2026-10-17; GitHub fica como alternativa), preencher `.env`, `docker compose up -d --build`
   - Pronto quando: `docker compose ps` tudo saudável e `curl <url>/.well-known/oauth-protected-resource/mcp` responde
 - [ ] 1.5 Adicionar conector personalizado no claude.ai e testar do iPhone: registrar → consultar → desfazer
-- [ ] 1.6 Criar um Projeto no claude.ai "Assistente" com instruções de uso (quando registrar, tom das confirmações)
+- [x] 1.6 Criar um Projeto no claude.ai "Assistente" com instruções de uso (quando registrar, tom das confirmações). Feito 2026-10-17 com o texto da ficha 1; no i7, só trocar o conector
 
 ## Fase 1b — Instância da esposa (opcional, depois da sua estar estável)
 - [ ] 1b.1 Segunda instância (README → "Segunda instância"), login Google, porta 8001 / Funnel 8443
