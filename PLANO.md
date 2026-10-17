@@ -63,7 +63,7 @@ A sequência de **teste no MacBook → produção no i7** está em `docs/IMPLANT
 - [ ] 5.2 Ferramenta `resumo_periodo(inicio, fim)` que junta gastos, horas e diário num só retorno (economiza chamadas)
 
 ## Fase 5b — Saúde (Apple Watch / app Saúde) — ideia aprovada para planejar, 2026-10-17
-- [ ] 5b.1 Importar o histórico pelo `export.zip` do app Saúde (sem endpoint novo): tabelas de amostras, treinos e sono + migração; importação idempotente
+- [ ] 5b.1 Importar o histórico pelo `export.zip` do app Saúde (sem endpoint novo): tabelas de amostras, treinos e sono + migração; importação idempotente. **Guardar todas as amostras** (decisão do Leonardo, 2026-10-17), não só resumos
 - [ ] ⚑ 5b.2 Endpoint só de ingestão (token próprio, só escrita, limite de chamadas) para a automação diária do app Atalhos do iOS
 - [ ] 5b.3 Ferramentas `consultar_saude` / `resumo_saude(periodo)`; comentários sobre treino ou sono vão para o vault ligados por id
 - Fora: app pago de exportação (premissa de não pagar nada além do Pro). Dado de saúde nunca vai para o vault nem para o GitHub.
@@ -83,6 +83,12 @@ A sequência de **teste no MacBook → produção no i7** está em `docs/IMPLANT
 
 # Segunda etapa (só depois da base — fases 1 a 5 — pronta)
 
+## Fase 7b — Monitoramento de casa (só no i7, rede de casa) — planejado em 2026-10-17
+Só faz sentido com o servidor ligado 24 h na rede de casa; no MacBook não roda.
+- [ ] ⚑ 7b.1 Saúde do armazenamento: script no host (fora do container, porque `smartctl` precisa do disco) roda `smartctl -j` e `df` a cada hora e grava num diretório que um worker importa; tabela de leituras + ferramenta `consultar_saude_armazenamento` (SMART, uso do disco, tamanho do Postgres, idade do último backup); alerta quando setor realocado/pendente sobe, desgaste do SSD passa do limite ou o disco passa de 85%
+- [ ] ⚑ 7b.2 Rede: DNS local (AdGuard Home, grátis) na VM de serviços de rede do i5 ou no i7, com o roteador apontando para ele; worker importa consultas por aparelho e consumo; ferramentas `consultar_rede` e `bloquear_dominio` (escrita, com confirmação). Cobre o "bloqueio de distrações" da nota `infraestrutura-de-casa` do vault
+- [ ] 7b.3 Resumo semanal de saúde da casa (discos, backup, rede) na rotina da Fase 5
+
 ## Fase 8 — Canais próprios
 - [ ] 8.1 Celular Android barato dedicado, com chip próprio, ligado no carregador e no Wi-Fi de casa (número só do agente)
 - [ ] ⚑ 8.2 API própria de WhatsApp, parecida com o WAHA, usando o repositório "reverse engineering anything" (REA) do GitHub como base para a engenharia reversa, rodando em casa; substitui o WAHA da fase 6
@@ -92,7 +98,7 @@ A sequência de **teste no MacBook → produção no i7** está em `docs/IMPLANT
 - Todos os canais falam com o MESMO servidor MCP; nenhum acesso novo ao banco por fora dele.
 
 ## Ideias sem data
-- Monitor de rede em casa (o que é acessado, consumo, bloqueio pelo agente).
+- ~~Monitor de rede em casa~~ → virou a Fase 7b.2 (2026-10-17).
 - Central de acesso às câmeras de monitoramento.
 - Ligação pela operadora (alerta por voz: liga, fala a mensagem, desliga) — avaliar VoIP/SIP + Asterisk. Ideia inicial, ver depois.
 - Conversa por voz em tempo real por telefone — exigiria API paga; só se valer o custo.
