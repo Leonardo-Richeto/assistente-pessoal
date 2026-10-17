@@ -68,7 +68,7 @@ def test_lista_vazia_nao_sobe():
                        base_url="https://mcp.exemplo.com", jwt_signing_key="k" * 32)
 
 
-@pytest.mark.parametrize("url_publica", ["https://<maquina>.<tailnet>.ts.net", "https://mcp.exemplo.com"])
+@pytest.mark.parametrize("url_publica", ["https://maquina.tailnet.ts.net", "https://mcp.exemplo.com"])
 def test_auth_desativada_nao_sobe_com_url_publica(tmp_path, url_publica):
     url = f"sqlite:///{tmp_path / 'a.db'}"
     cfg = Config(database_url_leitura=url, database_url_escrita=url, public_base_url=url_publica,

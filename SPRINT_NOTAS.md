@@ -15,6 +15,10 @@
 
 ## Avisos vivos
 
+- **URL do Funnel fora do repo (2026-10-17):** o repo é público; nos docs ela aparece como
+  `https://<maquina>.<tailnet>.ts.net`. A real: `tailscale funnel status`, ou o vault
+  (`10-projetos/assistente-pessoal/maquinas-do-assistente-pessoal.md`). Nunca grave a real aqui.
+
 - **Desde 2026-10-17 (revisor):** o compose não repassa mais `AUTH_DESATIVADA` ao servidor, e o
   servidor recusa subir sem login se `PUBLIC_BASE_URL` não for local. O smoke sem login do Passo 2
   não roda mais no container; o teste sem login fica nos testes em memória. `JWT_SIGNING_KEY` com
@@ -551,6 +555,13 @@
     em `/token` não tem teto global). Reiniciar o servidor zera a contagem.
   - A conferência na troca do código usa `_code_store` e `_token_validator`, internos do `OAuthProxy`
     (FastMCP 4.1.0). Se a versão mudar, `test_troca_do_codigo_so_para_conta_permitida` acusa.
+
+### Passo 6 — Teste pelo iPhone (em andamento, 2026-10-17, guiado pelo Opus 5.5 orquestrador)
+
+- **Feito:** o Leonardo registrou pelo app um gasto real (categoria `mercado`, origem `manual`). No banco:
+  linha em `gastos` com `desfeito = f` e auditoria `criar` no mesmo instante. Isso também prova que o
+  conector seguiu conectado depois dos rebuilds do 5b/5c.
+- **Pendente:** consultar, desfazer, ponto (entrada/saída) e horas.
 
 ## Prompt do próximo passo
 
