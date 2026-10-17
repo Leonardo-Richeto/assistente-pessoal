@@ -15,6 +15,10 @@
 
 ## Avisos vivos
 
+- **Decisões do Leonardo (2026-10-17):** o Claude Code só conecta no MCP na máquina dedicada (B11
+  da Sprint 2; nada disso no Mac agora). Vault no i7 com Syncthing em todos os aparelhos e GitHub
+  privado mantido por enquanto (B12).
+
 - **URL do Funnel fora do repo (2026-10-17):** o repo é público; nos docs ela aparece como
   `https://<maquina>.<tailnet>.ts.net`. A real: `tailscale funnel status`, ou o vault
   (`10-projetos/assistente-pessoal/maquinas-do-assistente-pessoal.md`). Nunca grave a real aqui.

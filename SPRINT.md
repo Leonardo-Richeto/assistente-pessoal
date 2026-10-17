@@ -80,6 +80,8 @@ Se este arquivo divergir de uma fonte acima, vale a fonte. Corrija este arquivo.
 | B5–B7 | OAuth App de produção, `.env` com senhas novas, subir a stack | A | Opus 5.5 | alto |
 | B8–B9 | Conector de produção no claude.ai e testes do A10 | C | Haiku 5.5 | baixo |
 | B10 | Levar os registros do teste ou começar limpo | D | Leonardo | — |
+| B11 | Claude Code conectando no MCP (decisão do Leonardo, 2026-10-17: só no i7): liberar retorno de login para `http://localhost:<porta>/callback` (só loopback, RFC 8252), com teste; `claude mcp add --transport http assistente <URL>/mcp` em cada máquina | A | Opus 5.5 | alto |
+| B12 | Sincronização do vault em todos os aparelhos (decisão do Leonardo, 2026-10-17): **Syncthing** entre i7, Mac, iPhone e PC Windows, **mantendo o GitHub privado por enquanto**. Só o i7 faz commit e push (job diário); o Syncthing ignora `.git` (`.stignore`) para não corromper o repositório. PC do trabalho: só o conector MCP, sem cópia do vault | B | Sonnet 5.5 | médio |
 
 ## Fases seguintes do `PLANO.md` (cada fase vira uma sprint)
 

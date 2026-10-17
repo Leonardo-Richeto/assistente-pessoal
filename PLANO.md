@@ -33,7 +33,7 @@ A sequência de **teste no MacBook → produção no i7** está em `docs/IMPLANT
 ## Fase 2 — Documentos e vault
 - [ ] 2.1 Subir Paperless-ngx com o compose oficial (rede Docker compartilhada com este stack); gerar token; preencher `PAPERLESS_URL`/`PAPERLESS_API_KEY`
   - Pronto quando: "me mostra o último documento que entrou" funciona pelo app
-- [ ] 2.2 Migrar o vault para `/srv/vault` no i7, `git init`, Syncthing com Mac/iPhone; preencher `VAULT_PATH`
+- [ ] 2.2 Migrar o vault para `/srv/vault` no i7, Syncthing com todos os aparelhos (Mac, iPhone, PC Windows) e GitHub privado mantido por enquanto (decisão de 2026-10-17); preencher `VAULT_PATH`. Detalhe: `SPRINT.md` B12
 - [ ] 2.2b Levar para o vault a "Regra de passagem" (`CONTEXTO.md`) e a nota de inventário das máquinas
 - [ ] 2.3 Job diário de commit do vault (`git add -A && git commit`) para ter histórico de tudo que a IA escrever
 - [ ] ⚑ 2.4 Definir o envio de arquivos para o servidor (pasta "consumir" do Paperless sincronizada pelo Syncthing é o caminho mais simples)
