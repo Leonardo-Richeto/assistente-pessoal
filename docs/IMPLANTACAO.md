@@ -20,7 +20,7 @@ máquina dedicada. Marque `[x]` conforme avança.
 - [x] A8 (2026-10-16, MacBook arm64). `docker compose up -d --build` e `docker compose logs -f servidor` (erro no build → guardar o log)
 - [x] A9 (2026-10-17: conector "Assistente (teste Mac)" conectado; "liste as categorias de gasto" respondeu só "teste"). claude.ai → Configurações → Conectores → conector personalizado → `<URL do A5>/mcp` → login Google
 - [x] A10 (2026-10-17). Teste pelo iPhone: registrar gasto → consultar → desfazer; registrar ponto → consultar horas
-- [x] A11 (2026-10-17: servidor com a cópia em `~/assistente-teste/vault`; 24 ferramentas, busca, leitura e escrita ok no servidor; teste pelo app com o Leonardo pendente). (Opcional) Testar o vault com uma **cópia** do vault em `VAULT_PATH`
+- [x] A11 (2026-10-17: servidor com a cópia em `~/assistente-teste/vault`; 24 ferramentas, busca, leitura e escrita ok no servidor; teste pelo app OK em 2026-10-17). (Opcional) Testar o vault com uma **cópia** do vault em `VAULT_PATH`
 - [ ] A12. Usar alguns dias; anotar aqui o que faltou ou incomodou
 
 Observações do teste:

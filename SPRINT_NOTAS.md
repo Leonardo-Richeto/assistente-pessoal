@@ -616,6 +616,8 @@
   6. "Apague essa nota." O Claude deve dizer que não pode.
   7. Avise o orquestrador do resultado; só então marque o A11 como confirmado pelo app.
 
+- **Passo 7, teste pelo app (2026-10-17):** o Leonardo confirmou busca, leitura e criação de nota na cópia; o pedido de apagar foi recusado (ferramenta inexistente). Passo 7 Feito.
+
 ## Prompt do próximo passo
 
 > **Passo 8 — Ficha "proposta" do Projeto "Assistente" no claude.ai.** Tier B · Sonnet 5.5 · effort
