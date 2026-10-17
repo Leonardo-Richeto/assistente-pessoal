@@ -5,16 +5,32 @@
 
 ## Onde estamos
 
-- **Sprint 1 (Etapa A, teste no MacBook):** Passos 1 a 7, 5b e 5c feitos. O Passo 8 tem a ficha escrita
-  (2026-10-17, status "proposta" em `docs/regras-de-negocio.md`); falta o Leonardo aprovar e criar o Projeto
-  no claude.ai. Os arquivos do Passo 8 estão no working tree, sem commit: o orquestrador confere e faz o commit.
+- **Sprint 1 (Etapa A, teste no MacBook):** Passos 1 a 7, 5b, 5c, 8b e 8b2 feitos. Passo 8: ficha 1 aprovada
+  (commit `e02afb4`); falta criar o Projeto no claude.ai. Os arquivos dos Passos 8b e 8b2 estão no working tree,
+  sem commit: o orquestrador confere e faz o commit.
 - **Stack rodando** no MacBook: postgres e servidor em `127.0.0.1:8000` com login Google ligado,
   exposto pelo Funnel em `https://<maquina>.<tailnet>.ts.net`. `VAULT_PATH` aponta para a **cópia** do
-  vault (`~/assistente-teste/vault`). 112 testes passando.
-- **Próximo:** o Leonardo decide as perguntas da ficha 1; depois cria o Projeto e segue para o Passo 9 (Tier D).
-- **Última atualização:** 2026-10-17, Sonnet 5.5 (executor do Passo 8), MacBook Air.
+  vault (`~/assistente-teste/vault`). Banco na migração `0002`. 145 testes passando.
+- **Próximo:** o Leonardo cria o Projeto e segue para o Passo 9 (Tier D).
+- **Última atualização:** 2026-10-17, Opus 5.5 (executor do Passo 8b2), MacBook Air.
 
 ## Avisos vivos
+
+- **Desde 2026-10-17 (Passos 8b e 8b2): toda chamada de ferramenta fica registrada** (`servidor/assistente/registro.py`).
+  - Só é leitura o que está em `LEITURAS_PECAS` (`servidor.py`) ou `LEITURAS_BANCO` (`banco.py`). Leitura: só log
+    INFO (`assistente.registro: Chamada <ferramenta>: ok autor=<conta> {'caminho': ...}`).
+  - Escritas do banco (`ESCRITAS_BANCO`): só log; `_gravar` já grava a auditoria (`criar`, `desfazer`).
+  - **Todo o resto** (escrita das peças, nome novo, bloqueada, inexistente, caminho `<hash12>_<nome>`): linha
+    `escrever` **antes** da chamada e `ok`, `erro`, `cancelado` ou `negado` depois. Se a `escrever` não grava
+    (banco fora), a chamada é recusada ("Escrita recusada") e nada muda (falha fechado).
+  - A linha do resultado guarda em `registro_id` o id da sua linha `escrever`. A `escrever` tem `registro_id` vazio.
+  - `dados`: vault, só o caminho da nota; Paperless, só ids inteiros (`document_id`, `tag_ids`...). Nunca texto.
+  - `autor` = conta conferida na lista (claim `identidade` gravado por `auth.py` no login): e-mail no Google,
+    login no GitHub (minúsculo). Sem token: `anonimo` (só em memória). Linhas antigas do banco ficam com autor vazio.
+  - Nome fora de `^[A-Za-z0-9_]{1,60}$` vira `<nome invalido>` no log e no banco.
+  - Ferramenta nova numa peça: ponha em `LEITURAS_PECAS` ou `ESCRITAS_PECAS`; sem isso, a leitura nova conta como
+    escrita (duas linhas a mais por chamada). Ferramenta nova no banco: ponha em `LEITURAS_BANCO` ou `ESCRITAS_BANCO`
+    (o teste falha até isso).
 
 - **Vault de teste (Passo 7, 2026-10-17):** `VAULT_PATH` no `.env` aponta para a cópia
   `~/assistente-teste/vault` (sem `.git`). O servidor escreve nela. Nunca aponte para
@@ -633,6 +649,185 @@
 - **Decidi sozinho:** usei "o dono" no texto, sem nome, porque o repo é público. O Leonardo pode trocar ao colar.
 - **Falta:** o Leonardo responder as perguntas da ficha 1, aprovar, criar o Projeto, e marcar PLANO 1.6.
 
+### Passo 8b — Registro de toda chamada de ferramenta (2026-10-17, Opus 5.5, executor)
+
+- **Resultado:** toda chamada de ferramenta passa por um middleware do FastMCP; escritas das peças e
+  tentativas negadas viram linha em `auditoria`, leituras vão só para o log. Sem commit: o orquestrador confere
+  e faz o commit.
+- **O que o FastMCP 4.1.0 faz (lido no `.venv`):**
+  - `fastmcp/server/server.py:1357` (`call_tool`) monta o `MiddlewareContext` e roda a cadeia do app em
+    `:1427`; a busca da ferramenta fica dentro dela, e `:1464` levanta `NotFoundError("Unknown tool")`.
+    Por isso o `on_call_tool` do app principal vê as montadas, as escondidas e as inexistentes.
+  - `fastmcp/server/mixins/mcp_operations.py:249-262`: `NotFoundError`/`DisabledError` viram o resultado
+    de erro "Unknown tool" só depois da cadeia.
+  - `fastmcp/server/middleware/middleware.py:239` (`on_call_tool`).
+  - O proxy das peças devolve erro como `ToolResult(is_error=True)`, sem exceção
+    (`fastmcp/server/providers/proxy.py:458-465`). O middleware confere os dois casos.
+  - Identidade: `fastmcp/server/dependencies.py:665` (`get_access_token`) lê o token do `request.scope["user"]`
+    da requisição HTTP e, sem ela, do contexto do SDK. O token é o que `GoogleRestrito.load_access_token`
+    devolve (`claims.email`); o do GitHub traz `claims.login`.
+- **Mudou:**
+  - `servidor/assistente/registro.py` (novo): `identidade()` (`:35`), `caminhos_do_vault()` (`:56`, só `path`,
+    `paths`, `oldPath`, `newPath`, cortados em 300 caracteres e 20 caminhos), `RegistroChamadas.on_call_tool`
+    (`:96`).
+  - `servidor/assistente/servidor.py:34-67`: `PERMITIDAS` virou `LEITURAS_PECAS | ESCRITAS_PECAS` (mesmos 64
+    nomes). `:175`: middleware ligado com as escritas das peças montadas.
+  - `servidor/assistente/banco.py:34`: `_autor()` usa `identidade()`. Antes só lia `login`: com Google, o autor
+    das escritas do banco ficava vazio. `:256`: descrição de `consultar_auditoria` cita vault, Paperless e negadas.
+  - `servidor/assistente/modelos.py:68`: `registro_id` aceita vazio; comentários com os valores de `tabela` e `acao`.
+  - `servidor/alembic/versions/0002_auditoria_sem_registro.py` (nova, à mão): `ALTER COLUMN registro_id DROP NOT
+    NULL`. O downgrade põe `0` nas linhas vazias e volta o `NOT NULL`; nada é apagado.
+  - `servidor/tests/test_registro.py` (novo, 16 testes).
+- **Linhas em `auditoria`:**
+
+  | Caso | `tabela` | `acao` | `dados` |
+  |---|---|---|---|
+  | Escrita no vault | `vault` | `escrever`, depois `ok` ou `erro` | `{"caminho": ...}` |
+  | Escrita no Paperless | `paperless` | `escrever`, depois `ok` ou `erro` | `{}` |
+  | Bloqueada ou escondida | `vault` ou `paperless` | `negado` | caminho, se for do vault |
+  | Nome desconhecido | `ferramenta` | `negado` | `{}` |
+  | Escrita do banco (como antes) | `gastos`, `ponto`, `atividades` | `criar`, `desfazer` | dados gravados |
+
+- **GRANTs:** não mudaram. `ALTER COLUMN` mantém os privilégios. Conferido no banco real e num banco de rascunho:
+  `assistente_leitura=r`, `assistente_escrita=ar` (INSERT e SELECT; o UPDATE saiu na 0001). O `01-papeis.sh` não muda.
+- **Verificado:**
+  - `cd servidor && chflags -R nohidden .venv; uv run pytest -q` = `128 passed` (112 antes).
+  - Prova de falha: com `servidor.py`, `banco.py` e `modelos.py` do `HEAD` e sem a 0002, 14 dos 15 testes
+    novos falharam (só o de `caminhos_do_vault` passou, porque o módulo novo ficou). Com a linha `escrever`
+    gravada sem travar (falha aberto), `test_falha_ao_gravar_auditoria_recusa_a_escrita` falhou. Com o `_autor`
+    antigo, os 2 casos de identidade falharam (o do Google pelo bug; o do GitHub porque o código antigo não usa
+    `registro.get_access_token`, que o teste simula). Sem o middleware, o teste pelo HTTP falhou. Código restaurado
+    e conferido com `cmp`; 128 passando.
+  - `test_identidade_pelo_http_com_token_do_google`: `POST /mcp` com Bearer pelo `http_app` de verdade e
+    `GoogleProvider.load_access_token` simulado; o autor gravado é o e-mail.
+  - Migração no Postgres, num banco de rascunho (`teste_migra_8b`, criado e apagado por mim): `0001` → linha
+    com `registro_id 5` → `0002` → INSERT com `registro_id NULL` pelo usuário de escrita deu certo, UPDATE deu
+    `permission denied` → SELECT pelo de leitura deu certo → downgrade: linhas mantidas, a vazia virou `0`,
+    `NOT NULL` de volta → `0002` de novo.
+  - `docker compose up -d --build`: `migracao` rodou `0001 -> 0002` e saiu com 0. Servidor subiu sem erro e sem
+    traceback. `\d auditoria` no banco real: `registro_id` sem `not null`; `alembic_version = 0002`; as 13 linhas
+    antigas continuam.
+  - No container (`registro_container.py`, scratchpad do executor), cliente em memória: leitura de
+    `00-inbox/onde-parei.md` (só log); escrita de `00-inbox/teste-passo8b.md` na cópia; `vault_delete_note`
+    recusado ("Unknown tool"). No banco: linhas 14 `escrever`, 15 `ok` e 16 `negado`, `tabela = vault`,
+    `dados = {"caminho": "00-inbox/teste-passo8b.md"}`, `autor = anonimo` (cliente sem token). Nenhuma linha com
+    o texto da nota. A nota existe na cópia (41 bytes) e não existe no vault real. `consultar_auditoria` mostra as
+    3 linhas com as mesmas 7 chaves de antes.
+  - `POST /mcp` sem token = 401, local e pela URL do Funnel.
+- **Não verificado:**
+  - Uma escrita pelo app (claude.ai) com o token real do Leonardo. O teste pelo HTTP simula o token; o caminho do
+    token até o middleware é o mesmo. O próximo uso pelo app deve gravar `autor` com o e-mail.
+  - Paperless real (só no i7). As escritas do Paperless foram testadas com peça falsa.
+  - Os testes rodam no Python 3.14 local; a imagem usa 3.12. O servidor e o script do container rodaram no 3.12.
+- **Decidi sozinho:**
+  - Falha fechado na escrita das peças: a linha `escrever` grava antes da chamada; sem ela, a chamada volta
+    "Escrita recusada" e a peça nem é chamada. Gravar só depois deixaria escrever sem rastro e devolver erro de
+    algo que aconteceu. A linha do resultado (`ok`/`erro`) e a `negado` falham aberto, com log ERROR: a escrita já
+    aconteceu (ou já foi barrada) e o rastro principal existe. Leitura não depende do banco.
+  - Duas linhas por escrita (`escrever` e o resultado), porque a `auditoria` é só INSERT: não dá para completar a
+    linha depois.
+  - Menor schema: só `registro_id` passa a aceitar vazio. As colunas `autor` e `dados` já existiam; não criei
+    coluna nova. O caminho vai em `dados`.
+  - Downgrade põe `0` nas linhas vazias em vez de recusar ou apagar: nenhum registro real tem id 0.
+  - `tabela = "ferramenta"` para nome desconhecido; nome cortado em 60 caracteres (tamanho da coluna).
+  - Sem token, `autor = "anonimo"` (só em teste em memória ou login desligado). Com login, sem token o servidor
+    responde 401 antes de chegar na ferramenta: quem está fora não consegue encher a tabela.
+  - Do Paperless não grava argumento nenhum (nem id de documento): o pedido foi não gravar valores.
+  - `vault_manage_tags` com `operation=list` conta como leitura.
+  - `_autor()` do banco passou a gravar o e-mail do Google (antes ficava vazio). As linhas antigas não mudam.
+  - Descrição de `consultar_auditoria` ganhou "vault, Paperless e tentativas negadas" (o Claude vê esse texto).
+- **Limitações:**
+  - Se o processo morrer entre a chamada e a linha do resultado, fica só a linha `escrever`. A cópia (ou o git,
+    no i7) mostra se a nota mudou.
+  - O log INFO tem o e-mail e o caminho da nota; fica no log do container.
+
+### Passo 8b2 — Correções do revisor do Passo 8b (2026-10-17, Opus 5.5, executor)
+
+- **Resultado:** os itens 1, 2, 3, 4 e 6 do revisor do Passo 8b estão corrigidos e cobertos por teste. Sem migração
+  nova. Sem commit: o orquestrador confere e faz o commit.
+- **Mudou:**
+  - Item 1, identidade: `servidor/assistente/auth.py:140` devolve uma cópia do token com o claim `identidade` (a conta
+    já conferida na lista, minúscula). `servidor/assistente/registro.py:41` (`identidade()`) lê só esse claim; sem
+    ele, `None` e o autor sai `anonimo`. `banco.py:42` (`_autor()`) usa a mesma função; só mudou o comentário.
+  - Item 2, cancelamento: `registro.py:164` pega `BaseException`; `CancelledError` e afins gravam `cancelado` e a
+    exceção sobe de novo. `registro.py:135`: a gravação depois da chamada roda em `anyio.CancelScope(shield=True)`
+    (anyio 4.15.1 no `.venv`).
+  - Item 3, classificação: `registro.py:111` (`_e_escrita`) diz leitura só para `leituras` (`LEITURAS_PECAS |
+    LEITURAS_BANCO`) e não grava `escrever` para `auditadas` (`ESCRITAS_BANCO`). Todo o resto é escrita.
+    `banco.py:37-39`: as 9 ferramentas do banco em duas listas. `servidor.py:173`: o middleware recebe as listas.
+  - Item 4, ligação: `registro.py:118` (`_inserir`) devolve o id; a linha do resultado grava esse id em
+    `registro_id`. `registro.py:82` (`ids_do_paperless`): do Paperless, só `id`, `*_id` inteiros e `*_ids` (até 20
+    ids inteiros). `modelos.py:62-74`: comentários de `ferramenta`, `registro_id`, `acao` e `dados`.
+  - Item 6, nome cru: `registro.py:53` (`nome_seguro`) troca o nome fora de `^[A-Za-z0-9_]{1,60}$` por
+    `<nome invalido>` antes de logar e gravar (`registro.py:142`).
+  - `servidor/tests/test_bloqueadas.py:73`: o fixture cria a tabela `auditoria`; nome bloqueado agora grava
+    `escrever` antes.
+  - `servidor/tests/test_registro.py`: 9 testes atualizados, o do nome comprido trocado pelo do nome inválido e 12
+    novos (cancelamento direto e pelo cliente, nome fora das listas, caminho por hash de verdade, listas do banco,
+    escrita do banco sem linha a mais, ids do Paperless, claim no `load_access_token` do GitHub e do Google, token
+    sem claim, leitura de peça não montada). O teste HTTP ganhou o caso GitHub com e-mail público.
+- **Linhas em `auditoria` agora:**
+
+  | Caso | `tabela` | `acao` | `registro_id` | `dados` |
+  |---|---|---|---|---|
+  | Escrita no vault | `vault` | `escrever`, depois `ok`, `erro` ou `cancelado` | vazio; o resultado aponta para a `escrever` | `{"caminho": ...}` |
+  | Escrita no Paperless | `paperless` | idem | idem | só ids inteiros |
+  | Bloqueada, escondida, inexistente | peça ou `ferramenta` | `escrever`, depois `negado` | idem | caminho ou ids |
+  | Leitura conhecida de peça não montada | peça | `negado` | vazio | caminho ou ids |
+  | Nome inválido | `ferramenta` | `escrever`, depois `negado` | idem | `{}`, ferramenta `<nome invalido>` |
+  | Escrita do banco (como antes) | `gastos`, `ponto`, `atividades` | `criar`, `desfazer` | id do registro | dados gravados |
+
+- **Verificado:**
+  - `cd servidor && chflags -R nohidden .venv; uv run pytest -q` = `145 passed` (128 antes).
+  - Prova de falha, revertendo um item por vez em `registro.py` (e depois em `auth.py`) e rodando a suíte toda:
+    - identidade antiga (`email` antes de `login`): 3 falhas, entre elas o HTTP com GitHub (autor virou o e-mail);
+    - `load_access_token` sem o claim: 4 falhas (os 2 do claim e os 2 HTTP);
+    - `except Exception`: 2 falhas (os 2 de cancelamento); sem o `shield`: as mesmas 2 falhas;
+    - classificação antiga (só `ESCRITAS_PECAS` é escrita): 15 falhas, entre elas nome novo e caminho por hash;
+    - `registro_id` sempre vazio: 8 falhas; Paperless sem ids: 2 falhas; nome cru cortado em 60: 6 falhas.
+    - Código restaurado e conferido com `cmp`; 145 passando.
+  - Caminho por hash: o teste registra no app uma ferramenta visível a apps (`meta.fastmcp.tool_hash` e
+    `ui.visibility = ["app", ...]`) e a chama como `0123456789ab_<nome>`. Ela roda e grava `escrever` e `ok`.
+  - Cancelamento pelo cliente: a sessão fecha com a escrita parada no meio; o servidor cancela e grava `cancelado`
+    ligado à `escrever`. Rodou 5 vezes seguidas sem falha.
+  - `docker compose up -d --build servidor`: `migracao` saiu com 0 (continua na `0002`), servidor subiu sem erro nem
+    traceback. `POST /mcp` sem token = 401, local e pela URL do Funnel. O volume `oauth` não foi tocado.
+  - No container (`registro_container.py`, scratchpad do executor), cliente em memória sem token: escrita de
+    `00-inbox/teste-passo8b2.md` na cópia, `vault_delete_note` e `vault_delete_note;rm -rf` recusados. Linhas novas:
+    17 `escrever` e 18 `ok` (`registro_id` 17), 19 `escrever` e 20 `negado` (`registro_id` 19), 21 `escrever` e 22
+    `negado` (`registro_id` 21) com `ferramenta = <nome invalido>`, `tabela = ferramenta`, `dados = {}`. Autor
+    `anonimo` em todas. Nenhuma linha nem log com o texto da nota. A nota existe na cópia (42 bytes) e não no vault
+    real.
+- **Não verificado:**
+  - Uma escrita pelo app (claude.ai) com o token real do Leonardo. Os testes HTTP simulam o token do provedor;
+    `_Restrito.load_access_token` roda de verdade. O próximo uso pelo app deve gravar `autor` com o e-mail.
+  - Cancelamento real vindo do claude.ai (`notifications/cancelled`). O teste cobre o cancelamento pelo escopo do
+    anyio, que é o que o SDK do MCP usa.
+  - Os testes rodam no Python 3.14 local; a imagem usa 3.12. O servidor e o script do container rodaram no 3.12.
+- **Decidi sozinho:**
+  - Nome bloqueado, escondido ou inexistente grava `escrever` e depois `negado`. Pular a `escrever` exigiria repetir a
+    busca de ferramenta do FastMCP antes da chamada; se a repetição errasse, uma escrita passaria sem rastro.
+  - Com o banco fora, chamada bloqueada ou nome desconhecido volta "Escrita recusada" em vez de "Unknown tool". As duas
+    recusam; a peça não é chamada.
+  - Leitura conhecida de peça não montada (ex.: Paperless no Mac) grava só `negado`, sem `escrever`.
+  - `negado` depois de `escrever` também liga pelo `registro_id`.
+  - O claim guarda a conta minúscula, a mesma forma comparada com a lista. No GitHub, o autor sai `leonardoricheto`.
+  - `load_access_token` devolve cópia do token (`model_copy`): não muda o objeto que o provedor pode guardar em cache.
+  - Token sem o claim `identidade` (não deveria existir com login ligado) vira `anonimo` no registro e autor vazio no
+    banco, como antes sem token.
+  - Ids do Paperless: chave `id`, `*_id` ou `*_ids`, valor inteiro (booleano não conta), até 20 por lista.
+    `task_id` é texto na peça: fica de fora.
+  - Linha `cancelado` também para `KeyboardInterrupt` e afins (tudo que não é `Exception`).
+- **Pendências do revisor (não feitas, a pedido do orquestrador):**
+  - Item 5: filtro por `tabela` e `acao` em `consultar_auditoria`. **Pendente.**
+  - Item 7: o downgrade da `0002` faz `UPDATE` na `auditoria` (põe `0` nas linhas vazias). **Pendente.**
+  - Item 8: o teste de classificação por prefixo (`test_leituras_e_escritas_das_pecas_nao_se_cruzam`) depende de o
+    nome começar com `read`, `get`... **Pendente.**
+  - Item 9: o log INFO tem o caminho da nota (e o e-mail). **Pendente.**
+- **Limitações:**
+  - Se o processo morrer (não cancelar) entre a chamada e a linha do resultado, fica só a linha `escrever`.
+  - A mensagem de erro "Unknown tool" do FastMCP devolve ao cliente o nome cru; isso não vai para o nosso log nem para o banco.
+
 ## Prompt do próximo passo
 
 > **Passo 9 — Usar alguns dias e anotar o que faltou (A12).** Tier D · do Leonardo · sem modelo.
@@ -648,3 +843,7 @@
 > 3. Se o Claude errar uma regra, diga a correção ao orquestrador: ela vira ficha ou regra na hora.
 >
 > **Pronto quando:** A12 tem a lista do que faltou e o Leonardo diz que pode fechar a Sprint 1 (Passo 10).
+>
+> **Passo 8b feito (2026-10-17, Opus 5.5):** registro de toda chamada de ferramenta; ver o bloco do Passo 8b.
+> **Passo 8b2 feito (2026-10-17, Opus 5.5):** correções do revisor do 8b; ver o bloco do Passo 8b2. Itens 5, 7, 8
+> e 9 do revisor ficaram pendentes (lista no bloco).

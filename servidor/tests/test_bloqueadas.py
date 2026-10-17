@@ -17,9 +17,11 @@ from fastmcp import Client, FastMCP
 from fastmcp.exceptions import ToolError
 
 from fastmcp.server import create_proxy
+from sqlalchemy import create_engine
 
 from assistente import servidor
 from assistente.config import Config
+from assistente.modelos import Base
 
 AQUI = Path(__file__).parent
 PECAS = json.loads((AQUI / "fixtures" / "ferramentas_pecas.json").read_text())
@@ -67,6 +69,8 @@ def _proxy_falso(config: dict):
 def app(tmp_path, monkeypatch):
     monkeypatch.setattr(servidor, "create_proxy", _proxy_falso)
     url = f"sqlite:///{tmp_path / 'teste.db'}"
+    # Nome fora das leituras conhecidas grava `escrever` antes (registro.py): precisa da tabela.
+    Base.metadata.create_all(create_engine(url))
     cfg = Config(_env_file=None, database_url_leitura=url, database_url_escrita=url, auth_desativada=True,
                  vault_path=str(tmp_path), paperless_url="http://127.0.0.1:1", paperless_api_key="falso")
     return servidor.criar_app(cfg)

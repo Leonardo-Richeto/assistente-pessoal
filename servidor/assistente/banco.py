@@ -21,6 +21,7 @@ from sqlalchemy import select
 
 from .db import Bancos
 from .modelos import Atividade, Auditoria, Gasto, Ponto
+from .registro import identidade
 
 LEITURA = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
 ESCRITA = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)
@@ -30,14 +31,17 @@ TipoRegistro = Literal["gasto", "ponto", "atividade"]
 _MODELOS = {"gasto": Gasto, "ponto": Ponto, "atividade": Atividade}
 
 
-def _autor() -> str | None:
-    try:
-        from fastmcp.server.dependencies import get_access_token
+# Nomes das ferramentas abaixo, para o registro (registro.py): leitura só vai para o log; as
+# escritas já gravam a auditoria em _gravar. Ferramenta nova aqui sem entrar numa lista conta
+# como escrita de fora (linha `escrever` a mais); test_registro.py confere as listas.
+LEITURAS_BANCO = {"consultar_gastos", "listar_categorias_gasto", "consultar_ponto", "consultar_atividades",
+                  "consultar_auditoria"}
+ESCRITAS_BANCO = {"registrar_gasto", "registrar_ponto", "registrar_atividade", "desfazer_registro"}
 
-        token = get_access_token()
-        return token.claims.get("login") if token else None
-    except Exception:
-        return None
+
+def _autor() -> str | None:
+    # Conta conferida na lista (e-mail no Google, login no GitHub), gravada no token por auth.py.
+    return identidade()
 
 
 def _brl(v: Decimal) -> str:
@@ -257,7 +261,7 @@ def criar_servidor_banco(bancos: Bancos, tz: ZoneInfo, nome: str = "Leonardo") -
 
     @mcp.tool(annotations=LEITURA)
     def consultar_auditoria(limite: Annotated[int, Field(ge=1, le=200)] = 20) -> list[dict]:
-        """Últimas escritas feitas pelas ferramentas."""
+        """Últimas escritas feitas pelas ferramentas (banco, vault, Paperless) e tentativas negadas."""
         with bancos.leitura() as s:
             regs = s.scalars(select(Auditoria).order_by(Auditoria.id.desc()).limit(limite)).all()
         return [

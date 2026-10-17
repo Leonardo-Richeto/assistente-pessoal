@@ -14,9 +14,10 @@ from fastmcp import FastMCP
 from fastmcp.server import create_proxy
 
 from .auth import GitHubRestrito, GoogleRestrito
-from .banco import criar_servidor_banco
+from .banco import ESCRITAS_BANCO, LEITURAS_BANCO, criar_servidor_banco
 from .config import Config, config
 from .db import Bancos
+from .registro import RegistroChamadas
 
 log = logging.getLogger("assistente")
 
@@ -29,13 +30,13 @@ log = logging.getLogger("assistente")
 # cada versão fixada estão em tests/fixtures/ferramentas_pecas.json; tests/test_bloqueadas.py
 # falha se um nome da fixture não estiver em PERMITIDAS nem em BLOQUEADAS.
 # O que cada ferramenta de escrita pode apagar está em SPRINT_NOTAS.md (Passos 3 e 5b).
-PERMITIDAS = {
+# Leituras só vão para o log; o resto (escritas e nomes fora das listas) ganha linha em `auditoria`
+# antes e depois (registro.py). Ferramenta de leitura nova: ponha em LEITURAS_PECAS, senão conta como escrita.
+LEITURAS_PECAS = {
     # mcpvault 0.16.0: leitura
     "vault_read_note", "vault_read_note_lines", "vault_read_multiple_notes", "vault_search_notes",
     "vault_list_directory", "vault_get_note_outline", "vault_get_notes_info", "vault_get_frontmatter",
     "vault_get_vault_stats", "vault_list_all_tags", "vault_wiki_link",
-    # mcpvault 0.16.0: escrita. write_note no modo padrão (overwrite) troca a nota inteira.
-    "vault_write_note", "vault_patch_note", "vault_update_frontmatter", "vault_manage_tags",
     # paperless-mcp 0.1.0: leitura
     "paperless_search_documents", "paperless_search_everywhere", "paperless_search_autocomplete",
     "paperless_get_document", "paperless_get_document_content", "paperless_get_document_metadata",
@@ -48,6 +49,11 @@ PERMITIDAS = {
     "paperless_get_paperless_info", "paperless_get_statistics", "paperless_get_system_status",
     "paperless_list_saved_views", "paperless_get_saved_view", "paperless_run_saved_view",
     "paperless_list_share_links",
+}
+ESCRITAS_PECAS = {
+    # mcpvault 0.16.0: escrita. write_note no modo padrão (overwrite) troca a nota inteira.
+    # manage_tags com operation=list é leitura (registro.py confere).
+    "vault_write_note", "vault_patch_note", "vault_update_frontmatter", "vault_manage_tags",
     # paperless-mcp 0.1.0: escrita sem destruir
     "paperless_upload_document", "paperless_add_document_note", "paperless_create_tag",
     "paperless_create_correspondent", "paperless_create_document_type", "paperless_create_storage_path",
@@ -59,6 +65,7 @@ PERMITIDAS = {
     "paperless_set_document_custom_field", "paperless_remove_document_custom_field",
     "paperless_bulk_rotate_documents",
 }
+PERMITIDAS = LEITURAS_PECAS | ESCRITAS_PECAS
 
 # Segunda trava e registro do porquê: irreversíveis ou que abrem dados para fora. Nunca entram em
 # PERMITIDAS (o teste confere).
@@ -161,6 +168,9 @@ def criar_app(cfg: Config | None = None) -> FastMCP:
         log.info("Vault não configurado; pulando.")
 
     app.disable(names=BLOQUEADAS)
+    # Vê toda chamada, inclusive das peças e das negadas. Falha fechado: fora das leituras
+    # conhecidas e das escritas do banco (que já se auditam), grava `escrever` antes da chamada.
+    app.add_middleware(RegistroChamadas(bancos, leituras=LEITURAS_PECAS | LEITURAS_BANCO, auditadas=ESCRITAS_BANCO))
     return app
 
 

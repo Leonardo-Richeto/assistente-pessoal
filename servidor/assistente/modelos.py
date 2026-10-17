@@ -55,15 +55,22 @@ class Atividade(_Registro, Base):
 
 
 class Auditoria(Base):
-    """Toda escrita feita por ferramenta passa por aqui."""
+    """Toda escrita feita por ferramenta passa por aqui, e toda tentativa negada (registro.py)."""
 
     __tablename__ = "auditoria"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     momento: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Nome da ferramenta; `<nome invalido>` se o nome pedido não for só letras, números e `_`.
     ferramenta: Mapped[str] = mapped_column(String(60))
+    # Banco: gastos | ponto | atividades. Peças: vault | paperless. Outro nome: ferramenta.
     tabela: Mapped[str] = mapped_column(String(60))
-    registro_id: Mapped[int]
-    acao: Mapped[str] = mapped_column(String(20))  # criar | desfazer
+    # Banco: id do gasto, ponto ou atividade. Linha ok | erro | cancelado | negado depois de uma
+    # `escrever`: o id dessa linha `escrever` (auditoria.id). Vazio na `escrever` e na negada sem ela.
+    registro_id: Mapped[int | None]
+    # Banco: criar | desfazer. Fora do banco: escrever (antes) e ok | erro | cancelado (depois).
+    # Negada: negado.
+    acao: Mapped[str] = mapped_column(String(20))
+    # Banco: os dados gravados. Vault: só o caminho da nota. Paperless: só ids inteiros. Nunca texto.
     dados: Mapped[dict] = mapped_column(JSON)
     autor: Mapped[str | None] = mapped_column(String(80))

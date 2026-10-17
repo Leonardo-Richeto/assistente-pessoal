@@ -68,6 +68,8 @@ Se este arquivo divergir de uma fonte acima, vale a fonte. Corrija este arquivo.
 | 6 | Teste ponta a ponta pelo iPhone: gasto → consultar → desfazer; ponto → horas. Conferir no banco as linhas e a auditoria. IMPLANTACAO A10 | C | Haiku 5.5 | baixo | supervisionado | 5 | Feito 2026-10-17 (Leonardo + Opus 5.5 orquestrador) |
 | 7 | Vault com uma **cópia** em `VAULT_PATH`: ler, buscar, criar nota; apagar continua bloqueado. IMPLANTACAO A11 | B | Sonnet 5.5 | médio | supervisionado | 6 | Feito 2026-10-17 (Sonnet 5.5; teste pelo app OK com o Leonardo) |
 | 8 | Projeto "Assistente" no claude.ai com instruções de uso (PLANO 1.6). O texto é de produto: vira ficha "proposta" antes | B | Sonnet 5.5 | médio | supervisionado | 6 | Ficha escrita 2026-10-17 (proposta, `docs/regras-de-negocio.md`); falta o ok do Leonardo e criar o Projeto no claude.ai |
+| 8b | Registro de toda chamada de ferramenta: middleware no app principal; escrita do vault e do Paperless e tentativa negada viram linha em `auditoria` (só o caminho da nota, nunca o conteúdo); leitura só no log; migração 0002 (`registro_id` pode ficar vazio) | A | Opus 5.5 | alto | supervisionado | 7 | Feito 2026-10-17; revisor passou, commit do orquestrador |
+| 8b2 | Correções do revisor do 8b: autor = conta conferida na lista (claim `identidade` gravado no login), linha `cancelado` blindada quando a chamada é cancelada, classificação falha fechado (só é leitura o que está na lista de leituras), `registro_id` liga o resultado à linha `escrever`, Paperless grava só ids inteiros, nome de ferramenta inválido vira `<nome invalido>` | A | Opus 5.5 | alto | supervisionado | 8b | Feito 2026-10-17; revisor passou, commit do orquestrador |
 | 9 | Usar alguns dias e anotar o que faltou em `docs/IMPLANTACAO.md` (A12) | D | Leonardo | — | — | 6 | Pendente |
 | 10 | Fechar a sprint: consolidar em `CONTEXTO.md` e no vault, apagar `SPRINT.md` e `SPRINT_NOTAS.md` com o ok do Leonardo | C | Haiku 5.5 | baixo | supervisionado | 9 | Pendente |
 
@@ -82,6 +84,7 @@ Se este arquivo divergir de uma fonte acima, vale a fonte. Corrija este arquivo.
 | B10 | Levar os registros do teste ou começar limpo | D | Leonardo | — |
 | B11 | Claude Code conectando no MCP (decisão do Leonardo, 2026-10-17: só no i7): liberar retorno de login para `http://localhost:<porta>/callback` (só loopback, RFC 8252), com teste; `claude mcp add --transport http assistente <URL>/mcp` em cada máquina | A | Opus 5.5 | alto |
 | B12 | Sincronização do vault em todos os aparelhos (decisão do Leonardo, 2026-10-17): **Syncthing** entre i7, Mac, iPhone e PC Windows, **mantendo o GitHub privado por enquanto**. Só o i7 faz commit e push (job diário); o Syncthing ignora `.git` (`.stignore`) para não corromper o repositório. PC do trabalho: só o conector MCP, sem cópia do vault | B | Sonnet 5.5 | médio |
+| B13 | Bateria de perguntas ao Leonardo para popular os dados iniciais de cada bloco implementado (`PLANO.md` § Dados novos previstos), inclusive as 3 perguntas adiadas | B | Sonnet 5.5 | médio |
 
 ## Fases seguintes do `PLANO.md` (cada fase vira uma sprint)
 

@@ -21,6 +21,7 @@ from mcp.server.auth.provider import TokenError
 from starlette.middleware import Middleware
 
 from .limite import LimiteRequisicoes, proxies_padrao
+from .registro import CLAIM_IDENTIDADE
 
 log = logging.getLogger(__name__)
 
@@ -134,7 +135,9 @@ class _Restrito:
         if ident not in self._permitidos:
             log.warning("Acesso negado para %r", ident)
             return None
-        return acesso
+        # A conta conferida vai no token: o registro (registro.identidade) lê só este claim.
+        # Cópia: não mexe no objeto que o provedor pode guardar em cache.
+        return acesso.model_copy(update={"claims": {**(acesso.claims or {}), CLAIM_IDENTIDADE: ident}})
 
 
 class GitHubRestrito(_Restrito, GitHubProvider):
