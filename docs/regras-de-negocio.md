@@ -13,6 +13,8 @@
 - **Status:** aprovada (Leonardo, 2026-10-17, na conversa): itens 1–5 e 7–9 como recomendado; item 6
   corrigido por ele (registro nos dois lugares, ligados por id). Proposta escrita pelo Sonnet 5.5.
   Origem: PLANO 1.6. O vínculo do lado do banco depende do Passo 8c.
+  **Mudança proposta (2026-10-17, Passo 8b3, Opus 5.5):** 3 linhas novas no texto, em
+  "Mudança proposta (Passo 8b3)" abaixo. Só essa parte está como **proposta**; o resto continua aprovado.
 - **Onde vive:** o texto abaixo é colado nas instruções do Projeto "Assistente" no claude.ai.
   Não entra no claude.ai antes de o Leonardo aprovar a ficha.
 - **Relação com `INSTRUCOES`** (`servidor/assistente/servidor.py`): o servidor já manda 5 linhas
@@ -139,6 +141,38 @@ Pergunta que cruza áreas ("quanto gastei com o que está na nota fiscal X?") us
 - Não repita senha, token, chave ou número de documento pessoal em respostas, a menos
   que o dono peça aquele dado. Nunca copie esses dados para outra nota.
 ```
+
+### Mudança proposta (Passo 8b3) — status: proposta
+
+Pedido do Leonardo (2026-10-17): "precisamos registrar tudo". O servidor agora grava cada chamada de
+ferramenta na tabela `chamadas` (cliente, sessão, user-agent, resultado, duração). O nome do modelo o
+servidor não tem como saber: só o próprio modelo pode declarar. Fica marcado como "declarado".
+
+O que muda no texto do Projeto (não cole antes do ok do Leonardo):
+
+1. Em "O que você tem", na lista do Banco, depois de `consultar_auditoria`, acrescente:
+   `, consultar_chamadas`.
+2. No fim de "Como confirmar", acrescente a linha:
+   ```
+   Em registrar_gasto, registrar_ponto, registrar_atividade e desfazer_registro, preencha
+   o parâmetro modelo com o nome do modelo que você é (ex.: claude-opus-5-5).
+   ```
+3. No fim de "Consultas", acrescente a linha:
+   ```
+   Para ver de onde veio cada chamada (app, sessão, modelo declarado), use consultar_chamadas.
+   ```
+
+Regra: o modelo declara o próprio nome nas escritas do banco. Nome fora de `^[A-Za-z0-9 ._-]{1,60}$`
+é descartado sem falhar a chamada. As ferramentas do vault e do Paperless não mudam (peças prontas):
+nelas o modelo só fica registrado se o cliente mandar `_meta._modelo`, o que o claude.ai
+provavelmente não faz.
+
+Cenário de teste: `servidor/tests/test_chamadas.py` (modelo válido gravado, inválido descartado,
+`_meta._modelo` nas peças, `consultar_chamadas`). Estado: **Verificado** no servidor; o texto no app
+fica **Pendente** até o ok.
+
+Decisão sua: aprovar as 3 linhas? Recomendação: sim. Sem elas, `modelo_declarado` fica vazio em todas
+as chamadas vindas do app.
 
 ### Exemplos
 

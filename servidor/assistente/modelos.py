@@ -8,7 +8,7 @@ Para um dado novo, crie o modelo aqui e gere a migração com
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import JSON, Boolean, Date, DateTime, Numeric, String, Text, func
+from sqlalchemy import JSON, Boolean, Date, DateTime, Integer, Numeric, String, Text, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -74,3 +74,33 @@ class Auditoria(Base):
     # Banco: os dados gravados. Vault: só o caminho da nota. Paperless: só ids inteiros. Nunca texto.
     dados: Mapped[dict] = mapped_column(JSON)
     autor: Mapped[str | None] = mapped_column(String(80))
+
+
+class Chamada(Base):
+    """Toda chamada de ferramenta, inclusive leitura (registro.py, Passo 8b3). Só INSERT.
+
+    Nunca guarda argumento nem conteúdo: só de onde a chamada veio e como terminou.
+    """
+
+    __tablename__ = "chamadas"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # Início da chamada.
+    momento: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+    # Nome da ferramenta; `<nome invalido>` se o nome pedido não for só letras, números e `_`.
+    ferramenta: Mapped[str] = mapped_column(String(60))
+    # ok | erro | negado | cancelado
+    resultado: Mapped[str] = mapped_column(String(20))
+    # Conta conferida na lista (claim `identidade`); `anonimo` sem token.
+    autor: Mapped[str | None] = mapped_column(String(80))
+    # clientInfo do cliente MCP (nome e versão), como o cliente declarou.
+    cliente: Mapped[str | None] = mapped_column(String(80))
+    versao_cliente: Mapped[str | None] = mapped_column(String(40))
+    # Cabeçalho mcp-session-id (vazio sem HTTP ou sem sessão).
+    sessao: Mapped[str | None] = mapped_column(String(100))
+    user_agent: Mapped[str | None] = mapped_column(String(200))
+    # Nome do modelo DECLARADO pelo próprio modelo (parâmetro `modelo` ou `_meta._modelo`). Não é conferido.
+    modelo_declarado: Mapped[str | None] = mapped_column(String(60))
+    duracao_ms: Mapped[int] = mapped_column(Integer)
+    # Linha de `auditoria` da chamada: `escrever` (peças), `negado` sem `escrever`, ou `criar`/`desfazer` (banco).
+    auditoria_id: Mapped[int | None]

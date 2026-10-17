@@ -5,14 +5,16 @@
 
 ## Onde estamos
 
-- **Sprint 1 (Etapa A, teste no MacBook):** Passos 1 a 7, 5b, 5c, 8b e 8b2 feitos. Passo 8: ficha 1 aprovada
-  (commit `e02afb4`); falta criar o Projeto no claude.ai. Os arquivos dos Passos 8b e 8b2 estão no working tree,
-  sem commit: o orquestrador confere e faz o commit.
+- **Sprint 1 (Etapa A, teste no MacBook):** Passos 1 a 7, 5b, 5c, 8b, 8b2 e 8b3 feitos. Passo 8: ficha 1 aprovada
+  (commit `e02afb4`); falta criar o Projeto no claude.ai. 8b e 8b2 no commit `5f12b86`. Os arquivos do Passo 8b3
+  estão no working tree, sem commit: o orquestrador confere, roda o revisor e faz o commit.
+- **Pendente do Leonardo (Passo 8b3):** 1 chamada pelo iPhone e 1 pela web, para o log de descoberta mostrar o que o
+  claude.ai manda. Roteiro no bloco do Passo 8b3.
 - **Stack rodando** no MacBook: postgres e servidor em `127.0.0.1:8000` com login Google ligado,
   exposto pelo Funnel em `https://<maquina>.<tailnet>.ts.net`. `VAULT_PATH` aponta para a **cópia** do
-  vault (`~/assistente-teste/vault`). Banco na migração `0002`. 145 testes passando.
+  vault (`~/assistente-teste/vault`). Banco na migração `0003`. 168 testes passando.
 - **Próximo:** o Leonardo cria o Projeto e segue para o Passo 9 (Tier D).
-- **Última atualização:** 2026-10-17, Opus 5.5 (executor do Passo 8b2), MacBook Air.
+- **Última atualização:** 2026-10-17, Opus 5.5 (executor do Passo 8b3), MacBook Air.
 
 ## Avisos vivos
 
@@ -31,6 +33,23 @@
   - Ferramenta nova numa peça: ponha em `LEITURAS_PECAS` ou `ESCRITAS_PECAS`; sem isso, a leitura nova conta como
     escrita (duas linhas a mais por chamada). Ferramenta nova no banco: ponha em `LEITURAS_BANCO` ou `ESCRITAS_BANCO`
     (o teste falha até isso).
+
+- **Desde 2026-10-17 (Passo 8b3): toda chamada também vira linha em `chamadas`** (`registro.py`, migração `0003`).
+  - Uma linha por chamada, no fim, inclusive leitura: `momento` (início), `ferramenta`, `resultado`
+    (`ok`/`erro`/`negado`/`cancelado`), `autor`, `cliente` e `versao_cliente` (clientInfo), `sessao`
+    (cabeçalho `mcp-session-id`), `user_agent` (200 caracteres), `modelo_declarado`, `duracao_ms`, `auditoria_id`.
+  - Nunca argumento nem conteúdo. Do HTTP, só `mcp-session-id` e `User-Agent`.
+  - Falha aberto: sem banco, a chamada segue e o log mostra `Falha ao gravar a chamada`. A escrita continua
+    falhando fechado pela linha `escrever` da `auditoria`.
+  - `auditoria_id`: peça = a linha `escrever`; banco = a linha `criar` ou `desfazer`; leitura = vazio.
+  - `modelo_declarado`: parâmetro `modelo` das 4 escritas do banco ou `_meta._modelo` da requisição. Fora de
+    `^[A-Za-z0-9 ._-]{1,60}$`, descartado. Ninguém confere: é o que o modelo diz.
+  - GRANTs: `assistente_escrita=ar` (INSERT, SELECT), `assistente_leitura=r`. A 0003 tira o UPDATE que os
+    privilégios padrão do `01-papeis.sh` dariam. Tabela nova: conceda explicitamente na migração.
+  - O downgrade da 0003 não apaga a tabela; subir de novo reaproveita.
+  - **Log de descoberta TEMPORÁRIO ligado** (`assistente.descoberta`, classe `DescobertaCliente`): a cada
+    `initialize` e `tools/call`, clientInfo, protocolo, sessão, User-Agent e os NOMES dos cabeçalhos e das chaves do
+    `_meta`. Para desligar: tirar `app.add_middleware(DescobertaCliente())` de `servidor.py` e a classe.
 
 - **Vault de teste (Passo 7, 2026-10-17):** `VAULT_PATH` no `.env` aponta para a cópia
   `~/assistente-teste/vault` (sem `.git`). O servidor escreve nela. Nunca aponte para
@@ -828,6 +847,118 @@
   - Se o processo morrer (não cancelar) entre a chamada e a linha do resultado, fica só a linha `escrever`.
   - A mensagem de erro "Unknown tool" do FastMCP devolve ao cliente o nome cru; isso não vai para o nosso log nem para o banco.
 
+### Passo 8b3 — Origem de cada chamada (2026-10-17, Opus 5.5, executor)
+
+- **Resultado:** toda chamada de ferramenta, inclusive leitura, vira uma linha na tabela nova `chamadas`, com
+  cliente MCP e versão, sessão, user-agent, resultado, duração e modelo declarado. Sem commit: o orquestrador
+  confere, roda o revisor e faz o commit.
+- **O que o FastMCP 4.1.0 e o SDK `mcp` 2.3.0 expõem (lido no `.venv`):**
+  - clientInfo: `context.fastmcp_context.session.client_params.client_info` (`mcp/server/session.py:65`, que lê
+    `mcp/server/connection.py:243`). Vale para os dois protocolos:
+    - 2025-06-18 e anteriores: o `initialize` grava (`mcp/server/runner.py:239`);
+    - 2026-07-28: não há `initialize`; o clientInfo vem no `_meta` de cada requisição
+      (`io.modelcontextprotocol/clientInfo`, `mcp_types/_types.py:59`) e o SDK monta o mesmo `client_params`
+      (`mcp/server/connection.py:262`, `from_envelope`). O cliente em memória do fastmcp usa este.
+  - `on_initialize` do middleware: `fastmcp/server/low_level.py:192` e `:378`; a mensagem traz
+    `params.client_info` e `params.protocol_version`.
+  - `_meta` cru da requisição: `FastMCPRequestContext.meta` (`fastmcp/server/dependencies.py:82`), por
+    `context.fastmcp_context.request_context` (`fastmcp/server/context.py:312`).
+  - Sessão: `Context.session_id` (`fastmcp/server/context.py:707`) gera um uuid novo quando não há sessão
+    (protocolo 2026-07-28, cliente em memória). Por isso o registro grava só o cabeçalho `mcp-session-id`.
+  - Cabeçalhos: `get_http_request()` (`fastmcp/server/dependencies.py:579`); sem HTTP, `RuntimeError`.
+    `get_http_headers()` (`:600`) tira `authorization` e `cookie`, mas o registro nem usa: lê só os 2 cabeçalhos.
+  - Pedido sem token não chega ao middleware: o 401 sai antes. Quem está fora não enche a tabela.
+- **Mudou:**
+  - `servidor/assistente/registro.py`: `origem()` (`:131`), `modelo_declarado()` (`:92`), `anotar_auditoria()`
+    (`:77`), `on_call_tool` (`:241`) grava a linha de `chamadas` no `finally`, blindado contra cancelamento
+    (`:233`); a lógica antiga da auditoria foi para `_chamar` (`:265`), sem mudar de comportamento.
+    `DescobertaCliente` (`:330`): log temporário.
+  - `servidor/assistente/modelos.py:79`: modelo `Chamada`.
+  - `servidor/alembic/versions/0003_chamadas.py` (nova, à mão): cria `chamadas` e o índice de `momento`;
+    REVOKE ALL e GRANTs explícitos; downgrade sem efeito.
+  - `servidor/assistente/banco.py`: parâmetro opcional `modelo` em `registrar_gasto`, `registrar_ponto`,
+    `registrar_atividade` e `desfazer_registro` (`:35`; a ferramenta não usa, só o registro lê).
+    `_gravar` e `desfazer_registro` avisam o id da auditoria depois do commit (`:116`, `:272`).
+    `consultar_auditoria` com filtros `tabela` e `acao` (`:276`; item 5 do revisor do 8b). Ferramenta nova
+    `consultar_chamadas(inicio, fim, ferramenta?, cliente?, limite<=200)` (`:296`). `LEITURAS_BANCO` com ela.
+  - `servidor/assistente/servidor.py:174-177`: comentário e o middleware de descoberta.
+  - `servidor/tests/test_chamadas.py` (novo, 23 testes); `servidor/tests/test_bloqueadas.py` (lista do banco).
+  - `docs/regras-de-negocio.md`: ficha 1 ganhou "Mudança proposta (Passo 8b3)", status **proposta**.
+- **Verificado:**
+  - `cd servidor && chflags -R nohidden .venv; uv run pytest -q` = `168 passed` (145 antes).
+  - Prova de falha, revertendo um item por vez e rodando a suíte toda:
+    - sem gravar `chamadas`: 17 falhas; argumento no `user_agent`: 5; modelo sem validar: 7;
+    - sem o `shield`: 1 (cancelado); sem o vínculo do banco: 2; descoberta logando valores: 2;
+    - sem o filtro `tabela`: 1; GRANT com UPDATE: 1; sem o REVOKE: 1; downgrade com `drop_table`: 1.
+    - Código restaurado e conferido com `cmp`; 168 passando. Cancelamento: 5 rodadas sem falha.
+  - Banco de rascunho `teste_migra_8b3` (criado e apagado por mim), com os mesmos privilégios padrão do
+    `01-papeis.sh`: `0002` → linha em `auditoria` → `0003` → `\dp chamadas` = `assistente_escrita=ar`,
+    `assistente_leitura=r`; sequência `assistente_escrita=rU`. Como `assistente_escrita`: INSERT e SELECT ok;
+    UPDATE e DELETE `permission denied`. Como `assistente_leitura`: SELECT ok; INSERT `permission denied`.
+    Downgrade para `0002`: a linha de `chamadas` e a de `auditoria` continuam. `0003` de novo: reaproveita, mesmos GRANTs.
+  - `docker compose up -d --build`: `migracao` rodou `0002 -> 0003` e saiu com 0. Servidor sem traceback.
+    Banco real: `alembic_version = 0003`, `\d chamadas` com as 12 colunas, `\dp` igual ao rascunho. As 22 linhas
+    de `auditoria` continuam.
+  - No container (`chamadas_container.py`, scratchpad do executor), cliente em memória sem token, clientInfo
+    `teste-8b3 0.0.1`: leitura de `00-inbox/onde-parei.md`; escrita de `00-inbox/teste-passo8b3.md` na cópia com
+    `_meta._modelo = claude-opus-5-5`. Linhas: `chamadas` 1 (`vault_read_note`, ok, 285 ms, sem auditoria), 2
+    (`vault_write_note`, ok, `modelo_declarado = claude-opus-5-5`, `auditoria_id = 23`) e 3 (`consultar_chamadas`);
+    `auditoria` 23 `escrever` e 24 `ok`. Nenhuma linha com o texto da nota. A nota existe na cópia (27 bytes) e
+    não no vault real. `sessao` e `user_agent` vazios: sem HTTP.
+  - `POST /mcp` sem token = 401, local e pela URL do Funnel, depois de cada `up`. O volume `oauth` não foi tocado.
+- **Não verificado:**
+  - O que o claude.ai manda de verdade (clientInfo, protocolo, User-Agent, sessão). Precisa do login do Leonardo.
+    O teste HTTP simula um `initialize` de 2025-06-18; se o claude.ai usar o protocolo 2026-07-28 sem sessão,
+    `sessao` fica vazio e o clientInfo vem do `_meta` (coberto pelo cliente em memória).
+  - Se o claude.ai manda `_meta._modelo`: quase certo que não. Sem as 3 linhas novas da ficha 1, `modelo_declarado`
+    fica vazio nas chamadas do app.
+  - Os testes rodam no Python 3.14 local; a imagem usa 3.12. O servidor e o script do container rodaram no 3.12.
+- **Decidi sozinho:**
+  - Tabela `chamadas` falha aberto, para leitura e escrita: a escrita já tem rastro que falha fechado
+    (`escrever` na `auditoria`, ou a transação do `_gravar` no banco). Travar leitura por causa desta tabela tiraria
+    o app do ar sem ganho de segurança.
+  - Uma linha só, gravada no fim (a tabela é só INSERT): assim cabem resultado e duração. `momento` = início.
+    Se o processo morrer no meio, a chamada fica sem linha em `chamadas` (a `escrever` da auditoria fica).
+  - `sessao` só do cabeçalho `mcp-session-id`: o `session_id` do FastMCP inventa um uuid quando não há sessão.
+  - `auditoria_id` sem chave estrangeira, como `registro_id`: o vínculo nunca derruba a linha.
+  - Downgrade da 0003 sem efeito: apagar a tabela apagaria o histórico. A subida confere se a tabela existe.
+  - Modelo declarado: parâmetro `modelo` só nas 4 escritas do banco; nas peças, só `_meta._modelo` (schema das
+    peças intocado). Inválido é descartado, sem falhar. Não criei ferramenta "declarar modelo por sessão": a
+    declaração ficaria velha se a sessão trocasse de modelo ou de conversa, e custaria uma chamada a mais.
+  - O argumento `modelo` é lido de qualquer ferramenta que o receba (hoje só as 4 do banco têm o parâmetro).
+  - Texto de fora (clientInfo, cabeçalhos) passa por limpeza: só caracteres imprimíveis, cortado no tamanho da coluna.
+  - `consultar_auditoria`: `tabela` e `acao` com valores fixos (Literal); valor fora da lista é recusado.
+  - `consultar_chamadas`: padrão de 50 linhas; ordem do mais novo; `momento` no fuso de Brasília. A linha da
+    própria consulta só aparece na consulta seguinte.
+  - O log de descoberta mostra também os nomes das chaves do `_meta` (nunca valores): mostra se o claude.ai manda
+    algo como modelo ou conversa.
+- **Roteiro de coleta (Leonardo, pendente):**
+  1. No iPhone, no app do Claude, numa conversa com o conector "Assistente": peça "consulte meus gastos de hoje".
+  2. Na web (claude.ai no navegador), outra conversa: peça "liste as categorias de gasto".
+  3. Avise o orquestrador. Ele roda no Mac:
+     `docker compose logs servidor --since 2h | grep -E "assistente.descoberta|Falha ao gravar a chamada"`
+     e, no banco, `docker compose exec -T postgres psql -U assistente_dono -d assistente -c "select id, momento,
+     ferramenta, resultado, autor, cliente, versao_cliente, sessao, user_agent, modelo_declarado, duracao_ms
+     from chamadas order by id desc limit 10"`.
+  4. O orquestrador confere: `cliente`, `versao_cliente` e `user_agent` preenchidos; `sessao` preenchido ou vazio
+     (protocolo 2026-07-28); `autor` = o e-mail; os nomes de cabeçalho. Se o desenho bater, desliga o log de descoberta
+     (tirar a linha de `servidor.py` e a classe) num passo curto.
+- **Pendências do revisor do 8b (continuam):** item 7 (downgrade da 0002 faz UPDATE), item 8 (teste por prefixo) e
+  item 9 (log INFO com caminho e e-mail). **Pendente.** O item 5 (filtros) foi feito aqui.
+- **Limitações:**
+  - `modelo_declarado` é o que o modelo diz; não há como conferir.
+  - O log de descoberta tem User-Agent, sessão e clientInfo (sem segredo). Fica no log do container até ser desligado.
+
+### Revisor do Passo 8b3 (2026-10-17, Opus 5.5) e correção do orquestrador
+
+- **Erro claro:** nenhum. Sem vazamento de cabeçalho, token ou argumento; migração e GRANTs certos.
+- **Corrigido (média):** registro de chamadas sem prazo prendia leituras com o Postgres travado.
+  `servidor/assistente/db.py`: `connect_timeout=3`, `statement_timeout=5000` e `pool_timeout=3` no
+  Postgres; teste em `servidor/tests/test_db.py`. Verificado no container: `statement_timeout` = 5s.
+- **Corrigido (baixa):** docstring de `consultar_chamadas` diz que cliente, user_agent e modelo são dado.
+- **Pendente:** paginação de `consultar_chamadas` (`antes_id`); teste de fuso no limite do dia;
+  desligar o log `DescobertaCliente` depois da coleta do Leonardo; retenção da tabela `chamadas`.
+
 ## Prompt do próximo passo
 
 > **Passo 9 — Usar alguns dias e anotar o que faltou (A12).** Tier D · do Leonardo · sem modelo.
@@ -847,3 +978,6 @@
 > **Passo 8b feito (2026-10-17, Opus 5.5):** registro de toda chamada de ferramenta; ver o bloco do Passo 8b.
 > **Passo 8b2 feito (2026-10-17, Opus 5.5):** correções do revisor do 8b; ver o bloco do Passo 8b2. Itens 5, 7, 8
 > e 9 do revisor ficaram pendentes (lista no bloco).
+> **Passo 8b3 feito (2026-10-17, Opus 5.5):** tabela `chamadas` e log de descoberta temporário; ver o bloco do
+> Passo 8b3. Antes do Passo 9: o Leonardo faz 1 chamada pelo iPhone e 1 pela web (roteiro no bloco), aprova ou
+> não as 3 linhas novas da ficha 1, e o orquestrador confere o log e desliga a descoberta.
