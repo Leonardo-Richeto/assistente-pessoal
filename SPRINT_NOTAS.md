@@ -572,39 +572,38 @@
 
 ## Prompt do próximo passo
 
-> **Passo 6 — Teste ponta a ponta pelo iPhone.** Tier C · Haiku 5.5 · effort baixo · **supervisionado**.
-> Só comece com o A9 feito (`[x]` em `docs/IMPLANTACAO.md`). Se não estiver, pare e avise.
+> **Passo 7 — Vault com uma cópia.** Tier B · Sonnet 5.5 · effort médio · supervisionado (o
+> Leonardo testa pelo app no fim).
 >
-> **Objetivo:** conferir que o Leonardo, pelo app do Claude no iPhone, registra e desfaz pelo
-> conector, e que o banco e a auditoria batem.
+> **Objetivo:** o servidor monta o vault a partir de uma **cópia** do vault real, e as 15
+> ferramentas permitidas do vault funcionam; apagar e mover seguem invisíveis.
 >
-> **Leia antes:** `SPRINT.md`, este arquivo (avisos vivos, Passos 5, 5b e 5c), `CLAUDE.md`,
-> `docs/IMPLANTACAO.md` (A10).
+> **Leia antes:** `SPRINT.md`, este arquivo (avisos vivos, Passos 3, 5b e 5c), `CLAUDE.md`,
+> `docker-compose.yml` (volume do vault), `servidor/assistente/servidor.py` (`PERMITIDAS`,
+> `_montar_peca`), `docs/IMPLANTACAO.md` (A11).
 >
 > **Faça:**
-> 1. Confira que o login está ligado: `docker compose ps` (servidor de pé) e
->    `curl -s -o /dev/null -w "%{http_code}" -X POST https://<maquina>.<tailnet>.ts.net/mcp` = 401.
->    Se não for 401, rode `docker compose stop servidor`, registre aqui e pare.
-> 2. Anote a contagem atual: `docker compose exec postgres psql -U assistente_dono -d assistente
->    -c "select count(*) from gastos; select count(*) from ponto; select count(*) from auditoria;"`.
-> 3. Peça ao Leonardo, pelo iPhone, nesta ordem: registrar um gasto de teste (ex.: R$ 1,00,
->    categoria `teste`); consultar os gastos de hoje; desfazer o gasto; registrar entrada e saída
->    de ponto; consultar as horas de hoje.
-> 4. Confira no banco: o gasto novo com `desfeito = true`; as linhas de ponto; uma linha de
->    auditoria por escrita. Use só `select` com o usuário dono, sem mudar nada.
-> 5. Peça também "liste as categorias de gasto": desde o Passo 5b, gasto desfeito não conta. O
->    gasto de teste desfeito no item 3 não pode trazer `teste` de volta.
-> 6. Veja `docker compose logs servidor`: sem `Acesso negado`, sem `Troca de código negada`, sem
->    traceback, sem `Limite de ... atingido`, sem `Teto global`. Se o conector der erro ao reconectar e o log mostrar 429, espere
->    1 hora ou reinicie o servidor (`docker compose restart servidor`, zera a contagem).
-> 7. Marque A10 em `docs/IMPLANTACAO.md`, status do Passo 6 no `SPRINT.md`, bloco do Passo 6 aqui,
->    "Onde estamos" atualizado. Escreva o prompt do Passo 7 (o vault usa a lista `PERMITIDAS`;
->    ver Passo 5b).
+> 1. Copie o vault real para fora do repo, sem `.git`:
+>    `mkdir -p ~/assistente-teste && rsync -a --delete --exclude .git ~/Desktop/Projetos/Obsidian/ ~/assistente-teste/vault/`.
+>    Nunca aponte o servidor para `~/Desktop/Projetos/Obsidian`.
+> 2. No `.env`, mude só a linha `VAULT_PATH` para o caminho absoluto da cópia, com `sed` (sem
+>    ler nem imprimir as outras linhas). Confira só o nome da variável.
+> 3. `docker compose up -d --build servidor`. Confira nos logs que o vault montou, sem erro de
+>    permissão (o container roda com uid 1000; o Mac, 501).
+> 4. Dentro do container, com um script no scratchpad do orquestrador, monte `criar_app` com a
+>    config real e liste as ferramentas: 9 do banco + 15 `vault_*`, nenhuma de `BLOQUEADAS`.
+>    Chame `vault_search_notes`, `vault_read_note` e `vault_write_note` (crie
+>    `00-inbox/teste-assistente.md` na cópia) e confirme o arquivo no disco da cópia.
+> 5. Confira pela URL do Funnel (`tailscale funnel status` dá a URL): `POST /mcp` sem token = 401.
+> 6. Rode `cd servidor && chflags -R nohidden .venv; uv run pytest -q`.
+> 7. Escreva para o orquestrador o roteiro do teste do Leonardo pelo app: "busque no vault notas
+>    sobre o agente whatsapp", "leia a nota onde-parei", "crie uma nota de teste no inbox",
+>    "apague essa nota" (deve dizer que não pode) e conferir na tela de permissões as 15 novas.
 >
-> **Não faça:**
-> - Não leia, imprima nem grave valores do `.env`. Não mexa em `AUTH_DESATIVADA`.
-> - Não apague linhas nem volumes. Não rode `docker compose down -v`.
-> - Não faça commit sem o ok do Leonardo. Não faça push.
+> **Não faça:** não aponte para o vault real; não leia valores do `.env`; não desligue o login;
+> não instale Paperless; não faça commit nem push (o orquestrador faz).
 >
-> **Pronto quando:** os 5 pedidos do item 3 e a lista de categorias funcionaram pelo iPhone e o
-> banco bate.
+> **Pronto quando:** 24 ferramentas no app montado, nenhuma bloqueada visível, nota de teste
+> criada na cópia, 401 sem token, testes passando, notas e `SPRINT.md` atualizados e o prompt do
+> Passo 8 escrito aqui (Tier B, Sonnet 5.5: ficha "proposta" do texto do Projeto "Assistente"
+> no claude.ai, com as regras banco × vault × Paperless, para o Leonardo aprovar).
