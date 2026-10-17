@@ -5,16 +5,30 @@
 
 ## Onde estamos
 
-- **Sprint 1 (Etapa A, teste no MacBook):** Passos 1 a 7, 5b, 5c, 8b, 8b2 e 8b3 feitos. Passo 8: ficha 1 aprovada
-  (commit `e02afb4`); falta criar o Projeto no claude.ai. 8b e 8b2 no commit `5f12b86`. Os arquivos do Passo 8b3
-  estão no working tree, sem commit: o orquestrador confere, roda o revisor e faz o commit.
-- **Pendente do Leonardo (Passo 8b3):** 1 chamada pelo iPhone e 1 pela web, para o log de descoberta mostrar o que o
-  claude.ai manda. Roteiro no bloco do Passo 8b3.
-- **Stack rodando** no MacBook: postgres e servidor em `127.0.0.1:8000` com login Google ligado,
-  exposto pelo Funnel em `https://<maquina>.<tailnet>.ts.net`. `VAULT_PATH` aponta para a **cópia** do
-  vault (`~/assistente-teste/vault`). Banco na migração `0003`. 168 testes passando.
-- **Próximo:** o Leonardo cria o Projeto e segue para o Passo 9 (Tier D).
-- **Última atualização:** 2026-10-17, Opus 5.5 (executor do Passo 8b3), MacBook Air.
+**Passagem de chat em 2026-10-17 (Opus 5.5 orquestrador, MacBook Air).** Leia esta seção, "Avisos
+vivos" e "Prompt do próximo passo". Os blocos em "Passos feitos" são histórico: abra só o do passo
+que precisar.
+
+- **Sprint 1 (Etapa A, teste no MacBook):** Passos 1 a 8b3 Feitos e commitados, sem push (último
+  commit de código `a3d9048`). 170 testes. Migração no banco: `0003`.
+- **No ar no Mac:** postgres + servidor MCP em `127.0.0.1:8000`, login Google (só o e-mail do
+  Leonardo), Funnel ligado (URL: `tailscale funnel status`), vault de **cópia** em
+  `~/assistente-teste/vault`. Conector "Assistente (teste Mac)" conectado no claude.ai; testes
+  pelo iPhone OK (gasto, desfazer, ponto, horas, vault, apagar recusado).
+- **O que o servidor tem:** 10 ferramentas do banco (gastos, ponto, atividades, desfazer,
+  auditoria, chamadas) + 15 do vault (lista de permitidas). Toda chamada vai para a tabela
+  `chamadas`; escritas de peça e tentativas negadas vão também para `auditoria`.
+- **Ficha 1** (`docs/regras-de-negocio.md`, instruções do Projeto "Assistente"): **aprovada**
+  inteira, inclusive as 3 linhas do 8b3. Falta criar o Projeto no claude.ai (depois do 8c).
+- **Coleta do clientInfo:** chamada pelo iPhone feita (2026-10-17 18:29). O claude.ai manda
+  `cliente=Anthropic/ClaudeAI`, `versao=1.0.0`, protocolo `2026-07-28`, **sem sessão**,
+  `user_agent=Claude-User`; autor gravado = e-mail do Leonardo (correção do 8b2 confirmada).
+  **Falta:** uma chamada pela web ("liste as categorias de gasto") para ver se dá para diferenciar
+  iPhone × web. Depois, desligar o log `DescobertaCliente`.
+- **Próximo:** Passo 8d (fechar a coleta e as pendências pequenas), depois 8c (vínculo banco →
+  nota do vault), depois criar o Projeto no claude.ai, Passo 9 (usar alguns dias) e 10 (fechar a
+  sprint). Sprint 2 (i7) só depois.
+- **Última atualização:** 2026-10-17, Opus 5.5 (orquestrador), MacBook Air.
 
 ## Avisos vivos
 
@@ -961,23 +975,31 @@
 
 ## Prompt do próximo passo
 
-> **Passo 9 — Usar alguns dias e anotar o que faltou (A12).** Tier D · do Leonardo · sem modelo.
-> O Opus 5.5 só guia, se o Leonardo pedir.
+> **Passo 8d — Fechar a coleta e pendências pequenas.** Tier B · Sonnet 5.5 · effort médio ·
+> supervisionado (precisa de 1 chamada do Leonardo pela web).
 >
-> **Antes:** o Leonardo responde as perguntas da ficha 1 em `docs/regras-de-negocio.md`, aprova a ficha
-> (muda o status para aprovada) e cola o texto no Projeto "Assistente" do claude.ai (PLANO 1.6).
+> **Leia antes:** este arquivo (Onde estamos, Avisos vivos, blocos 8b2, 8b3 e "Revisor do Passo
+> 8b3"), `CLAUDE.md`, `servidor/assistente/{registro,banco,servidor,db}.py`.
 >
-> **Faça, por alguns dias:**
-> 1. Use o app pelo Projeto: gastos, ponto, diário e notas do dia a dia.
-> 2. Anote em `docs/IMPLANTACAO.md` (A12) o que faltou: ferramenta, categoria, resposta ruim, confirmação
->    longa demais, caso que o texto do Projeto não cobriu.
-> 3. Se o Claude errar uma regra, diga a correção ao orquestrador: ela vira ficha ou regra na hora.
+> **Faça:**
+> 1. Peça ao Leonardo uma chamada pela web: "liste as categorias de gasto". Compare com a do iPhone
+>    (`docker compose logs servidor --since 2h | grep assistente.descoberta` e
+>    `select * from chamadas order by id desc limit 5`). Registre se iPhone e web se diferenciam.
+> 2. Desligue o log de descoberta: tire `DescobertaCliente` de `servidor.py` e a classe de
+>    `registro.py`, com os testes dela.
+> 3. `consultar_chamadas`: parâmetro `antes_id` para paginar; filtro vazio ou só espaços = sem filtro.
+> 4. Teste de fuso no limite do dia (chamada às 22h locais, `inicio=fim=` o dia local).
+> 5. Pendências do revisor do 8b: downgrade da 0002 recusa se houver `registro_id` nulo (em vez de
+>    UPDATE na auditoria); log de leitura de nota em DEBUG (o INFO hoje tem o caminho e o e-mail).
+> 6. Retenção da tabela `chamadas`: **não implemente**; escreva a ficha "proposta" em
+>    `docs/regras-de-negocio.md` (recomendação: guardar 1 ano, depois resumir por dia) e pergunte.
 >
-> **Pronto quando:** A12 tem a lista do que faltou e o Leonardo diz que pode fechar a Sprint 1 (Passo 10).
+> **Não faça:** não leia valores do `.env`; não aponte para o vault real; não desligue o login; não
+> faça push; não grave a URL do Funnel no repo (o repo é público).
 >
-> **Passo 8b feito (2026-10-17, Opus 5.5):** registro de toda chamada de ferramenta; ver o bloco do Passo 8b.
-> **Passo 8b2 feito (2026-10-17, Opus 5.5):** correções do revisor do 8b; ver o bloco do Passo 8b2. Itens 5, 7, 8
-> e 9 do revisor ficaram pendentes (lista no bloco).
-> **Passo 8b3 feito (2026-10-17, Opus 5.5):** tabela `chamadas` e log de descoberta temporário; ver o bloco do
-> Passo 8b3. Antes do Passo 9: o Leonardo faz 1 chamada pelo iPhone e 1 pela web (roteiro no bloco), aprova ou
-> não as 3 linhas novas da ficha 1, e o orquestrador confere o log e desliga a descoberta.
+> **Pronto quando:** coleta registrada, descoberta desligada, itens 3–5 com teste, ficha de
+> retenção proposta, testes passando, `docker compose up -d --build servidor` sem erro e 401 sem
+> token. Commit sem push. Depois, o prompt do **Passo 8c** aqui: coluna `nota_vault` (caminho da
+> nota, opcional) em gastos, ponto e atividades, migração 0004 aditiva, parâmetro nas ferramentas
+> `registrar_*` e ferramenta `vincular_nota(tipo, id, caminho)` auditada (ficha 1, item 6). Tier A,
+> Opus 5.5, alto.

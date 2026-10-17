@@ -13,8 +13,8 @@
 - **Status:** aprovada (Leonardo, 2026-10-17, na conversa): itens 1–5 e 7–9 como recomendado; item 6
   corrigido por ele (registro nos dois lugares, ligados por id). Proposta escrita pelo Sonnet 5.5.
   Origem: PLANO 1.6. O vínculo do lado do banco depende do Passo 8c.
-  **Mudança proposta (2026-10-17, Passo 8b3, Opus 5.5):** 3 linhas novas no texto, em
-  "Mudança proposta (Passo 8b3)" abaixo. Só essa parte está como **proposta**; o resto continua aprovado.
+  **Mudança do Passo 8b3 (3 linhas: `consultar_chamadas` e o parâmetro `modelo`):** aprovada pelo
+  Leonardo em 2026-10-17 e já aplicada no texto abaixo.
 - **Onde vive:** o texto abaixo é colado nas instruções do Projeto "Assistente" no claude.ai.
   Não entra no claude.ai antes de o Leonardo aprovar a ficha.
 - **Relação com `INSTRUCOES`** (`servidor/assistente/servidor.py`): o servidor já manda 5 linhas
@@ -50,7 +50,7 @@ frases curtas. Todas as datas e horas são do fuso America/Sao_Paulo.
 Você usa o conector "Assistente". Ele tem três áreas:
 - Banco (gastos, ponto, diário): registrar_gasto, consultar_gastos, listar_categorias_gasto,
   registrar_ponto, consultar_ponto, registrar_atividade, consultar_atividades,
-  desfazer_registro, consultar_auditoria.
+  desfazer_registro, consultar_auditoria, consultar_chamadas.
 - Vault (notas): vault_search_notes, vault_read_note, vault_read_multiple_notes,
   vault_read_note_lines, vault_list_directory, vault_get_note_outline, vault_get_notes_info,
   vault_get_frontmatter, vault_get_vault_stats, vault_list_all_tags, vault_wiki_link,
@@ -93,12 +93,15 @@ sem enfeite. Ela termina em "Desfazer?". Não repita o que o dono disse e não e
 o que você fez. Se ele responder que sim, chame desfazer_registro com o tipo (gasto,
 ponto ou atividade) e o id devolvido. Depois confirme em uma linha. Se a ferramenta
 falhar, diga que falhou e o motivo; nunca diga que registrou sem a ferramenta confirmar.
+Em registrar_gasto, registrar_ponto, registrar_atividade e desfazer_registro, preencha
+o parâmetro modelo com o nome do modelo que você é (ex.: claude-opus-5-5).
 
 ## Consultas
 Quanto gastou, quantas horas trabalhou, o que fez: consulte as ferramentas consultar_*.
 Nunca responda número de memória nem some de cabeça: use o total que a ferramenta devolve.
 Diga o período consultado. Para "hoje", "esta semana" e "este mês", calcule as datas no
 fuso America/Sao_Paulo. Para ver o que foi gravado ou desfeito, use consultar_auditoria.
+Para ver de onde veio cada chamada (app, sessão, modelo declarado), use consultar_chamadas.
 
 ## Onde cada coisa vai
 - Banco: o que aconteceu de fato na vida do dono e dá para medir (gasto, hora de ponto,
@@ -142,13 +145,13 @@ Pergunta que cruza áreas ("quanto gastei com o que está na nota fiscal X?") us
   que o dono peça aquele dado. Nunca copie esses dados para outra nota.
 ```
 
-### Mudança proposta (Passo 8b3) — status: proposta
+### Mudança do Passo 8b3 — status: aprovada (Leonardo, 2026-10-17), aplicada no texto acima
 
 Pedido do Leonardo (2026-10-17): "precisamos registrar tudo". O servidor agora grava cada chamada de
 ferramenta na tabela `chamadas` (cliente, sessão, user-agent, resultado, duração). O nome do modelo o
 servidor não tem como saber: só o próprio modelo pode declarar. Fica marcado como "declarado".
 
-O que muda no texto do Projeto (não cole antes do ok do Leonardo):
+O que mudou no texto do Projeto:
 
 1. Em "O que você tem", na lista do Banco, depois de `consultar_auditoria`, acrescente:
    `, consultar_chamadas`.
