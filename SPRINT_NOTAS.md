@@ -21,14 +21,16 @@ que precisar.
   `chamadas`; escritas de peça e tentativas negadas vão também para `auditoria`.
 - **Ficha 1** (`docs/regras-de-negocio.md`, instruções do Projeto "Assistente"): **aprovada**
   inteira, inclusive as 3 linhas do 8b3 e as 4 mudanças do 8c (aprovadas e aplicadas em 2026-10-17). Fato com parte
-  subjetiva conta como pedido de nota (decisão do Leonardo). Próximo: criar o Projeto no claude.ai com esse texto.
+  subjetiva conta como pedido de nota (decisão do Leonardo). **Colada no Projeto "Assistente" em 2026-10-17**; teste curto OK.
 - **Coleta do clientInfo: encerrada** (Passo 8d). iPhone e web chegam idênticos (cliente
   `Anthropic/ClaudeAI`, versão `1.0.0`, protocolo `2026-07-28`, sem sessão, `user_agent=Claude-User`);
   não dá para diferenciar. Log `DescobertaCliente` desligado e removido.
-- **Próximo:** commit do 8c (orquestrador), criar o Projeto no claude.ai (Leonardo, guiado), Passo 9
-  (usar alguns dias) e 10 (fechar a sprint). Sprint 2 (i7) só depois. Ficha 2 (retenção de `chamadas`)
+- **Projeto "Assistente" criado no claude.ai (2026-10-17, Leonardo):** texto da ficha 1, conector ligado. Teste:
+  gasto 7 (R$ 1,00, `teste`) criado e desfeito; auditoria 25 `criar` e 26 `desfazer`; chamadas 7 e 8 com
+  `modelo_declarado=claude-haiku-5-5` (a conversa rodou no Haiku). 401 sem token conferido.
+- **Próximo:** Passo 9 (usar alguns dias, Leonardo) e 10 (fechar a sprint). Sprint 2 (i7) só depois. Ficha 2 (retenção de `chamadas`)
   aprovada: guardar tudo (Leonardo, 2026-10-17).
-- **Última atualização:** 2026-10-17, Opus 5.5 (executor do Passo 8c, depois do revisor), MacBook Air.
+- **Última atualização:** 2026-10-17, Opus 5.5 (orquestrador, depois do Projeto criado), MacBook Air.
 
 ## Avisos vivos
 
@@ -1151,25 +1153,9 @@ Os números de linha e o retorno de `vincular_nota` citados acima são da primei
 
 ## Prompt do próximo passo
 
-> **Criar o Projeto "Assistente" no claude.ai.** Tier D · Leonardo (o orquestrador guia, Sonnet 5.5 basta) ·
-> supervisionado.
+> Projeto "Assistente" criado e testado em 2026-10-17 (ver Onde estamos).
 >
-> **Objetivo:** o Projeto existe no claude.ai com o texto da ficha 1, e o conector "Assistente (teste Mac)" está
-> ligado nele.
->
-> **Leia antes:** este arquivo (Onde estamos, Avisos vivos, bloco 8c e "Revisor do Passo 8c"), `CLAUDE.md`, a
-> ficha 1 inteira (`docs/regras-de-negocio.md`).
->
-> **Faça (guiando o Leonardo):**
-> 1. Copie o bloco "Texto proposto (colar no Projeto)" da ficha 1. Lembre o Leonardo de trocar "o dono" por
->    "Leonardo" ao colar (item 9).
-> 2. No claude.ai: criar o Projeto "Assistente", colar o texto nas instruções, ligar o conector.
-> 3. Teste curto numa conversa do Projeto: "gastei 1 real de teste" → confirmação → "sim" desfaz.
-> 4. Marque na ficha 1: "Onde vive" com a data em que o texto entrou no Projeto.
->
-> **Critério de pronto:** o Projeto existe; o teste curto passou; `POST /mcp` sem token = 401.
->
-> **Depois: Passo 9 — Usar alguns dias** (Tier D, Leonardo). Usar pelo iPhone e pela web e anotar o que faltou em
+> **Passo 9 — Usar alguns dias** (Tier D, Leonardo). Usar pelo iPhone e pela web e anotar o que faltou em
 > `docs/IMPLANTACAO.md` (A12). Roteiro mínimo:
 > 1. Gasto com categoria existente; "sim" desfaz; gasto sem valor gera pergunta.
 > 2. Ponto do dia e "quantas horas trabalhei hoje?".

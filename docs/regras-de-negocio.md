@@ -19,7 +19,8 @@
   "nota nova sem pedir" para fato com parte subjetiva:** aprovadas pelo Leonardo em 2026-10-17 e já
   aplicadas no texto abaixo.
 - **Onde vive:** o texto abaixo é colado nas instruções do Projeto "Assistente" no claude.ai.
-  Não entra no claude.ai antes de o Leonardo aprovar a ficha.
+  Não entra no claude.ai antes de o Leonardo aprovar a ficha. **Colado em 2026-10-17** (com "o dono"
+  trocado por "Leonardo", item 9); teste curto pelo Projeto OK (gasto 7 criado e desfeito).
 - **Relação com `INSTRUCOES`** (`servidor/assistente/servidor.py`): o servidor já manda 5 linhas
   de regra ao cliente. O Projeto repete só o essencial e acrescenta o que o servidor não diz:
   quando registrar, tom e a divisão banco × vault × Paperless.
