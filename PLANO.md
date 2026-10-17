@@ -123,5 +123,12 @@ Ordem sugerida de implementação, uma sprint por bloco:
 
 Fora: medicamentos e consultas frequentes (o Leonardo não tem).
 
+**Bateria de perguntas ao subir no i7 (pedido do Leonardo, 2026-10-17):** quando cada bloco acima
+estiver implementado em produção, o modelo faz ao Leonardo uma bateria de perguntas para popular os
+dados iniciais (contas fixas, veículos, livros em andamento, pets, documentos e vencimentos,
+hábitos etc.). Perguntas que ficaram para esse momento: aviso para documentos com vencimento
+(recomendação: 60 dias antes); registrar o salário como receita (recomendação: sim); quais
+hábitos marcar (3 a 5).
+
 ## Sempre que surgir um dado novo
 Seguir "Dado novo" no `README.md`: modelo → migração revisada → ferramentas `registrar_*`/`consultar_*` → testes.
