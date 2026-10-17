@@ -19,7 +19,7 @@ máquina dedicada. Marque `[x]` conforme avança.
       Vault e Paperless vazios por enquanto.
 - [x] A8 (2026-10-16, MacBook arm64). `docker compose up -d --build` e `docker compose logs -f servidor` (erro no build → guardar o log)
 - [x] A9 (2026-10-17: conector "Assistente (teste Mac)" conectado; "liste as categorias de gasto" respondeu só "teste"). claude.ai → Configurações → Conectores → conector personalizado → `<URL do A5>/mcp` → login Google
-- [ ] A10. Teste pelo iPhone: registrar gasto → consultar → desfazer; registrar ponto → consultar horas
+- [x] A10 (2026-10-17). Teste pelo iPhone: registrar gasto → consultar → desfazer; registrar ponto → consultar horas
 - [ ] A11. (Opcional) Testar o vault com uma **cópia** do vault em `VAULT_PATH`
 - [ ] A12. Usar alguns dias; anotar aqui o que faltou ou incomodou
 

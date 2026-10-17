@@ -564,7 +564,7 @@
 - **Verificado no banco (2026-10-17):** gasto real (id 5) ativo; gasto de teste (id 6) criado e desfeito;
   ponto: 1 `entrada`. Auditoria tem `criar`, `criar`, `desfazer`, `criar`, na ordem. O Leonardo disse que
   consultas, categorias e horas responderam certo.
-- **Pendente:** nenhuma `saida` de ponto foi gravada; conferir com o Leonardo se ele registrou.
+- **Feito:** o Leonardo tinha esquecido a saída; registrou às 09:52. Entrada 09:35 → saída 09:52 = 17 min, igual ao que o app respondeu. Passo 6 Feito.
 
 ## Prompt do próximo passo
 
