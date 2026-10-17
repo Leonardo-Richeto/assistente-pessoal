@@ -75,6 +75,26 @@ A sequência de **teste no MacBook → produção no i7** está em `docs/IMPLANT
 - [ ] 6.4 Avisos por evento: workers publicam alertas que o gateway envia no WhatsApp
 - [ ] 6.5 Receber arquivos pelo WhatsApp e mandar para o Paperless
 
+## Fase 6b — Fábrica de ferramentas (ideia aprovada para planejar, Leonardo, 2026-10-17)
+Quando o Leonardo pede algo e falta ferramenta, o Claude pede a ferramenta; um agente no i7 a constrói e o
+Leonardo aprova antes de subir. **Nunca sobe sem o sim do Leonardo:** o servidor lê dado de fora (notas,
+documentos), e criar e publicar código sozinho viraria execução arbitrária por injeção de prompt. Mantém as
+regras "sem comando arbitrário" e "só fica visível o que está em `PERMITIDAS`". Depende do Claude Code headless
+no i7 (B11 da Sprint 2 e 6.1). Antes de implementar: ficha "proposta" em `docs/regras-de-negocio.md`.
+- [ ] ⚑ 6b.1 `pedir_ferramenta(descricao, motivo)`: grava o pedido numa fila no banco (tabela `pedidos_ferramenta`,
+  migração), auditado; só texto, não executa nada. O Claude responde ao pedido do momento com o que já existe e
+  avisa que pediu a ferramenta. Pode vir antes do resto (até no Mac): serve de lista de desejos implementada à mão
+- [ ] 6b.2 `consultar_pedidos_ferramenta` (leitura) e status do pedido (`aberto`, `em_construcao`, `aguardando_ok`,
+  `aprovado`, `recusado`, `no_ar`)
+- [ ] ⚑ 6b.3 Construtor no i7: Claude Code headless pega o pedido e escreve ficha proposta, código e testes num
+  branch próprio, num container sem o `.env` de produção e sem rede além do necessário
+- [ ] ⚑ 6b.4 Revisor independente automático no branch (regras do `CLAUDE.md`: sem SQL livre, escrita auditada,
+  classificação leitura/escrita, `PERMITIDAS`) e testes passando; reprovado volta ao construtor ou vira `recusado`
+- [ ] ⚑ 6b.5 Aprovação do Leonardo: resumo com a ficha, o diff e o parecer do revisor (pelo app; depois da Fase 6,
+  pelo WhatsApp); só o sim dele libera
+- [ ] ⚑ 6b.6 Deploy depois do sim: merge, nome em `PERMITIDAS` e na classificação, `docker compose up -d --build`,
+  401 sem token conferido; o status do pedido vira `no_ar` e o Claude avisa
+
 ## Fase 7 — Backup
 - [ ] 7.1 `pg_dump` diário + vault (git) + mídia do Paperless para o i5 (Proxmox), com retenção
 - [ ] 7.2 Teste de restauração documentado
