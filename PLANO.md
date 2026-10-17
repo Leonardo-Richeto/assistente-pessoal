@@ -114,7 +114,7 @@ Ordem sugerida de implementação, uma sprint por bloco:
 | 1 | Finanças | receitas e transferências; contas fixas e assinaturas (valor, dia, consumo de luz e água por mês); investimentos e dívidas/parcelamentos (posição por mês) | **sem aviso de vencimento** de conta; Pluggy (Fase 3) pode alimentar parte |
 | 2 | Leitura e estudo | livros (título, páginas lidas por dia, início, fim); estudo diário (tema, duração) | o resumo do que aprendeu vai para o vault, ligado por id |
 | 3 | Veículos | carro e patinete elétrico: abastecimento/recarga, km, manutenção, IPVA e seguro do carro | uma tabela de veículos, um registro por evento |
-| 4 | Família e pets | eventos de saúde por pessoa ou pet (vacina, consulta, veterinário, crescimento) | a filha vai nascer em breve: confirmar o que acompanhar |
+| 4 | Família e pets | eventos de saúde por pessoa ou pet (vacina, consulta, veterinário, crescimento) | filha (decisão de 2026-10-17): começar com vacinas, consultas, peso e altura; dado de criança fica só no banco de casa, nunca no vault/GitHub |
 | 5 | Hábitos | marcação diária (ex.: água, leitura, tempo de tela) | definição dos hábitos com o Leonardo |
 | 6 | Garantias e documentos | itens com prazo de garantia (ligados à nota fiscal no Paperless); documentos com vencimento (CNH etc.) | aviso de documento: confirmar |
 | 7 | Saúde pessoal | peso e medidas (baixa prioridade); humor/energia/sono 1–5; Apple Watch na Fase 5b | — |
