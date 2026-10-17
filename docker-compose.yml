@@ -43,7 +43,7 @@ services:
       DATABASE_URL_ESCRITA: postgresql+psycopg://assistente_escrita:${SENHA_ESCRITA}@postgres/assistente
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?defina PUBLIC_BASE_URL no .env}
       AUTH_PROVEDOR: ${AUTH_PROVEDOR:-github}
-      AUTH_DESATIVADA: ${AUTH_DESATIVADA:-false}
+      # AUTH_DESATIVADA não entra aqui de propósito: o servidor exposto nunca sobe sem login.
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
       GITHUB_LOGINS_PERMITIDOS: ${GITHUB_LOGINS_PERMITIDOS:-}
@@ -51,6 +51,7 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_EMAILS_PERMITIDOS: ${GOOGLE_EMAILS_PERMITIDOS:-}
       JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:?defina JWT_SIGNING_KEY no .env}
+      AUTH_REDIRECTS_PERMITIDOS: ${AUTH_REDIRECTS_PERMITIDOS:-}
       NOME_USUARIO: ${NOME_USUARIO:-Leonardo}
       VAULT_PATH: ${VAULT_PATH:+/vault}
       PAPERLESS_URL: ${PAPERLESS_URL:-}
@@ -59,6 +60,8 @@ services:
     volumes:
       # Pasta do vault no host (sincronizada por Syncthing, versionada com git).
       - ${VAULT_PATH:-./vazio}:/vault
+      # Clientes OAuth registrados e tokens (cifrados). Sem isto, todo rebuild exige reconectar.
+      - oauth:/home/assistente/.local/share/fastmcp
     ports:
       - "127.0.0.1:${PORTA_HOST:-8000}:8000"
     depends_on:
@@ -73,3 +76,4 @@ services:
 
 volumes:
   pgdata:
+  oauth:

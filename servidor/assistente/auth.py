@@ -53,7 +53,8 @@ class GoogleRestrito(_Restrito, GoogleProvider):
         super().__init__(required_scopes=["openid", "email"], **kwargs)
 
     def _identidade(self, acesso):
-        # E-mail não verificado no Google não vale como identidade.
-        if acesso.claims.get("email_verified") is False:
+        # Falha fechado: só vale e-mail com email_verified verdadeiro. O tokeninfo do Google manda
+        # texto ("true"/"false"); o userinfo manda booleano. Claim ausente = recusa.
+        if str(acesso.claims.get("email_verified")).strip().lower() != "true":
             return None
         return acesso.claims.get("email")

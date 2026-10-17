@@ -25,6 +25,10 @@ COPY . .
 RUN uv sync --frozen --no-dev
 
 RUN useradd --create-home --uid 1000 assistente
+# Estado do login (clientes registrados e tokens, cifrados com a JWT_SIGNING_KEY). O compose monta
+# um volume aqui para o rebuild não derrubar o conector. A pasta nasce do usuário para o volume herdar.
+ENV FASTMCP_HOME=/home/assistente/.local/share/fastmcp
+RUN mkdir -p "$FASTMCP_HOME" && chown -R assistente:assistente /home/assistente/.local
 USER assistente
 
 EXPOSE 8000

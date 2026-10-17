@@ -8,8 +8,8 @@
 ## O que é o projeto
 
 Assistente pessoal do Leonardo. O app do Claude (iPhone, Mac, web) é a porta de
-entrada. Ele conversa com um servidor MCP que roda em casa, com login GitHub ou
-Google. O servidor guarda gastos, ponto e diário num Postgres, e dá acesso ao
+entrada. Ele conversa com um servidor MCP que roda em casa, com login pelo Google
+(decisão do Leonardo, 2026-10-17; o GitHub continua no código como alternativa). O servidor guarda gastos, ponto e diário num Postgres, e dá acesso ao
 Paperless e ao vault. Os dados ficam em casa; o modelo é só o cérebro.
 
 O plano é testar tudo no MacBook Air M1 (8 GB) e, quando estiver estável,
@@ -60,9 +60,9 @@ Se este arquivo divergir de uma fonte acima, vale a fonte. Corrija este arquivo.
 |---|---|---|---|---|---|---|---|
 | 1 | Ambiente local: abrir o Docker Desktop, instalar `uv` (`brew install uv`), `uv sync`, `uv run pytest` (17 testes). IMPLANTACAO A1–A3 | C | Haiku 5.5 | baixo | autopilot | — | Feito |
 | 2 | Stack local sem internet: `.env` de teste com senhas geradas, `docker compose up -d --build` no M1 (arm64), migração aplicada, smoke com `fastmcp.Client` contra `127.0.0.1:8000` (registrar, consultar, desfazer, auditoria). Corrigir Dockerfile/compose se o build falhar. Parte do A8 | B | Sonnet 5.5 | médio | autopilot | 1 | Feito |
-| 3 | Conferir as ferramentas bloqueadas: listar os nomes reais das ferramentas do `mcpvault@0.16.0` e do `paperless-mcp==0.1.0` e comparar com `BLOQUEADAS`. Nome errado deixa ferramenta perigosa ligada. Cobrir com teste | A | Opus 5.5 | alto | supervisionado | 2 | Pendente |
-| 4 | Tailscale no Mac (HTTPS + Funnel, `tailscale funnel --bg 8000`) e GitHub OAuth App de teste. IMPLANTACAO A4–A6 | D | Leonardo (Sonnet 5.5 guia) | baixo | supervisionado | 2 | Pendente |
-| 5 | Login real: `.env` com `PUBLIC_BASE_URL` e credenciais do passo 4, subir, conferir `/.well-known/oauth-protected-resource/mcp` = 200, sem token = 401, login fora da lista = recusado. Conector no claude.ai. IMPLANTACAO A7–A9 | A | Opus 5.5 | alto | supervisionado | 3, 4 | Pendente |
+| 3 | Conferir as ferramentas bloqueadas: listar os nomes reais das ferramentas do `mcpvault@0.16.0` e do `paperless-mcp==0.1.0` e comparar com `BLOQUEADAS`. Nome errado deixa ferramenta perigosa ligada. Cobrir com teste | A | Opus 5.5 | alto | supervisionado | 2 | Feito; mais 3 bloqueadas a pedido do Leonardo (2026-10-17); revisor passou |
+| 4 | Tailscale no Mac (HTTPS + Funnel, `tailscale funnel --bg 8000`) e cliente OAuth do Google de teste. IMPLANTACAO A4–A6 | D | Leonardo (Sonnet 5.5 guia) | baixo | supervisionado | 2 | Feito 2026-10-17 (Leonardo, guiado pelo Opus 5.5) |
+| 5 | Login real: `.env` com `PUBLIC_BASE_URL`, `AUTH_PROVEDOR=google` e credenciais do passo 4, subir, conferir `/.well-known/oauth-protected-resource/mcp` = 200, sem token = 401, e-mail fora da lista = recusado. Conector no claude.ai. IMPLANTACAO A7–A9 | A | Opus 5.5 | alto | supervisionado | 3, 4 | Feito 2026-10-17 (Opus 5.5); A9 conectado pelo Leonardo; revisor passou |
 | 6 | Teste ponta a ponta pelo iPhone: gasto → consultar → desfazer; ponto → horas. Conferir no banco as linhas e a auditoria. IMPLANTACAO A10 | C | Haiku 5.5 | baixo | supervisionado | 5 | Pendente |
 | 7 | Vault com uma **cópia** em `VAULT_PATH`: ler, buscar, criar nota; apagar continua bloqueado. IMPLANTACAO A11 | B | Sonnet 5.5 | médio | supervisionado | 6 | Pendente |
 | 8 | Projeto "Assistente" no claude.ai com instruções de uso (PLANO 1.6). O texto é de produto: vira ficha "proposta" antes | B | Sonnet 5.5 | médio | supervisionado | 6 | Pendente |

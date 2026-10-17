@@ -7,6 +7,13 @@ from zoneinfo import ZoneInfo
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
+# Callback do claude.ai (web, desktop e celular). A documentação da Anthropic avisa que pode
+# passar a claude.com; as duas ficam liberadas.
+REDIRECTS_CLAUDE = [
+    "https://claude.ai/api/mcp/auth_callback",
+    "https://claude.com/api/mcp/auth_callback",
+]
+
 
 class Config(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -28,6 +35,9 @@ class Config(BaseSettings):
     google_client_secret: str = ""
     google_emails_permitidos: Annotated[list[str], NoDecode] = Field(default_factory=list)
     jwt_signing_key: str = ""
+    # Para onde o login pode devolver o cliente MCP (registro dinâmico). Vazio = só o claude.ai.
+    # Sem esta lista, o FastMCP aceita qualquer https.
+    auth_redirects_permitidos: Annotated[list[str], NoDecode] = Field(default_factory=lambda: list(REDIRECTS_CLAUDE))
 
     # Quem é o dono desta instância (vai nas instruções que o modelo recebe).
     nome_usuario: str = "Leonardo"
@@ -48,6 +58,13 @@ class Config(BaseSettings):
         if isinstance(v, str):
             return [x.strip().lower() for x in v.split(",") if x.strip()]
         return [x.lower() for x in v]
+
+    @field_validator("auth_redirects_permitidos", mode="before")
+    @classmethod
+    def _separar_redirects(cls, v):
+        if isinstance(v, str):
+            v = [x.strip() for x in v.split(",") if x.strip()]
+        return v or list(REDIRECTS_CLAUDE)
 
     @property
     def tz(self) -> ZoneInfo:

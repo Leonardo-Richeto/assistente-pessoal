@@ -8,6 +8,7 @@ Só este endpoint vai para a internet (via Tailscale Funnel). Paperless e vault 
 """
 
 import logging
+from urllib.parse import urlparse
 
 from fastmcp import FastMCP
 from fastmcp.server import create_proxy
@@ -24,13 +25,31 @@ log = logging.getLogger("assistente")
 
 # Ferramentas das peças prontas que ficam desligadas: irreversíveis ou que abrem dados para fora.
 # Para religar uma, tire daqui.
+# Nome = "<namespace>_<nome na peça>" (FastMCP 4.1.0, transforms/namespace.py). Os nomes reais de
+# cada versão fixada estão em tests/fixtures/ferramentas_pecas.json; tests/test_bloqueadas.py
+# falha se um nome daqui não existir na peça.
 BLOQUEADAS = {
     "paperless_create_share_link",       # link público de documento = vazamento
-    "paperless_delete_document_pages",
-    "paperless_split_document",
-    "paperless_bulk_merge_documents",
-    "paperless_bulk_reprocess_documents",
+    "paperless_delete_document_pages",   # gera versão menor do documento; páginas somem
+    "paperless_split_document",          # com delete_original=True o original some
+    "paperless_bulk_merge_documents",    # com delete_originals=True os originais vão para a lixeira
+    "paperless_bulk_reprocess_documents",  # refaz o OCR e perde correções manuais do texto
+    # Só aparecem com PAPERLESS_MCP_ENABLE_DELETE=true (hoje desligado). Bloqueio de reserva,
+    # para não depender só da variável da peça.
+    "paperless_delete_document",         # apaga documento
+    "paperless_delete_document_note",    # apaga nota do documento, sem volta
+    "paperless_delete_tag",              # apaga tag e tira de todos os documentos
+    "paperless_delete_correspondent",    # apaga correspondente e tira de todos os documentos
+    "paperless_delete_document_type",    # apaga tipo e tira de todos os documentos
+    "paperless_delete_storage_path",     # apaga caminho de armazenamento
+    "paperless_delete_custom_field",     # apaga o campo e os valores em todos os documentos
+    "paperless_bulk_delete_objects",     # apaga tags/correspondentes/tipos/caminhos em lote
+    "paperless_empty_trash",             # esvazia a lixeira: apagar de vez
     "vault_delete_note",                 # git recupera, mas não vale o risco
+    # Bloqueio provisório (Leonardo, 2026-10-17). Rever quando o vault tiver commit diário (PLANO 2.3).
+    "vault_move_file",                   # move qualquer arquivo; com overwrite=true apaga o destino
+    "vault_move_note",                   # com overwrite=true apaga a nota de destino
+    "paperless_bulk_edit_documents",     # troca tags/tipo/correspondente em lote, sem desfazer
 }
 
 INSTRUCOES = """\
@@ -42,8 +61,15 @@ Assistente pessoal de {nome} (fuso {fuso}).
 """
 
 
+LOCAIS = {"localhost", "127.0.0.1", "::1"}
+TAMANHO_MINIMO_CHAVE = 32
+
+
 def _auth(cfg: Config):
     if cfg.auth_desativada:
+        # O container não recebe esta variável (ver docker-compose.yml); isto é a segunda trava.
+        if urlparse(cfg.public_base_url).hostname not in LOCAIS:
+            raise SystemExit("AUTH_DESATIVADA só vale com PUBLIC_BASE_URL local; recusando subir sem login.")
         log.warning("AUTH DESATIVADA — use só em teste local, nunca com o tunnel ligado.")
         return None
     p = cfg.auth_provedor
@@ -51,7 +77,11 @@ def _auth(cfg: Config):
     faltando = [n.upper() for n in exigidos if not getattr(cfg, n)]
     if faltando:
         raise SystemExit(f"Configuração de login ({p}) incompleta: {', '.join(faltando)}")
-    comum = dict(base_url=cfg.public_base_url, jwt_signing_key=cfg.jwt_signing_key)
+    # A chave assina os tokens e deriva a chave que cifra o volume oauth.
+    if len(cfg.jwt_signing_key) < TAMANHO_MINIMO_CHAVE:
+        raise SystemExit(f"JWT_SIGNING_KEY curta: use {TAMANHO_MINIMO_CHAVE}+ caracteres (openssl rand -base64 32).")
+    comum = dict(base_url=cfg.public_base_url, jwt_signing_key=cfg.jwt_signing_key,
+                 allowed_client_redirect_uris=cfg.auth_redirects_permitidos)
     if p == "google":
         return GoogleRestrito(emails_permitidos=cfg.google_emails_permitidos,
                               client_id=cfg.google_client_id, client_secret=cfg.google_client_secret, **comum)
