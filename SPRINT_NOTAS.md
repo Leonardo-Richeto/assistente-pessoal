@@ -561,7 +561,10 @@
 - **Feito:** o Leonardo registrou pelo app um gasto real (categoria `mercado`, origem `manual`). No banco:
   linha em `gastos` com `desfeito = f` e auditoria `criar` no mesmo instante. Isso também prova que o
   conector seguiu conectado depois dos rebuilds do 5b/5c.
-- **Pendente:** consultar, desfazer, ponto (entrada/saída) e horas.
+- **Verificado no banco (2026-10-17):** gasto real (id 5) ativo; gasto de teste (id 6) criado e desfeito;
+  ponto: 1 `entrada`. Auditoria tem `criar`, `criar`, `desfazer`, `criar`, na ordem. O Leonardo disse que
+  consultas, categorias e horas responderam certo.
+- **Pendente:** nenhuma `saida` de ponto foi gravada; conferir com o Leonardo se ele registrou.
 
 ## Prompt do próximo passo
 
