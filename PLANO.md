@@ -93,5 +93,8 @@ A sequência de **teste no MacBook → produção no i7** está em `docs/IMPLANT
 
 ---
 
+## Dados novos previstos
+- Receitas, transferências e reembolsos (hoje o banco só tem gastos; ficha 1 de `docs/regras-de-negocio.md`).
+
 ## Sempre que surgir um dado novo
 Seguir "Dado novo" no `README.md`: modelo → migração revisada → ferramentas `registrar_*`/`consultar_*` → testes.
