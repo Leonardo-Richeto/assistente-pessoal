@@ -105,11 +105,23 @@ Só faz sentido com o servidor ligado 24 h na rede de casa; no MacBook não roda
 
 ---
 
-## Dados novos previstos
-- Receitas, transferências e reembolsos (hoje o banco só tem gastos; ficha 1 de `docs/regras-de-negocio.md`).
-- Humor, energia e sono (nota 1–5 no banco; texto no vault, ligado por id).
-- Metas (ex.: teto mensal por categoria; o motivo fica no vault, ligado por id).
-- Saúde do Apple Watch/iPhone (passos, frequência cardíaca, HRV, treinos, sono): ver Fase 5b.
+## Dados novos previstos (respostas do Leonardo, 2026-10-17)
+Tudo vai para o banco (dado real e medível); comentário subjetivo vai para o vault, ligado por id (ficha 1).
+Ordem sugerida de implementação, uma sprint por bloco:
+
+| # | Bloco | Registros | Observação |
+|---|---|---|---|
+| 1 | Finanças | receitas e transferências; contas fixas e assinaturas (valor, dia, consumo de luz e água por mês); investimentos e dívidas/parcelamentos (posição por mês) | **sem aviso de vencimento** de conta; Pluggy (Fase 3) pode alimentar parte |
+| 2 | Leitura e estudo | livros (título, páginas lidas por dia, início, fim); estudo diário (tema, duração) | o resumo do que aprendeu vai para o vault, ligado por id |
+| 3 | Veículos | carro e patinete elétrico: abastecimento/recarga, km, manutenção, IPVA e seguro do carro | uma tabela de veículos, um registro por evento |
+| 4 | Família e pets | eventos de saúde por pessoa ou pet (vacina, consulta, veterinário, crescimento) | a filha vai nascer em breve: confirmar o que acompanhar |
+| 5 | Hábitos | marcação diária (ex.: água, leitura, tempo de tela) | definição dos hábitos com o Leonardo |
+| 6 | Garantias e documentos | itens com prazo de garantia (ligados à nota fiscal no Paperless); documentos com vencimento (CNH etc.) | aviso de documento: confirmar |
+| 7 | Saúde pessoal | peso e medidas (baixa prioridade); humor/energia/sono 1–5; Apple Watch na Fase 5b | — |
+| 8 | Viagens | datas, destino, gastos ligados | não é frequente, mas entra |
+| 9 | Metas | teto mensal por categoria e outras | o motivo fica no vault |
+
+Fora: medicamentos e consultas frequentes (o Leonardo não tem).
 
 ## Sempre que surgir um dado novo
 Seguir "Dado novo" no `README.md`: modelo → migração revisada → ferramentas `registrar_*`/`consultar_*` → testes.
