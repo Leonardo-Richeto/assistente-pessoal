@@ -1151,8 +1151,6 @@ Os números de linha e o retorno de `vincular_nota` citados acima são da primei
 
 ## Prompt do próximo passo
 
-> **Antes (orquestrador, Opus 5.5):** confira o Passo 8c e faça o commit.
->
 > **Criar o Projeto "Assistente" no claude.ai.** Tier D · Leonardo (o orquestrador guia, Sonnet 5.5 basta) ·
 > supervisionado.
 >
