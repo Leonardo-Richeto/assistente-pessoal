@@ -1,7 +1,7 @@
 """Registro de toda chamada de ferramenta (middleware do FastMCP no app principal).
 
 Classificação falha fechado: só é leitura o que está numa lista explícita de leituras.
-- Leitura conhecida (banco ou peça pronta): só log em INFO.
+- Leitura conhecida (banco ou peça pronta): só log (DEBUG se ok; INFO sem dados se erro ou cancelada).
 - Escrita do banco conhecida: só log; `_gravar` (banco.py) já grava a auditoria dos dados.
 - Todo o resto (escrita de peça, nome novo, caminho por hash do FastMCP): linha `escrever` em
   `auditoria` ANTES da chamada e `ok`, `erro` ou `cancelado` depois, com `registro_id` apontando
@@ -202,9 +202,17 @@ class RegistroChamadas(Middleware):
         # manage_tags com operation=list só lê.
         return not (nome == "vault_manage_tags" and argumentos.get("operation") == "list")
 
-    def _nivel(self, nome: str, escrita: bool) -> int:
-        """Leitura (inclusive manage_tags list) loga em DEBUG: o caminho da nota e a conta não ficam no log INFO."""
-        return logging.INFO if escrita or nome in self._auditadas else logging.DEBUG
+    def _logar(self, nome: str, escrita: bool, situacao: str, autor: str, dados: dict) -> None:
+        """Escrita (peça ou banco): INFO com autor e dados. Leitura `ok`: DEBUG (caminho e conta fora do INFO).
+
+        Leitura com `erro` ou `cancelado`: INFO só com o nome e o resultado, sem autor nem dados (Passo 8e).
+        """
+        if escrita or nome in self._auditadas:
+            log.info("Chamada %s: %s autor=%s %s", nome, situacao, autor, dados)
+        elif situacao == "ok":
+            log.debug("Chamada %s: %s autor=%s %s", nome, situacao, autor, dados)
+        else:
+            log.info("Chamada %s: %s", nome, situacao)
 
     def _inserir(self, nome: str, tabela: str, acao: str, dados: dict, autor: str,
                  registro_id: int | None = None) -> int:
@@ -293,17 +301,15 @@ class RegistroChamadas(Middleware):
             # Cancelamento (CancelledError e afins) não é Exception: a escrita pode ter acontecido.
             situacao = "erro" if isinstance(e, Exception) else "cancelado"
             chamada["resultado"] = situacao
-            log.log(self._nivel(nome, escrita), "Chamada %s: %s autor=%s %s",
-                    nome, situacao, autor, dados)
+            self._logar(nome, escrita, situacao, autor, dados)
             if escrita:
                 await self._gravar_sem_falhar(nome, tabela, situacao, dados, autor, id_escrita)
             raise
 
         situacao = "erro" if getattr(resultado, "is_error", False) else "ok"
         chamada["resultado"] = situacao
-        # Leitura: caminho da nota e e-mail só em DEBUG (o registro durável é a tabela `chamadas`).
-        log.log(self._nivel(nome, escrita), "Chamada %s: %s autor=%s %s",
-                nome, situacao, autor, dados)
+        # Leitura ok: caminho da nota e e-mail só em DEBUG (o registro durável é a tabela `chamadas`).
+        self._logar(nome, escrita, situacao, autor, dados)
         if escrita:
             await self._gravar_sem_falhar(nome, tabela, situacao, dados, autor, id_escrita)
         return resultado

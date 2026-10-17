@@ -9,8 +9,9 @@
 vivos" e "Prompt do próximo passo". Os blocos em "Passos feitos" são histórico: abra só o do passo
 que precisar.
 
-- **Sprint 1 (Etapa A, teste no MacBook):** Passos 1 a 8d e 8c Feitos e commitados, sem push
-  (8c: revisor rodou e as correções estão feitas, 2026-10-17). 248 testes.
+- **Sprint 1 (Etapa A, teste no MacBook):** Passos 1 a 8e Feitos e commitados, sem push (revisor
+  rodou em todos os de Tier A). 260 testes + 1 pulado (Postgres de rascunho). Falta só o uso real (Passo 9, que o
+  Leonardo vai fazer no i7) e fechar a sprint (Passo 10). Fase 6b (fábrica de ferramentas) anotada no `PLANO.md`.
   Migração no banco: `0004`.
 - **No ar no Mac:** postgres + servidor MCP em `127.0.0.1:8000`, login Google (só o e-mail do
   Leonardo), Funnel ligado (URL: `tailscale funnel status`), vault de **cópia** em
@@ -30,7 +31,8 @@ que precisar.
   `modelo_declarado=claude-haiku-5-5` (a conversa rodou no Haiku). 401 sem token conferido.
 - **Próximo:** Passo 9 (usar alguns dias, Leonardo) e 10 (fechar a sprint). Sprint 2 (i7) só depois. Ficha 2 (retenção de `chamadas`)
   aprovada: guardar tudo (Leonardo, 2026-10-17).
-- **Última atualização:** 2026-10-17, Opus 5.5 (orquestrador, depois do Projeto criado), MacBook Air.
+- **Decisão do Leonardo (2026-10-17):** o i7 ainda não entra; tudo o que for do Mac pode ser feito (Passo 8e).
+- **Última atualização:** 2026-10-17, Opus 5.5 (orquestrador, depois do revisor do 8e), MacBook Air.
 
 ## Avisos vivos
 
@@ -47,9 +49,10 @@ que precisar.
   - `consultar_auditoria` devolve o `id` de cada linha desde o 8c.
 
 - **Desde 2026-10-17 (Passos 8b e 8b2): toda chamada de ferramenta fica registrada** (`servidor/assistente/registro.py`).
-  - Só é leitura o que está em `LEITURAS_PECAS` (`servidor.py`) ou `LEITURAS_BANCO` (`banco.py`). Leitura: só log
-    **DEBUG** desde o 8d (`assistente.registro: Chamada <ferramenta>: ok autor=<conta> {'caminho': ...}`); escrita e
-    negada continuam em INFO.
+  - Só é leitura o que está em `LEITURAS_PECAS` (`servidor.py`) ou `LEITURAS_BANCO` (`banco.py`). Leitura `ok`: só log
+    **DEBUG** desde o 8d (`assistente.registro: Chamada <ferramenta>: ok autor=<conta> {'caminho': ...}`). Leitura com
+    `erro` ou `cancelado`: **INFO** sem autor nem dados desde o 8e (`Chamada <ferramenta>: erro`). Escrita e negada
+    continuam em INFO.
   - Escritas do banco (`ESCRITAS_BANCO`): só log; `_gravar` já grava a auditoria (`criar`, `desfazer`).
   - **Todo o resto** (escrita das peças, nome novo, bloqueada, inexistente, caminho `<hash12>_<nome>`): linha
     `escrever` **antes** da chamada e `ok`, `erro`, `cancelado` ou `negado` depois. Se a `escrever` não grava
@@ -61,7 +64,11 @@ que precisar.
   - Nome fora de `^[A-Za-z0-9_]{1,60}$` vira `<nome invalido>` no log e no banco.
   - Ferramenta nova numa peça: ponha em `LEITURAS_PECAS` ou `ESCRITAS_PECAS`; sem isso, a leitura nova conta como
     escrita (duas linhas a mais por chamada). Ferramenta nova no banco: ponha em `LEITURAS_BANCO` ou `ESCRITAS_BANCO`
-    (o teste falha até isso).
+    (o teste falha até isso). Desde o 8e, ponha também em `CLASSIFICACAO_REVISADA` (`tests/test_registro.py`), decidindo
+    à mão se lê ou escreve; o teste não olha o prefixo do nome.
+  - Desde o 8e, `tests/test_contrato_ficha1.py` lê o texto do Projeto em `docs/regras-de-negocio.md`: ferramenta citada
+    que não existe, bloqueada, ou ferramenta do banco/vault fora do texto faz o teste falhar. Ferramenta nova = proposta
+    de linha na ficha 1.
 
 - **Desde 2026-10-17 (Passo 8b3): toda chamada também vira linha em `chamadas`** (`registro.py`, migração `0003`). O log temporário `DescobertaCliente` foi removido no Passo 8d.
   - Uma linha por chamada, no fim, inclusive leitura: `momento` (início), `ferramenta`, `resultado`
@@ -693,7 +700,7 @@ que precisar.
   e dois exemplos, porque ele não está ligado (só no i7). O texto manda avisar "O Paperless não está ligado
   ainda" e parar, sem improvisar.
 - **Não verificado:** o texto no app. O Projeto não foi criado (é depois do ok do Leonardo). Nenhum teste
-  novo; não mexi no servidor. O teste de contrato (nomes citados existem no app) está como Pendente na ficha.
+  novo; não mexi no servidor. O teste de contrato (nomes citados existem no app) está como Pendente na ficha (resolvido no 8e).
 - **Decidi sozinho:** usei "o dono" no texto, sem nome, porque o repo é público. O Leonardo pode trocar ao colar.
 - **Falta:** o Leonardo responder as perguntas da ficha 1, aprovar, criar o Projeto, e marcar PLANO 1.6.
 
@@ -870,7 +877,7 @@ que precisar.
   - Item 5: filtro por `tabela` e `acao` em `consultar_auditoria`. **Pendente.**
   - Item 7: o downgrade da `0002` faz `UPDATE` na `auditoria` (põe `0` nas linhas vazias). **Pendente.**
   - Item 8: o teste de classificação por prefixo (`test_leituras_e_escritas_das_pecas_nao_se_cruzam`) depende de o
-    nome começar com `read`, `get`... **Pendente.**
+    nome começar com `read`, `get`... **Pendente.** (resolvido no 8e)
   - Item 9: o log INFO tem o caminho da nota (e o e-mail). **Pendente.**
 - **Limitações:**
   - Se o processo morrer (não cancelar) entre a chamada e a linha do resultado, fica só a linha `escrever`.
@@ -972,7 +979,7 @@ que precisar.
   4. O orquestrador confere: `cliente`, `versao_cliente` e `user_agent` preenchidos; `sessao` preenchido ou vazio
      (protocolo 2026-07-28); `autor` = o e-mail; os nomes de cabeçalho. Se o desenho bater, desliga o log de descoberta
      (tirar a linha de `servidor.py` e a classe) num passo curto.
-- **Pendências do revisor do 8b (continuam):** item 7 (downgrade da 0002 faz UPDATE), item 8 (teste por prefixo) e
+- **Pendências do revisor do 8b (continuam):** item 7 (downgrade da 0002 faz UPDATE), item 8 (teste por prefixo) (resolvido no 8e) e
   item 9 (log INFO com caminho e e-mail). **Pendente.** O item 5 (filtros) foi feito aqui.
 - **Limitações:**
   - `modelo_declarado` é o que o modelo diz; não há como conferir.
@@ -1041,12 +1048,12 @@ que precisar.
   limites para UTC, porque só `chamadas` grava em UTC. `consultar_gastos` usa coluna `date`, sem `_intervalo`.
 - **Corrigido também:** teste `test_escrita_continua_em_info` (escrita de peça e do banco em INFO); corpo da Ficha 2
   reescrito (regra aprovada "guardar tudo"; a proposta recusada virou histórico).
-- **Não corrigido (aponto ao Leonardo):** leitura com `erro`/`cancelado` também vai para DEBUG (só fica em `chamadas`);
+- **Não corrigido (aponto ao Leonardo):** leitura com `erro`/`cancelado` também vai para DEBUG (só fica em `chamadas`) (resolvido no 8e);
   paginação por `antes_id` pode pular uma linha se duas transações fizerem commit fora da ordem do id (risco baixo,
-  um usuário só).
+  um usuário só) (resolvido no 8e: aviso na docstring).
 - 174 testes passando.
 
-- **Pendente (sai deste passo):** item 8 do revisor do 8b (teste por prefixo) continua; retenção resolvida (Ficha 2: guardar tudo, nada a implementar).
+- **Pendente (sai deste passo):** item 8 do revisor do 8b (teste por prefixo) continua (resolvido no 8e); retenção resolvida (Ficha 2: guardar tudo, nada a implementar).
 
 ### Passo 8c — Vínculo banco → nota do vault (2026-10-17, Opus 5.5, executor)
 
@@ -1141,9 +1148,9 @@ Os números de linha e o retorno de `vincular_nota` citados acima são da primei
   - `docker compose up -d --build servidor`: subiu sem traceback, código novo no container, `alembic_version = 0004`,
     `POST /mcp` sem token = 401.
 - **Não corrigido (pendente):**
-  - Downgrade da 0002 em modo `--sql`: ainda chama `.scalar()` offline e quebra. Fica para outro passo.
+  - Downgrade da 0002 em modo `--sql`: ainda chama `.scalar()` offline e quebra. Fica para outro passo. (resolvido no 8e)
   - `FOR UPDATE` sob concorrência no Postgres: o comando roda (rascunho `teste_8c`), mas duas trocas ao mesmo tempo
-    não foram testadas.
+    não foram testadas. (resolvido no 8e)
 - **Decidi sozinho:**
   - Sem `id` no retorno de `vincular_nota`: desvio consciente da convenção "retorno traz id". O id seria da linha
     da auditoria e convidaria `desfazer_registro(gasto, id)`, que desfaz outro gasto.
@@ -1151,8 +1158,82 @@ Os números de linha e o retorno de `vincular_nota` citados acima são da primei
   - Mensagem nova para vínculo velho: "O vínculo N não é o mais novo do gasto 12: desfaça antes o vínculo M." A
     conferência do valor atual ficou como defesa.
 
+### Passo 8e — Pendências do Mac (2026-10-17, Opus 5.5, executor)
+
+- **Resultado:** as 6 pendências pequenas do Mac estão feitas, cada uma com teste. Sem commit: o orquestrador roda o
+  revisor e faz o commit. Decisão do Leonardo (2026-10-17): o i7 ainda não entra.
+- **Mudou:**
+  - Item 8 do revisor do 8b: `servidor/tests/test_registro.py:492` (`CLASSIFICACAO_REVISADA`): os 64 nomes das peças e
+    os 11 do banco, um por um, com leitura ou escrita decidida à mão. `test_cada_permitida_esta_em_uma_lista_so` (`:533`)
+    e `test_classificacao_bate_com_a_revisao_nome_por_nome` (`:540`) trocam o teste por prefixo.
+  - `servidor/alembic/versions/0002_auditoria_sem_registro.py:35`: downgrade em modo `--sql` levanta `RuntimeError`
+    claro, como a 0004. Teste `test_migracao_0002_desce_offline_e_recusada` (`test_registro.py:605`).
+  - `servidor/tests/test_concorrencia_pg.py` (novo): duas `vincular_nota` simultâneas no mesmo gasto, num Postgres de
+    rascunho. Só roda com `ASSISTENTE_PG_RASCUNHO` (banco `teste_*` já migrado); sem ela, pulado. Uma terceira conexão
+    segura a linha com `FOR UPDATE`; as duas trocas param juntas na trava (conferido em `pg_stat_activity`) e disputam a
+    linha ao soltar. O comando completo está na docstring do teste.
+  - `servidor/assistente/registro.py:205` (`_logar`): leitura `ok` continua em DEBUG; leitura com `erro` ou `cancelado`
+    vai para INFO só com `Chamada <nome>: <resultado>`, sem autor nem dados. Escrita igual. Testes em
+    `test_registro.py:206` e `:219` (erro, erro no resultado, cancelado).
+  - `servidor/assistente/banco.py:481`: docstring de `consultar_chamadas` avisa que `antes_id` pode pular uma chamada
+    gravada fora da ordem do id (raro). Lógica intacta. Teste no fim de `test_chamadas.py`.
+  - `servidor/tests/test_contrato_ficha1.py` (novo, 4 testes): lê o bloco "Texto proposto (colar no Projeto)" da
+    ficha 1 e confere que cada nome citado com `_` existe no app (banco, vault e Paperless com as peças falsas de
+    `test_bloqueadas.py`) e não está em `BLOQUEADAS`. `nota_vault`, `pausa_inicio` e `pausa_fim` ficam numa lista
+    explícita de não-ferramentas, conferidas no lugar certo. Também confere que toda ferramenta do banco e do vault está
+    citada no texto.
+  - `docs/regras-de-negocio.md:254`: ficha 1, "Cenário de teste" item 1 = **Feito**. Regra sem mudança.
+- **Verificado:**
+  - `cd servidor && chflags -R nohidden .venv; uv run pytest -q` = `259 passed, 1 skipped` (248 antes; o pulado é o do
+    Postgres de rascunho).
+  - Prova de falha, um item por vez, código restaurado e conferido com `cmp` ou `git diff`:
+    - classificação: nome novo `paperless_list_and_purge` em `LEITURAS_PECAS` (passaria no teste por prefixo) = 1 falha;
+      `paperless_run_saved_view` movida para escrita = 1 falha; `vault_write_note` nas duas listas = 2 falhas;
+    - 0002 sem a recusa offline = 1 falha; `registro.py` do `HEAD` = 4 falhas nos testes de log;
+    - ficha citando `vault_delete_note` e `vault_rename_note` = falha com os dois nomes.
+  - Banco de rascunho `teste_8e` (criado e apagado por mim, `createdb`/`dropdb` com o superusuário do container):
+    `alembic upgrade head` pela imagem `migracao` (URL derivada da do compose, sem ler o `.env`), `alembic_version =
+    0004`. O teste rodou 5 vezes seguidas, todas passando. Com `with_for_update` tirado de `vincular_nota`, falhou
+    (`anterior` da segunda troca = `a0`, não `a1`). Depois: `dropdb`; a lista de bancos voltou a `assistente`,
+    `postgres`, `template0`, `template1`. Nenhum container `migracao-run` sobrou.
+  - `docker compose up -d --build servidor`: `migracao` saiu com 0, servidor sem traceback, código novo no container,
+    `alembic_version = 0004` no banco real. `POST /mcp` sem token = 401.
+- **Não verificado:**
+  - A recusa offline da 0002 no Postgres real: o teste roda o `alembic --sql` local com URL falsa (não conecta).
+  - O nível INFO da leitura com erro no log do container: conferido só nos testes (nenhuma leitura com erro rodou no app).
+  - O teste de concorrência roda com o usuário dono no rascunho, não com `assistente_escrita`. O 8c já conferiu que o
+    `FOR UPDATE` passa com os GRANTs do usuário de escrita.
+- **Decidi sozinho:**
+  - Leitura com erro em INFO **sem** o autor também (o pedido deixava aberto): a conta fica em `chamadas`; o log INFO
+    continua sem conta e sem caminho de leitura, como no 8d.
+  - Uma linha só por leitura com erro (INFO sem dados); não repito a linha DEBUG com os dados.
+  - A tabela revisada inclui as 11 ferramentas do banco, não só as das peças: o mesmo risco de classificação vale lá.
+  - O teste de contrato também falha quando uma ferramenta do banco ou do vault **não** está no texto do Projeto.
+    Ferramenta nova passa a pedir proposta de linha na ficha 1 (o Leonardo aprova). Se for atrito demais, tire
+    `test_texto_cita_toda_ferramenta_do_banco_e_do_vault`.
+  - O teste de concorrência recusa (falha, não pula) banco fora de `teste_*` ou sem a 0004: proteção contra apontar para
+    o banco real.
+  - Rodei o teste dentro da imagem `migracao` (`docker compose run --rm --no-deps --user root`, com `tests`,
+    `assistente` e `alembic` montados só leitura e `uv sync --frozen` no container descartável): o Postgres não expõe
+    porta para o host e o compose já interpola a senha do dono.
+
+### Revisor do Passo 8e (2026-10-17, Opus 5.5) e correções do orquestrador
+
+- **Erro claro, corrigido:** a trava "só banco `teste_*`" do teste de concorrência olhava só o caminho da URL; um
+  `?dbname=assistente` na query passaria e gravaria no banco real. Agora confere `SELECT current_database()`.
+- **Erro claro, corrigido:** comentário de `vault_wiki_link` em `CLASSIFICACAO_REVISADA` dizia que não lê a nota; ela
+  lê e devolve o conteúdo (classificação de leitura continua certa).
+- **Sugestões feitas:** o teste do log prova o DEBUG da leitura ok; o teste de concorrência fecha as engines num
+  `finally`; teste novo "nenhuma ferramenta visível do vault apaga, move ou renomeia"; ficha 1 ("Cenário de teste")
+  descreve a conferência inversa do contrato.
+- **Verificado:** 260 passed, 1 skipped; teste de concorrência de novo no rascunho `teste_pg` (1 passed), rascunho
+  apagado. Classificação dos 75 nomes conferida pelo revisor contra os pacotes publicados nas versões fixadas.
+- **Ficou:** `CONTEXTO.md` não atualizado (a consolidação é do Passo 10).
+
 ## Prompt do próximo passo
 
+> Passo 8e (pendências do Mac) feito em 2026-10-17 pelo Opus 5.5; falta o revisor e o commit do orquestrador.
+>
 > Projeto "Assistente" criado e testado em 2026-10-17 (ver Onde estamos).
 >
 > **Passo 9 — Usar alguns dias** (Tier D, Leonardo). Usar pelo iPhone e pela web e anotar o que faltou em

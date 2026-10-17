@@ -251,8 +251,11 @@ lembrete (o servidor não tem essas ferramentas hoje).
 O texto do Projeto não roda em `pytest`. O que o teste cobre é o contrato dele com o servidor:
 
 1. Todo nome de ferramenta citado no texto existe no app (`banco` + `PERMITIDAS` com prefixo
-   `vault_`; do Paperless, só o prefixo e os exemplos). Estado: **Pendente** (aprovada a ficha,
-   vira teste em `servidor/tests/`).
+   `vault_`; do Paperless, só o prefixo e os exemplos). Estado: **Feito** (Passo 8e, 2026-10-17):
+   `servidor/tests/test_contrato_ficha1.py` lê o bloco "Texto proposto" deste arquivo e confere que
+   cada nome citado existe no app e não está bloqueado. Confere também o inverso (toda ferramenta do
+   banco e do vault está citada no texto: ferramenta nova obriga a propor a linha nesta ficha) e que
+   nenhuma ferramenta visível do vault apaga ou move nota.
 2. Cenário manual com o Projeto criado, no app, depois da aprovação (Passo 9):
    gasto com categoria existente; "sim" desfaz; valor faltando gera pergunta; "apague a nota"
    é recusado; nota com instrução embutida é ignorada. Estado: **Pendente**.

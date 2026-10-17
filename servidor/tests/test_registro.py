@@ -203,6 +203,56 @@ async def test_escrita_continua_em_info(app, caplog):
     assert SEGREDO not in caplog.text
 
 
+async def test_leitura_com_erro_vai_para_info_sem_dados(app, url, caplog):
+    """Passo 8e: leitura que falha aparece no log INFO, só com o nome e o resultado; leitura ok continua em DEBUG."""
+    with caplog.at_level(logging.DEBUG, logger="assistente.registro"):
+        async with Client(app) as c:
+            with pytest.raises(ToolError):
+                await c.call_tool("consultar_gastos", {"inicio": "2026-10-31", "fim": "2026-10-01"})
+            await c.call_tool("consultar_gastos", {"inicio": "2026-10-01", "fim": "2026-10-31"})
+    regs = [r for r in caplog.records if r.getMessage().startswith("Chamada consultar_gastos")]
+    assert [(r.levelno, r.getMessage().split(" autor=")[0]) for r in regs] == [
+        (logging.INFO, "Chamada consultar_gastos: erro"), (logging.DEBUG, "Chamada consultar_gastos: ok")]
+    assert "autor=" not in regs[0].getMessage()
+    assert _linhas(url) == []
+
+
+@pytest.mark.parametrize("situacao", ["erro", "erro_no_resultado", "cancelado"])
+async def test_leitura_de_peca_com_erro_ou_cancelada_loga_sem_caminho_nem_conta(url, caplog, monkeypatch, situacao):
+    from assistente.db import Bancos
+
+    monkeypatch.setattr(registro, "identidade", lambda: "ela@gmail.com")
+    mw = registro.RegistroChamadas(Bancos.de_urls(url, url), leituras={"vault_read_note"}, auditadas=set())
+    entrou = anyio.Event()
+
+    async def _peca(context):
+        entrou.set()
+        if situacao == "erro":
+            raise ToolError("nota não existe")
+        if situacao == "erro_no_resultado":
+            return SimpleNamespace(is_error=True)
+        await anyio.sleep_forever()
+
+    contexto = _contexto("vault_read_note", {"path": "00-inbox/segredo.md"})
+    with caplog.at_level(logging.DEBUG, logger="assistente.registro"):
+        if situacao == "cancelado":
+            with anyio.CancelScope() as escopo:
+                async with anyio.create_task_group() as tg:
+                    tg.start_soon(mw.on_call_tool, contexto, _peca)
+                    await entrou.wait()
+                    escopo.cancel()
+        elif situacao == "erro":
+            with pytest.raises(ToolError):
+                await mw.on_call_tool(contexto, _peca)
+        else:
+            await mw.on_call_tool(contexto, _peca)
+    esperado = "cancelado" if situacao == "cancelado" else "erro"
+    regs = [r for r in caplog.records if r.getMessage().startswith("Chamada")]
+    assert [(r.levelno, r.getMessage()) for r in regs] == [(logging.INFO, f"Chamada vault_read_note: {esperado}")]
+    assert "segredo.md" not in caplog.text and "ela@gmail.com" not in caplog.text
+    assert _linhas(url) == []  # leitura não vai para a auditoria
+
+
 async def test_manage_tags_que_muda_e_escrita(app, url):
     async with Client(app) as c:
         await c.call_tool("vault_manage_tags", {"path": "a.md", "operation": "add", "tags": ["x"]})
@@ -436,13 +486,70 @@ def test_caminhos_do_vault_ignora_conteudo():
     assert SEGREDO not in repr(dados)
 
 
-def test_leituras_e_escritas_das_pecas_nao_se_cruzam():
-    assert not servidor.LEITURAS_PECAS & servidor.ESCRITAS_PECAS
+# Classificação revisada à mão, nome por nome (Passo 8e; item 8 do revisor do 8b). Não depende do prefixo do nome:
+# "get_document_ai_suggestions" poderia gravar algo e "run_saved_view" soa como ação. Ferramenta nova numa peça
+# ou no banco só passa no teste depois de alguém decidir aqui se ela lê ou escreve. Na dúvida, escrita
+# (falha fechado: grava `escrever` antes da chamada).
+LE, ESCREVE = "leitura", "escrita"
+CLASSIFICACAO_REVISADA = {
+    # mcpvault 0.16.0
+    "vault_read_note": LE, "vault_read_note_lines": LE, "vault_read_multiple_notes": LE, "vault_search_notes": LE,
+    "vault_list_directory": LE, "vault_get_note_outline": LE, "vault_get_notes_info": LE,
+    "vault_get_frontmatter": LE, "vault_get_vault_stats": LE, "vault_list_all_tags": LE,
+    "vault_wiki_link": LE,  # lê a nota pelo nome (basename) e devolve o conteúdo; não escreve
+    "vault_write_note": ESCREVE, "vault_patch_note": ESCREVE, "vault_update_frontmatter": ESCREVE,
+    "vault_manage_tags": ESCREVE,  # operation=list é leitura, conferido em registro.py na hora da chamada
+    # paperless-mcp 0.1.0: leitura
+    "paperless_search_documents": LE, "paperless_search_everywhere": LE, "paperless_search_autocomplete": LE,
+    "paperless_get_document": LE, "paperless_get_document_content": LE, "paperless_get_document_metadata": LE,
+    "paperless_get_document_notes": LE, "paperless_get_document_history": LE,
+    "paperless_find_similar_documents": LE, "paperless_download_document": LE,
+    "paperless_get_document_thumbnail": LE, "paperless_get_next_asn": LE,
+    "paperless_get_document_suggestions": LE,
+    "paperless_get_document_ai_suggestions": LE,  # devolve sugestões; não aplica nada no documento
+    "paperless_list_tags": LE, "paperless_list_correspondents": LE, "paperless_list_document_types": LE,
+    "paperless_list_storage_paths": LE, "paperless_list_custom_fields": LE, "paperless_list_trash": LE,
+    "paperless_list_active_tasks": LE, "paperless_list_tasks": LE, "paperless_get_task": LE,
+    "paperless_get_paperless_info": LE, "paperless_get_statistics": LE, "paperless_get_system_status": LE,
+    "paperless_list_saved_views": LE, "paperless_get_saved_view": LE,
+    "paperless_run_saved_view": LE,  # roda a busca salva; só lê documentos
+    "paperless_list_share_links": LE,
+    # paperless-mcp 0.1.0: escrita
+    "paperless_upload_document": ESCREVE, "paperless_add_document_note": ESCREVE, "paperless_create_tag": ESCREVE,
+    "paperless_create_correspondent": ESCREVE, "paperless_create_document_type": ESCREVE,
+    "paperless_create_storage_path": ESCREVE, "paperless_create_custom_field": ESCREVE,
+    "paperless_restore_documents": ESCREVE, "paperless_acknowledge_tasks": ESCREVE,
+    "paperless_delete_share_link": ESCREVE, "paperless_update_document": ESCREVE, "paperless_update_tag": ESCREVE,
+    "paperless_update_correspondent": ESCREVE, "paperless_update_document_type": ESCREVE,
+    "paperless_update_storage_path": ESCREVE, "paperless_update_custom_field": ESCREVE,
+    "paperless_set_document_custom_field": ESCREVE, "paperless_remove_document_custom_field": ESCREVE,
+    "paperless_bulk_rotate_documents": ESCREVE,
+    # banco (código nosso)
+    "consultar_gastos": LE, "listar_categorias_gasto": LE, "consultar_ponto": LE, "consultar_atividades": LE,
+    "consultar_auditoria": LE, "consultar_chamadas": LE,
+    "registrar_gasto": ESCREVE, "registrar_ponto": ESCREVE, "registrar_atividade": ESCREVE,
+    "desfazer_registro": ESCREVE, "vincular_nota": ESCREVE,
+}
+
+
+def test_cada_permitida_esta_em_uma_lista_so():
     assert servidor.PERMITIDAS == servidor.LEITURAS_PECAS | servidor.ESCRITAS_PECAS
-    assert {"vault_write_note", "vault_patch_note", "vault_update_frontmatter", "vault_manage_tags"} <= servidor.ESCRITAS_PECAS
-    leitura = ("read", "get", "list", "search", "find", "download", "run_saved_view", "wiki_link")
-    assert all(n.split("_", 1)[1].startswith(leitura) for n in servidor.LEITURAS_PECAS)
-    assert not any(n.split("_", 1)[1].startswith(leitura) for n in servidor.ESCRITAS_PECAS)
+    for nome in servidor.PERMITIDAS:
+        assert (nome in servidor.LEITURAS_PECAS) + (nome in servidor.ESCRITAS_PECAS) == 1, nome
+    assert not banco.LEITURAS_BANCO & banco.ESCRITAS_BANCO
+
+
+def test_classificacao_bate_com_a_revisao_nome_por_nome():
+    """Cada nome visível (peças e banco) foi revisado à mão; sem revisão, o teste falha (sem olhar prefixo)."""
+    leituras = servidor.LEITURAS_PECAS | banco.LEITURAS_BANCO
+    escritas = servidor.ESCRITAS_PECAS | banco.ESCRITAS_BANCO
+    sem_revisao = sorted((leituras | escritas) - CLASSIFICACAO_REVISADA.keys())
+    assert not sem_revisao, f"Classifique à mão em CLASSIFICACAO_REVISADA: {sem_revisao}"
+    sobrando = sorted(CLASSIFICACAO_REVISADA.keys() - leituras - escritas)
+    assert not sobrando, f"Revisados que não existem mais nas listas: {sobrando}"
+    divergentes = {n: c for n, c in CLASSIFICACAO_REVISADA.items() if (n in leituras) != (c == LE)}
+    assert not divergentes, f"Lista diferente da revisão: {divergentes}"
+    assert not servidor.BLOQUEADAS & CLASSIFICACAO_REVISADA.keys()
 
 
 def _alembic(url: str, *args: str) -> None:
@@ -495,6 +602,16 @@ def test_migracao_sobe_e_desce_sem_apagar(tmp_path):
     _alembic(url, "upgrade", "head")
     engine.dispose()
     assert _registro_id_aceita_vazio(engine)
+
+
+def test_migracao_0002_desce_offline_e_recusada():
+    """Em modo --sql não há banco para contar as linhas vazias: a descida é recusada (Passo 8e, como a 0004)."""
+    r = subprocess.run([sys.executable, "-m", "alembic", "downgrade", "0002:0001", "--sql"], cwd=SERVIDOR,
+                       capture_output=True, text=True,
+                       env={**os.environ, "DATABASE_URL_MIGRACAO": "postgresql+psycopg://x@localhost/x"})
+    assert r.returncode != 0
+    assert "Downgrade da 0002 não roda em modo --sql" in r.stderr
+    assert "SET NOT NULL" not in r.stdout
 
 
 @pytest.mark.parametrize("provedor,claims,autor", [

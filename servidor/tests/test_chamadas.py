@@ -325,3 +325,10 @@ async def test_consultar_chamadas_acha_a_chamada_das_22h_locais(app, url):
     assert [x["ferramenta"] for x in dia] == ["registrar_gasto"]
     assert dia[0]["momento"] == "2026-10-17T22:00:00-03:00"
     assert seguinte == []
+
+
+async def test_consultar_chamadas_avisa_do_salto_raro_da_paginacao(app):
+    """Passo 8e: a descrição diz que antes_id pode pular linha gravada fora da ordem do id (lógica intacta)."""
+    async with Client(app) as c:
+        descricao = next(t.description for t in await c.list_tools() if t.name == "consultar_chamadas")
+    assert "pode pular uma chamada gravada fora da ordem do id" in descricao
