@@ -23,11 +23,45 @@ log = logging.getLogger("assistente")
 # Binários instalados na imagem com versão fixada (ver Dockerfile): nada é baixado em execução.
 # Para atualizar, mude a versão no Dockerfile lendo o changelog antes.
 
-# Ferramentas das peças prontas que ficam desligadas: irreversíveis ou que abrem dados para fora.
-# Para religar uma, tire daqui.
+# Peças prontas: só as ferramentas de PERMITIDAS aparecem (lista de permitidas). Ferramenta nova
+# numa versão nova da peça fica escondida até alguém revisar e pôr aqui ou em BLOQUEADAS.
 # Nome = "<namespace>_<nome na peça>" (FastMCP 4.1.0, transforms/namespace.py). Os nomes reais de
 # cada versão fixada estão em tests/fixtures/ferramentas_pecas.json; tests/test_bloqueadas.py
-# falha se um nome daqui não existir na peça.
+# falha se um nome da fixture não estiver em PERMITIDAS nem em BLOQUEADAS.
+# O que cada ferramenta de escrita pode apagar está em SPRINT_NOTAS.md (Passos 3 e 5b).
+PERMITIDAS = {
+    # mcpvault 0.16.0: leitura
+    "vault_read_note", "vault_read_note_lines", "vault_read_multiple_notes", "vault_search_notes",
+    "vault_list_directory", "vault_get_note_outline", "vault_get_notes_info", "vault_get_frontmatter",
+    "vault_get_vault_stats", "vault_list_all_tags", "vault_wiki_link",
+    # mcpvault 0.16.0: escrita. write_note no modo padrão (overwrite) troca a nota inteira.
+    "vault_write_note", "vault_patch_note", "vault_update_frontmatter", "vault_manage_tags",
+    # paperless-mcp 0.1.0: leitura
+    "paperless_search_documents", "paperless_search_everywhere", "paperless_search_autocomplete",
+    "paperless_get_document", "paperless_get_document_content", "paperless_get_document_metadata",
+    "paperless_get_document_notes", "paperless_get_document_history", "paperless_find_similar_documents",
+    "paperless_download_document", "paperless_get_document_thumbnail", "paperless_get_next_asn",
+    "paperless_get_document_suggestions", "paperless_get_document_ai_suggestions",
+    "paperless_list_tags", "paperless_list_correspondents", "paperless_list_document_types",
+    "paperless_list_storage_paths", "paperless_list_custom_fields", "paperless_list_trash",
+    "paperless_list_active_tasks", "paperless_list_tasks", "paperless_get_task",
+    "paperless_get_paperless_info", "paperless_get_statistics", "paperless_get_system_status",
+    "paperless_list_saved_views", "paperless_get_saved_view", "paperless_run_saved_view",
+    "paperless_list_share_links",
+    # paperless-mcp 0.1.0: escrita sem destruir
+    "paperless_upload_document", "paperless_add_document_note", "paperless_create_tag",
+    "paperless_create_correspondent", "paperless_create_document_type", "paperless_create_storage_path",
+    "paperless_create_custom_field", "paperless_restore_documents", "paperless_acknowledge_tasks",
+    "paperless_delete_share_link",  # revogar link público reduz exposição (só com deletes ligados)
+    # paperless-mcp 0.1.0: escrita que sobrescreve, um item por vez
+    "paperless_update_document", "paperless_update_tag", "paperless_update_correspondent",
+    "paperless_update_document_type", "paperless_update_storage_path", "paperless_update_custom_field",
+    "paperless_set_document_custom_field", "paperless_remove_document_custom_field",
+    "paperless_bulk_rotate_documents",
+}
+
+# Segunda trava e registro do porquê: irreversíveis ou que abrem dados para fora. Nunca entram em
+# PERMITIDAS (o teste confere).
 BLOQUEADAS = {
     "paperless_create_share_link",       # link público de documento = vazamento
     "paperless_delete_document_pages",   # gera versão menor do documento; páginas somem
@@ -81,12 +115,26 @@ def _auth(cfg: Config):
     if len(cfg.jwt_signing_key) < TAMANHO_MINIMO_CHAVE:
         raise SystemExit(f"JWT_SIGNING_KEY curta: use {TAMANHO_MINIMO_CHAVE}+ caracteres (openssl rand -base64 32).")
     comum = dict(base_url=cfg.public_base_url, jwt_signing_key=cfg.jwt_signing_key,
-                 allowed_client_redirect_uris=cfg.auth_redirects_permitidos)
+                 allowed_client_redirect_uris=cfg.auth_redirects_permitidos,
+                 limite_register=cfg.limite_register_por_hora, limite_authorize=cfg.limite_authorize_por_hora,
+                 limite_token=cfg.limite_token_por_hora, limite_global_register=cfg.limite_global_register_por_hora,
+                 limite_global_authorize=cfg.limite_global_authorize_por_hora,
+                 proxies_confiaveis=cfg.proxies_confiaveis, clientes_ttl_dias=cfg.clientes_ttl_dias)
     if p == "google":
         return GoogleRestrito(emails_permitidos=cfg.google_emails_permitidos,
                               client_id=cfg.google_client_id, client_secret=cfg.google_client_secret, **comum)
     return GitHubRestrito(logins_permitidos=cfg.github_logins_permitidos,
                           client_id=cfg.github_client_id, client_secret=cfg.github_client_secret, **comum)
+
+
+def _montar_peca(app: FastMCP, namespace: str, peca: FastMCP) -> None:
+    """Monta a peça com o prefixo e deixa visíveis só as ferramentas de PERMITIDAS."""
+    prefixo = f"{namespace}_"
+    nomes = {n.removeprefix(prefixo) for n in PERMITIDAS if n.startswith(prefixo)}
+    # Só ferramentas: os prompts da peça (texto pronto, sem ação) continuam visíveis.
+    peca.disable(components={"tool"})
+    peca.enable(names=nomes, components={"tool"})
+    app.mount(peca, namespace=namespace)
 
 
 def criar_app(cfg: Config | None = None) -> FastMCP:
@@ -97,24 +145,18 @@ def criar_app(cfg: Config | None = None) -> FastMCP:
     app.mount(criar_servidor_banco(bancos, cfg.tz, cfg.nome_usuario))
 
     if cfg.paperless_url and cfg.paperless_api_key:
-        app.mount(
-            create_proxy({"mcpServers": {"paperless": {
-                # paperless-mcp (Python, PyPI). Apagar documentos fica desligado por padrão nele.
-                "command": "paperless-mcp", "args": ["--stdio"],
-                "env": {"PAPERLESS_URL": cfg.paperless_url, "PAPERLESS_TOKEN": cfg.paperless_api_key},
-            }}}),
-            namespace="paperless",
-        )
+        _montar_peca(app, "paperless", create_proxy({"mcpServers": {"paperless": {
+            # paperless-mcp (Python, PyPI). Apagar documentos fica desligado por padrão nele.
+            "command": "paperless-mcp", "args": ["--stdio"],
+            "env": {"PAPERLESS_URL": cfg.paperless_url, "PAPERLESS_TOKEN": cfg.paperless_api_key},
+        }}}))
     else:
         log.info("Paperless não configurado; pulando.")
 
     if cfg.vault_path:
-        app.mount(
-            create_proxy({"mcpServers": {"vault": {
-                "command": "mcpvault", "args": [cfg.vault_path],
-            }}}),
-            namespace="vault",
-        )
+        _montar_peca(app, "vault", create_proxy({"mcpServers": {"vault": {
+            "command": "mcpvault", "args": [cfg.vault_path],
+        }}}))
     else:
         log.info("Vault não configurado; pulando.")
 

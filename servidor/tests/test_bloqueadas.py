@@ -1,9 +1,11 @@
-"""BLOQUEADAS só tem nomes reais e eles somem do endpoint montado.
+"""Nas peças prontas só aparece o que está em PERMITIDAS; BLOQUEADAS nunca aparece.
 
 As peças prontas (mcpvault e paperless-mcp) são processos externos que só existem
 na imagem. Aqui elas viram servidores falsos em memória com os nomes reais
 capturados da versão fixada (fixtures/ferramentas_pecas.json; como regenerar está
-em fixtures/gerar_ferramentas_pecas.py). Sem rede, sem Docker, sem Paperless.
+em fixtures/gerar_ferramentas_pecas.py), mais uma ferramenta que não está em lista
+nenhuma (simula versão nova). O proxy é o de verdade (create_proxy sobre o falso).
+Sem rede, sem Docker, sem Paperless.
 """
 
 import json
@@ -13,6 +15,8 @@ from pathlib import Path
 import pytest
 from fastmcp import Client, FastMCP
 from fastmcp.exceptions import ToolError
+
+from fastmcp.server import create_proxy
 
 from assistente import servidor
 from assistente.config import Config
@@ -29,6 +33,8 @@ ESSENCIAIS = {
     "vault_read_note", "vault_search_notes", "vault_list_directory", "vault_write_note",
     "paperless_search_documents", "paperless_get_document", "paperless_get_document_content",
 }
+# Ferramenta que uma versão nova da peça poderia trazer: não está em lista nenhuma.
+NOVA = "apagar_tudo"
 # Nunca podem aparecer, com qualquer conteúdo de BLOQUEADAS.
 PROIBIDAS = {
     "vault_delete_note", "vault_move_file", "vault_move_note",
@@ -41,8 +47,9 @@ def _nomes_reais() -> set[str]:
     return {f"{ns}_{n}" for ns, (peca, _) in NAMESPACES.items() for n in PECAS[peca]["ferramentas"]}
 
 
-def _proxy_falso(config: dict) -> FastMCP:
-    """Substitui create_proxy: devolve a peça com as ferramentas reais, sem subir processo."""
+def _proxy_falso(config: dict):
+    """Substitui o alvo do create_proxy: em vez do processo, uma peça falsa em memória com os
+    nomes reais e mais NOVA. O proxy devolvido é o FastMCPProxy de verdade."""
     (ns, alvo), = config["mcpServers"].items()
     peca, binario = NAMESPACES[ns]
     assert alvo["command"] == binario
@@ -51,9 +58,9 @@ def _proxy_falso(config: dict) -> FastMCP:
     def _ok() -> str:
         return "ok"
 
-    for nome in PECAS[peca]["ferramentas"]:
+    for nome in [*PECAS[peca]["ferramentas"], NOVA]:
         falso.tool(_ok, name=nome)
-    return falso
+    return create_proxy(falso)
 
 
 @pytest.fixture
@@ -75,24 +82,42 @@ def test_bloqueadas_existem_nas_pecas():
     assert not inexistentes, f"Nomes em BLOQUEADAS que não existem nas peças: {inexistentes}"
 
 
+def test_todo_nome_das_pecas_foi_revisado():
+    sem_decisao = sorted(_nomes_reais() - servidor.PERMITIDAS - servidor.BLOQUEADAS)
+    assert not sem_decisao, f"Ponha em PERMITIDAS ou BLOQUEADAS: {sem_decisao}"
+
+
+def test_permitidas_sao_nomes_reais_e_nao_bloqueadas():
+    assert not servidor.PERMITIDAS & servidor.BLOQUEADAS
+    inexistentes = sorted(servidor.PERMITIDAS - _nomes_reais())
+    assert not inexistentes, f"Nomes em PERMITIDAS que não existem nas peças: {inexistentes}"
+
+
 def test_apagar_do_paperless_fica_bloqueado():
     # delete_share_link fica de fora: revogar link público reduz exposição (decisão do Leonardo).
     apagar = {f"paperless_{n}" for n in PECAS["paperless-mcp"]["so_com_enable_delete"]} - {"paperless_delete_share_link"}
     assert apagar <= servidor.BLOQUEADAS
 
 
-async def test_bloqueadas_somem_do_app_montado(app):
+async def test_so_permitidas_aparecem_nas_pecas(app):
     async with Client(app) as c:
         visiveis = {t.name for t in await c.list_tools()}
     assert not servidor.BLOQUEADAS & visiveis
     assert not PROIBIDAS & visiveis
     assert ESSENCIAIS <= visiveis
-    assert _nomes_reais() - servidor.BLOQUEADAS <= visiveis
+    assert {f"{ns}_{NOVA}" for ns in NAMESPACES} & visiveis == set()
+    das_pecas = {n for n in visiveis if n.startswith(tuple(f"{ns}_" for ns in NAMESPACES))}
+    assert das_pecas == servidor.PERMITIDAS
+    # As do banco (sem namespace) continuam todas.
+    assert visiveis - das_pecas == {
+        "consultar_atividades", "consultar_auditoria", "consultar_gastos", "consultar_ponto", "desfazer_registro",
+        "listar_categorias_gasto", "registrar_atividade", "registrar_gasto", "registrar_ponto",
+    }
 
 
-async def test_bloqueada_nao_pode_ser_chamada(app):
+async def test_bloqueada_ou_nao_listada_nao_pode_ser_chamada(app):
     async with Client(app) as c:
         assert (await c.call_tool("vault_read_note", {})).data == "ok"
-        for nome in sorted(servidor.BLOQUEADAS):
+        for nome in sorted(servidor.BLOQUEADAS | {f"{ns}_{NOVA}" for ns in NAMESPACES}):
             with pytest.raises(ToolError, match="Unknown tool"):
                 await c.call_tool(nome, {})

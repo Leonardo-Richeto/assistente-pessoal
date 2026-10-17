@@ -9,7 +9,8 @@ Da raiz do repo:
         > servidor/tests/fixtures/ferramentas_pecas.json
 
 Rode de novo sempre que mudar a versão de uma peça no Dockerfile e revise o diff:
-ferramenta nova que apaga, sobrescreve ou expõe dados vai para `BLOQUEADAS`.
+ferramenta nova fica escondida até entrar em `PERMITIDAS` (segura) ou `BLOQUEADAS` (apaga,
+sobrescreve ou expõe dados); o teste falha enquanto não tiver decisão.
 """
 
 import asyncio

@@ -5,14 +5,13 @@
 
 ## Onde estamos
 
-- **Sprint 1 (Etapa A, teste no MacBook):** Passos 1 a 5 feitos. A9 Feito: o Leonardo conectou o
-  conector no claude.ai. Revisor dos Passos 3–5 passou; erros claros corrigidos; commit feito
-  (2026-10-17, sem push).
+- **Sprint 1 (Etapa A, teste no MacBook):** Passos 1 a 5, 5b e 5c feitos. A9 Feito: o Leonardo conectou
+  o conector no claude.ai. O revisor do 5b achou 3 erros claros; o Passo 5c corrigiu (2026-10-17).
+  O 5b e o 5c estão no working tree, sem commit: o orquestrador confere e faz o commit.
 - **Stack rodando** no MacBook: postgres e servidor em `127.0.0.1:8000` com login Google ligado,
-  exposto pelo Funnel em `https://<maquina>.<tailnet>.ts.net`. 46 testes passando.
-- **Próximo:** Passo 6 (teste ponta a ponta pelo iPhone; Haiku 5.5, baixo). Antes, o Leonardo
-  decide se `listar_categorias_gasto` ignora gastos desfeitos (ver avisos).
-- **Última atualização:** 2026-10-17, Opus 5.5 (orquestrador), MacBook Air.
+  exposto pelo Funnel em `https://<maquina>.<tailnet>.ts.net`. 112 testes passando.
+- **Próximo:** Passo 6 (teste ponta a ponta pelo iPhone; Haiku 5.5, baixo).
+- **Última atualização:** 2026-10-17, Opus 5.5 (executor do Passo 5c), MacBook Air.
 
 ## Avisos vivos
 
@@ -22,8 +21,28 @@
   menos de 32 caracteres também não sobe.
 
 - **A9 Feito (2026-10-17):** conector no claude.ai conectado pelo Leonardo; a ferramenta respondeu.
-  `listar_categorias_gasto` devolveu só "teste": vem dos gastos do smoke, todos desfeitos. Conferir
-  no Passo 6 se a lista deve ignorar gastos desfeitos (regra de negócio: perguntar ao Leonardo).
+  `listar_categorias_gasto` devolvia só "teste" (gastos do smoke, todos desfeitos). Desde o Passo 5b
+  ela ignora gastos desfeitos (decisão do Leonardo, 2026-10-17): hoje deve voltar lista vazia.
+
+- **Desde 2026-10-17 (Passo 5b):**
+  - Peças prontas usam lista de permitidas (`PERMITIDAS` em `servidor/assistente/servidor.py`).
+    Versão nova de peça: regenere a fixture; o teste falha até cada nome novo entrar em
+    `PERMITIDAS` ou `BLOQUEADAS`. Os prompts das peças continuam visíveis.
+  - `/register` (10 por hora) e `/authorize` (30 por hora) têm limite por IP; acima disso, 429.
+    Reiniciar o servidor zera a contagem. Não esgote o limite na URL pública.
+  - **Desde o Passo 5c:** `/consent` usa o limite do `/authorize`; `/token` e `/auth/callback`
+    têm 60 por hora por IP. Teto global somando todos os IPs: `/register` 100 por hora,
+    `/authorize` e `/consent` 300 por hora cada. `/token` não tem teto global: o refresh do
+    conector não trava por abuso de terceiros.
+  - **Desde o Passo 5c:** conta fora da lista não recebe token. A troca do código falha com
+    `invalid_grant` (HTTP 401) e o log mostra `Troca de código negada para '<conta>'`.
+  - O IP real vem do `X-Forwarded-For` que o Tailscale põe. Só vale quando a conexão vem do
+    loopback ou do gateway da rede do Docker (no Mac, `172.20.0.1`). O log mostra
+    `assistente.limite: /register de <ip>`.
+  - Cliente registrado que não troca código por token em 1 dia some do volume `oauth` (30 dias
+    até o Passo 5c). Uma limpeza por hora, no máximo, apaga do disco o que expirou (na hora de
+    `/register` ou `/authorize`).
+  - A imagem não consulta mais o PyPI na subida (`FASTMCP_CHECK_FOR_UPDATES=off`).
 
 - **Funnel ligado desde 2026-10-17:** `https://<maquina>.<tailnet>.ts.net` → `127.0.0.1:8000`.
   Com o servidor parado, `/mcp` pelo Funnel deu 502 (conferido). Desligar: `tailscale funnel --https=443 off`.
@@ -363,6 +382,176 @@
   - Conferir parâmetros de `vault_write_note`, `vault_patch_note` e `paperless_update_document`
     (podem apagar conteúdo).
 
+### Passo 5b — Correções do revisor dos Passos 3–5 (2026-10-17, Opus 5.5, executor)
+
+- **Resultado:** os 5 apontamentos do revisor e as 2 pendências do Passo 5 estão corrigidos e
+  cobertos por teste. Sem commit: o orquestrador confere e faz o commit.
+- **Mudou:**
+  1. Lista de permitidas: `servidor/assistente/servidor.py:32` (`PERMITIDAS`, 64 nomes: 15 do vault,
+     49 do Paperless), `:65` (`BLOQUEADAS` fica como segunda trava e registro do porquê), `:128`
+     (`_montar_peca`: esconde toda ferramenta da peça e mostra só as de `PERMITIDAS`). As do banco
+     continuam todas. Os prompts do Paperless (`triage_inbox`, `monthly_review`, `find_duplicates`)
+     continuam visíveis. Teste: `servidor/tests/test_bloqueadas.py`, com o `create_proxy` de verdade
+     sobre uma peça falsa que tem os nomes reais mais `apagar_tudo`.
+  2. Limite por IP: `servidor/assistente/limite.py` (novo, middleware ASGI em memória, janela de
+     1 hora, 429 com `Retry-After`, IPv6 contado por /64, teto de 10 mil IPs lembrados). Ligado em
+     `servidor/assistente/auth.py:43` (`get_middleware` do provedor; vale para Google e GitHub).
+     Config: `servidor/assistente/config.py:44-50`; compose e `.env.example` com
+     `LIMITE_REGISTER_POR_HORA=10`, `LIMITE_AUTHORIZE_POR_HORA=30`, `PROXIES_CONFIAVEIS`,
+     `CLIENTES_TTL_DIAS=30`. Teste: `servidor/tests/test_limite.py`.
+     Prazo dos clientes: `auth.py:68` grava o cliente registrado com prazo de 30 dias; `auth.py:77`
+     tira o prazo quando ele troca código por token; `auth.py:54` roda o `cull()` do `FileTreeStore`
+     no máximo uma vez por hora.
+  3. Testes novos em `servidor/tests/test_auth.py`: `/authorize` com o client id do provedor
+     (`:175`: redirect estranho = 400; callback do claude.ai = 302 para `/consent`); verificador do
+     Google com respostas simuladas do tokeninfo e do userinfo, passando pela lista (`:220`).
+  4. `AUTH_REDIRECTS_PERMITIDOS` soma ao padrão do claude.ai (`config.py:74-83`). Padrão sem caminho
+     (ou só `/` e `*`), sem esquema ou sem host não sobe. `.env.example` atualizado.
+  5. Parâmetros conferidos (abaixo). Nada novo bloqueado.
+  6. `listar_categorias_gasto` ignora gastos desfeitos: `servidor/assistente/banco.py:161`. Teste:
+     `servidor/tests/test_banco.py:82`.
+  7. `ENV FASTMCP_CHECK_FOR_UPDATES=off` em `servidor/Dockerfile:32`. Valores aceitos (lidos em
+     `fastmcp/settings.py:336-348`): `stable` (padrão), `prerelease`, `off`;
+     `utilities/version_check.py:140-143` sai sem chamar o PyPI com `off`.
+  - `servidor/tests/fixtures/gerar_ferramentas_pecas.py`: docstring diz que nome novo vai para
+    `PERMITIDAS` ou `BLOQUEADAS`.
+- **IP real atrás do Funnel (fonte: código do Tailscale, `ipn/ipnlocal/serve.go`):**
+  `addProxyForwardedHeaders` faz `Header.Set("X-Forwarded-For", <IP do cliente>)`; no Funnel, o IP
+  vem de `Tailscale-Ingress-Src`. `Set` troca o valor que o cliente mandou. Funnel não manda
+  `Tailscale-User-Login` (só tráfego da tailnet manda; `tailscale.com/kb/1312/serve`), mas manda
+  `Tailscale-Funnel-Request: ?1`. No container, a conexão chega de `172.20.0.1` (gateway da rede
+  do compose, conferido em `/proc/net/route`), não de `127.0.0.1`. Por isso o padrão de proxies
+  confiáveis é loopback mais o gateway do container.
+  - Verificado pela URL pública: com `X-Forwarded-For: 1.2.3.4` forjado, o log registrou o IP
+    público real pelo Funnel e `100.74.104.24` (o IP do Mac na tailnet) pelo caminho da tailnet.
+- **Item 5 — o que cada ferramenta pode apagar (schemas lidos no container, peças fixadas):**
+
+  | Ferramenta | Pode apagar | Recomendação |
+  |---|---|---|
+  | `vault_write_note` | `mode` padrão `overwrite`: troca a nota inteira (e o frontmatter, se vier). `append`/`prepend` só somam | manter (o uso normal precisa); o vault no git é que recupera |
+  | `vault_patch_note` | troca um trecho exato (`oldString` → `newString`); `newString` vazio apaga o trecho; `replaceAll=true` troca todas as ocorrências. Falha se houver mais de uma sem `replaceAll` | manter: edita menos que `write_note` com `overwrite`, que seria a alternativa |
+  | `paperless_update_document` | sobrescreve `title`, `content` (texto do OCR inteiro), `created`, ASN; `tag_ids`/`tag_names` **trocam** a lista de tags inteira; `clear_fields` tira correspondente, tipo, caminho e ASN; trocar o caminho move o arquivo no disco. Arquivo original fica | manter por enquanto (Paperless só no i7); rever na Fase 2.1 se o histórico do Paperless guarda o `content` antigo; se não guardar, bloquear |
+  | `vault_update_frontmatter` | `merge=false` troca o frontmatter inteiro | manter |
+  | `vault_manage_tags` | `remove` tira tags da nota | manter |
+- **Verificado:**
+  - `uv run pytest -q` = `89 passed` (46 antes).
+  - Prova de falha: com o código do commit anterior e os testes novos, 18 falharam (limite, prazo,
+    permitidas, nome sem decisão, categorias, redirects). Com a lista de redirects desligada e a regra
+    antiga de `email_verified`, 20 falharam em `test_auth.py`, entre eles 4 de `/authorize` e 3 do
+    tokeninfo. Com o proxy confiável ignorado, `test_ip_de_origem` falhou. Código restaurado e
+    conferido com `cmp`; 89 passando de novo.
+  - `docker compose up -d --build servidor`: build ok; `migracao` saiu com 0; logs sem erro, sem
+    traceback, sem `AUTH DESATIVADA`. No container: `FASTMCP_CHECK_FOR_UPDATES=off`, limites 10/30,
+    prazo 30.
+  - `criar_app` no container com as peças de verdade (vault em pasta temporária vazia, Paperless
+    falso): 72 ferramentas (9 banco, 15 vault, 48 Paperless); nenhuma fora de `PERMITIDAS`; nenhuma
+    bloqueada. Só `paperless_delete_share_link` não aparece (precisa dos deletes ligados).
+  - Pela URL do Funnel:
+
+    | Requisição | Código |
+    |---|---|
+    | `POST /mcp` sem token | 401 |
+    | `GET /.well-known/oauth-protected-resource/mcp` | 200 |
+    | `POST /register` com `https://evil.example/cb` (pelo relay público) | 400 |
+    | `GET /authorize` com client id falso e `X-Forwarded-For` forjado (relay público e tailnet) | 400 e 400 |
+
+- **Não verificado:**
+  - O 429 pela URL pública (de propósito; fica nos testes em memória).
+  - O prazo e a limpeza com o login de ponta a ponta. O cliente atual do Leonardo foi registrado
+    antes do 5b, não tem prazo e não expira. Os 2 clientes de teste do Passo 5 também ficam.
+  - Paperless real (só no i7).
+- **Decidi sozinho:**
+  - Limite e prazo ligados ao provedor de login (`get_middleware`), não ao `main`: vale em todo
+    `http_app`, inclusive nos testes.
+  - Pedido recusado (400) também conta no limite.
+  - IPv6 contado por bloco /64.
+  - Prompts das peças ficam fora da lista de permitidas (são texto, sem ação).
+  - Log em INFO com o IP de cada `/register` e `/authorize`, para ver abuso.
+- **Limitações:**
+  - O `/register` é chamado pelos servidores do claude.ai: todo usuário do claude.ai sai do mesmo
+    bloco de IPs. Quem tentar registrar nosso endereço no claude.ai gasta a cota de 10 por hora e
+    pode travar uma reconexão do Leonardo por até 1 hora.
+  - A limpeza só roda quando chega `/register` ou `/authorize`. Sem pedido, nada novo é gravado.
+  - O prazo usa o `_client_store` interno do `OAuthProxy` (FastMCP 4.1.0). Se a versão mudar, os
+    testes de `test_limite.py` acusam.
+
+### Passo 5c — Correções do revisor do Passo 5b (2026-10-17, Opus 5.5, executor)
+
+- **Resultado:** os 3 erros claros do revisor do 5b estão corrigidos e cobertos por teste, mais
+  4 das 5 melhorias baratas. Sem commit: o orquestrador confere e faz o commit.
+- **Mudou:**
+  1. Lista de permitidos na troca do código: `servidor/assistente/auth.py:97`
+     (`_conferir_conta_do_codigo`) e `:120` (chamada antes do `super()`). Lê o código em
+     `self._code_store`, valida o `access_token` do provedor com `self._token_validator.verify_token`
+     e aplica `_identidade` mais a lista. Conta fora da lista, token recusado pelo provedor ou erro
+     do provedor: apaga o código e levanta `TokenError("invalid_grant", ...)`. O SDK não aceita
+     `access_denied` no `/token` (`mcp/server/auth/provider.py:106`, `TokenErrorCode`). O FastMCP
+     troca o 400 de `invalid_grant` por 401 (`fastmcp/server/auth/auth.py:69`, `TokenHandler`).
+     Nenhum token é emitido, e o cliente mantém o prazo. Vale para Google e GitHub (mixin `_Restrito`).
+     Teste: `servidor/tests/test_auth.py:269` (`test_troca_do_codigo_so_para_conta_permitida`), pelo
+     `POST /token` de verdade com PKCE, nos dois provedores.
+  2. Limites em `/consent`, `/token` e `/auth/callback`: `auth.py:51` (`_limites`). `/consent` usa o
+     limite do `/authorize` (30); `/token` e o callback usam `LIMITE_TOKEN_POR_HORA` (60). Testes:
+     `servidor/tests/test_limite.py:62` (429 em `GET` e `POST /consent`) e `:77` (`/token` e callback).
+  3. Teto global por caminho: `servidor/assistente/limite.py:121` (`__call__`, fila global à parte do
+     mapa por IP, sem despejo). Padrão: `/register` 100, `/authorize` e `/consent` 300 por hora.
+     Config: `servidor/assistente/config.py:47-50`. Prazo padrão do cliente sem token: 1 dia
+     (`config.py:56`; a variável continua `CLIENTES_TTL_DIAS`). Compose e `.env.example` com
+     `LIMITE_TOKEN_POR_HORA`, `LIMITE_GLOBAL_REGISTER_POR_HORA`, `LIMITE_GLOBAL_AUTHORIZE_POR_HORA`
+     e `CLIENTES_TTL_DIAS=1`. Testes: `test_limite.py:87` (5 blocos /64 do mesmo /48: 3 passam,
+     depois 429) e `:102` (com o mapa por IP esquecendo IPs, o teto continua contando).
+  - Melhorias feitas:
+    - Redirect só com `https`, sem `?`, `#`, `[` ou `]`: `config.py:86-91`. O FastMCP compara o
+      caminho com `fnmatch` e ignora a query. Teste: `test_auth.py:134`, 7 casos novos.
+    - Log na subida com os proxies confiáveis (`auth.py:49`). Aviso de `X-Forwarded-For` vindo de
+      fora dos proxies confiáveis, no máximo um a cada 10 minutos (`limite.py:72`, `_avisar`). Os
+      avisos de 429 usam o mesmo freio. Testes: `test_limite.py:163` e `:177`.
+    - `test_limite.py:33` agora faz um pedido recusado (400) e prova que ele gasta a cota.
+- **Verificado:**
+  - `uv run pytest -q` = `112 passed` (89 antes).
+  - Prova de falha: com o pacote `assistente` do 5b e os testes novos, 24 falharam (troca do
+    código, `/consent`, `/token`, callback, teto global, padrões, avisos, prazo de 1 dia, redirects).
+    Só sem a chamada de `auth.py:120`, os 6 casos de conta recusada falharam: o `/token` deu 200
+    com `access_token` para `intruso@gmail.com`. Código restaurado e conferido com `cmp`; 112 passando.
+  - `docker compose up -d --build servidor`: build ok; `migracao` saiu; logs sem traceback, sem
+    erro, sem `AUTH DESATIVADA`. O log de subida mostra os proxies `127.0.0.0/8, ::1/128, 172.20.0.1`.
+    No container: limites 10/30/60, tetos 100/300, prazo 1 dia.
+  - Pela URL do Funnel (nenhuma chamada a `/register`):
+
+    | Requisição | Código |
+    |---|---|
+    | `POST /mcp` sem token | 401 |
+    | `GET /.well-known/oauth-protected-resource/mcp` | 200 |
+
+- **Não verificado:**
+  - A troca do código com login real de uma conta fora da lista. O teste simula o verificador do
+    provedor; não loguei com outra conta Google para não gastar o fluxo real.
+  - O conector do Leonardo depois do rebuild. Ele não passa pela troca do código (só pelo refresh
+    em `/token`, limite 60 por hora por IP); o Passo 6 confirma pelo iPhone.
+  - Os testes rodam no Python 3.14 local; a imagem usa 3.12 e não tem os testes. O servidor subiu
+    no 3.12 sem erro.
+- **Decidi sozinho:**
+  - Erro `invalid_grant`, não `access_denied`: o SDK só aceita os códigos de `TokenErrorCode`.
+  - Erro do provedor na conferência (rede, 5xx) também recusa e apaga o código: falha fechado.
+    O usuário refaz o login.
+  - `/token` e `/auth/callback` sem teto global: só gravam com código ou login válidos, e um teto
+    global deixaria qualquer um travar o refresh do conector.
+  - `/consent` divide o limite com `/authorize` (mesmo valor, cotas separadas por caminho).
+  - Mantive `CLIENTES_TTL_DIAS` em dias (padrão 1): compatível com compose e `.env.example`.
+  - O aviso de 429 por IP passou a sair no máximo uma vez a cada 10 minutos por caminho.
+- **Ficou de fora:**
+  - **Pendente:** limpeza periódica (`cull`) numa tarefa do lifespan. Não fiz: o lifespan do FastMCP
+    roda dentro do gerenciador de sessões (`fastmcp/server/http.py:741-763`), e uma tarefa em
+    segundo plano ali pede mais cuidado do que vale agora. A limpeza continua no `/register` e no
+    `/authorize`, que são os caminhos que gravam cliente e transação. Arquivo de CSRF do `/consent`
+    expira em 15 minutos e some na próxima limpeza.
+- **Limitações:**
+  - O teto global troca disco por disponibilidade: quem fizer 100 `/register` numa hora, de qualquer
+    IP, trava reconexões novas do Leonardo por até 1 hora. O conector já conectado continua (refresh
+    em `/token` não tem teto global). Reiniciar o servidor zera a contagem.
+  - A conferência na troca do código usa `_code_store` e `_token_validator`, internos do `OAuthProxy`
+    (FastMCP 4.1.0). Se a versão mudar, `test_troca_do_codigo_so_para_conta_permitida` acusa.
+
 ## Prompt do próximo passo
 
 > **Passo 6 — Teste ponta a ponta pelo iPhone.** Tier C · Haiku 5.5 · effort baixo · **supervisionado**.
@@ -371,7 +560,7 @@
 > **Objetivo:** conferir que o Leonardo, pelo app do Claude no iPhone, registra e desfaz pelo
 > conector, e que o banco e a auditoria batem.
 >
-> **Leia antes:** `SPRINT.md`, este arquivo (avisos vivos e Passo 5), `CLAUDE.md`,
+> **Leia antes:** `SPRINT.md`, este arquivo (avisos vivos, Passos 5, 5b e 5c), `CLAUDE.md`,
 > `docs/IMPLANTACAO.md` (A10).
 >
 > **Faça:**
@@ -385,13 +574,19 @@
 >    de ponto; consultar as horas de hoje.
 > 4. Confira no banco: o gasto novo com `desfeito = true`; as linhas de ponto; uma linha de
 >    auditoria por escrita. Use só `select` com o usuário dono, sem mudar nada.
-> 5. Veja `docker compose logs servidor`: sem `Acesso negado`, sem traceback.
-> 6. Marque A10 em `docs/IMPLANTACAO.md`, status do Passo 6 no `SPRINT.md`, bloco do Passo 6 aqui,
->    "Onde estamos" atualizado. Escreva o prompt do Passo 7.
+> 5. Peça também "liste as categorias de gasto": desde o Passo 5b, gasto desfeito não conta. O
+>    gasto de teste desfeito no item 3 não pode trazer `teste` de volta.
+> 6. Veja `docker compose logs servidor`: sem `Acesso negado`, sem `Troca de código negada`, sem
+>    traceback, sem `Limite de ... atingido`, sem `Teto global`. Se o conector der erro ao reconectar e o log mostrar 429, espere
+>    1 hora ou reinicie o servidor (`docker compose restart servidor`, zera a contagem).
+> 7. Marque A10 em `docs/IMPLANTACAO.md`, status do Passo 6 no `SPRINT.md`, bloco do Passo 6 aqui,
+>    "Onde estamos" atualizado. Escreva o prompt do Passo 7 (o vault usa a lista `PERMITIDAS`;
+>    ver Passo 5b).
 >
 > **Não faça:**
 > - Não leia, imprima nem grave valores do `.env`. Não mexa em `AUTH_DESATIVADA`.
 > - Não apague linhas nem volumes. Não rode `docker compose down -v`.
 > - Não faça commit sem o ok do Leonardo. Não faça push.
 >
-> **Pronto quando:** os 5 pedidos do item 3 funcionaram pelo iPhone e o banco bate.
+> **Pronto quando:** os 5 pedidos do item 3 e a lista de categorias funcionaram pelo iPhone e o
+> banco bate.

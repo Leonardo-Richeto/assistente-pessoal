@@ -156,9 +156,11 @@ def criar_servidor_banco(bancos: Bancos, tz: ZoneInfo, nome: str = "Leonardo") -
 
     @mcp.tool(annotations=LEITURA)
     def listar_categorias_gasto() -> list[str]:
-        """Categorias já usadas, para manter a nomenclatura consistente."""
+        """Categorias já usadas em gastos válidos, para manter a nomenclatura consistente."""
+        # Gasto desfeito não conta (decisão do Leonardo, 2026-10-17).
+        q = select(Gasto.categoria).where(Gasto.desfeito.is_(False)).distinct().order_by(Gasto.categoria)
         with bancos.leitura() as s:
-            return list(s.scalars(select(Gasto.categoria).distinct().order_by(Gasto.categoria)))
+            return list(s.scalars(q))
 
     # ---------------- Ponto ----------------
 

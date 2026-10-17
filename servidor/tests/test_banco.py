@@ -77,3 +77,13 @@ async def test_diario_busca(servidor):
     hoje = datetime.now(TZ).date()
     achados = await chamar(servidor, "consultar_atividades", inicio=str(hoje - timedelta(days=1)), fim=str(hoje), busca="trabalho")
     assert [a["descricao"] for a in achados] == ["Revisei o PR do gateway"]
+
+
+async def test_categorias_ignoram_gasto_desfeito(servidor):
+    # Decisão do Leonardo (2026-10-17): categoria só de gasto desfeito não aparece.
+    r = await chamar(servidor, "registrar_gasto", valor=1, descricao="teste", categoria="teste")
+    await chamar(servidor, "registrar_gasto", valor=5, descricao="Pão", categoria="mercado")
+    await chamar(servidor, "registrar_gasto", valor=7, descricao="Leite", categoria="mercado")
+    assert await chamar(servidor, "listar_categorias_gasto") == ["mercado", "teste"]
+    await chamar(servidor, "desfazer_registro", tipo="gasto", id=r["id"])
+    assert await chamar(servidor, "listar_categorias_gasto") == ["mercado"]
