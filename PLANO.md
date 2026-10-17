@@ -103,10 +103,19 @@ no i7 (B11 da Sprint 2 e 6.1). Antes de implementar: ficha "proposta" em `docs/r
 
 # Segunda etapa (só depois da base — fases 1 a 5 — pronta)
 
-## Fase 7b — Monitoramento de casa (só no i7, rede de casa) — planejado em 2026-10-17
+## Fase 7b — Monitoramento de casa (só na máquina de produção, rede de casa) — planejado em 2026-10-17
 Só faz sentido com o servidor ligado 24 h na rede de casa; no MacBook não roda.
+**Sem terminal (Leonardo, 2026-10-17):** o modelo nunca ganha shell na VM, no Proxmox nem no roteador. Cada serviço
+(AdGuard, WireGuard, Proxmox) ganha um agente pequeno com **ações fixas**, por API interna com token próprio; o
+servidor MCP chama só essas ações. Escrita com confirmação, auditoria e desfazer. Pedido que nenhuma ação cobre vai
+para a Fase 6b (fábrica de ferramentas).
 - [ ] ⚑ 7b.1 Saúde do armazenamento: script no host (fora do container, porque `smartctl` precisa do disco) roda `smartctl -j` e `df` a cada hora e grava num diretório que um worker importa; tabela de leituras + ferramenta `consultar_saude_armazenamento` (SMART, uso do disco, tamanho do Postgres, idade do último backup); alerta quando setor realocado/pendente sobe, desgaste do SSD passa do limite ou o disco passa de 85%
 - [ ] ⚑ 7b.2 Rede: DNS local (AdGuard Home, grátis) na VM de serviços de rede do i5 ou no i7, com o roteador apontando para ele; worker importa consultas por aparelho e consumo; ferramentas `consultar_rede` e `bloquear_dominio` (escrita, com confirmação). Cobre o "bloqueio de distrações" da nota `infraestrutura-de-casa` do vault
+- [ ] 7b.4 WireGuard: `estado_wireguard` (leitura: peers, último handshake, bytes por peer) por um agente no host
+  do WireGuard; ligar ou desligar peer (`alternar_peer_wireguard`, escrita com confirmação) fica para depois
+- [ ] ⚑ 7b.5 Tráfego por aparelho: `consultar_trafego(aparelho, periodo)` (leitura). Fonte a escolher: coletor
+  na rede (ntopng ou NetFlow/sFlow do roteador, se ele exportar) ou o que o AdGuard já dá; só metadado (bytes,
+  destino, horário), nunca conteúdo
 - [ ] 7b.3 Resumo semanal de saúde da casa (discos, backup, rede) na rotina da Fase 5
 
 ## Fase 8 — Canais próprios
