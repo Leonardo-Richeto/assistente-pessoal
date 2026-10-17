@@ -90,6 +90,8 @@ Se este arquivo divergir de uma fonte acima, vale a fonte. Corrija este arquivo.
 | B12 | Sincronização do vault em todos os aparelhos (decisão do Leonardo, 2026-10-17): **Syncthing** entre i7, Mac, iPhone e PC Windows, **mantendo o GitHub privado por enquanto**. Só o i7 faz commit e push (job diário); o Syncthing ignora `.git` (`.stignore`) para não corromper o repositório. PC do trabalho: só o conector MCP, sem cópia do vault | B | Sonnet 5.5 | médio |
 | B13 | Bateria de perguntas ao Leonardo para popular os dados iniciais de cada bloco implementado (`PLANO.md` § Dados novos previstos), inclusive as 3 perguntas adiadas | B | Sonnet 5.5 | médio |
 
+Preparação feita em 2026-10-17 (Sonnet 5.5): scripts (`deploy/inventario.sh`, `preparar-maquina.sh`, `backup-banco.sh`, `restaurar-banco.sh`, `deploy/vault/`) e roteiros (`docs/IMPLANTACAO.md` Etapa B, `docs/SYNCTHING.md`) prontos para os dois casos (VM no i5 ou i7 direto). A máquina continua por decidir.
+
 ## Fases seguintes do `PLANO.md` (cada fase vira uma sprint)
 
 Tarefa com ⚑ no plano é Tier A. O resto segue a regra abaixo.

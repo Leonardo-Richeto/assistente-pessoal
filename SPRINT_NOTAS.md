@@ -1230,6 +1230,35 @@ Os números de linha e o retorno de `vincular_nota` citados acima são da primei
   apagado. Classificação dos 75 nomes conferida pelo revisor contra os pacotes publicados nas versões fixadas.
 - **Ficou:** `CONTEXTO.md` não atualizado (a consolidação é do Passo 10).
 
+### Preparação da produção (2026-10-17, Sonnet 5.5)
+
+- **Feito:** `deploy/inventario.sh`, `deploy/preparar-maquina.sh` (`--dry-run`), `deploy/backup-banco.sh`,
+  `deploy/restaurar-banco.sh`, `deploy/vault/` (`.stignore`, `commit-diario.sh`, `vault-commit.service` e `.timer`),
+  `docs/SYNCTHING.md`, Etapa B de `docs/IMPLANTACAO.md` reescrita (B2a VM no i5, B2b i7, roteiro de amanhã).
+  `.gitignore` ganhou `inventario-*.md` (tem hostname e IP).
+- **Decisão da máquina:** não tomada. Os scripts servem aos dois casos.
+- **Verificado:** `bash -n` e shellcheck (aviso e erro: nada); inventário e `--dry-run` em `debian:12`; Ubuntu recusado;
+  backup (retenção 2 apagou só o mais velho e não tocou `outro.txt`), restauração em `teste_restauro` (gastos 7 = 7),
+  recusa de `assistente`, segunda restauração recusada; banco de teste apagado; `commit-diario.sh` em repo de teste.
+- **Não verificado:** instalação real em Debian 12 (apt, repositórios, systemd, qemu-guest-agent), timers, Syncthing,
+  Synctrain com Obsidian no iPhone, troca de banco do B10 (`RENAME`), push do vault.
+- **Sem commit:** fica para o orquestrador.
+
+#### Revisor e correções (2026-10-17, Sonnet 5.5)
+
+O revisor independente apontou 12 erros e várias sugestões. Corrigidos:
+- `.git` do Mac vai para fora do vault (`~/vault-git-mac-parado`); `.git-mac-parado` também no `.stignore`.
+- `commit-diario.sh` exclui `.stversions`, `.stfolder`, `*.syncthing.*.tmp` e `.git-mac-parado`; novo
+  `deploy/vault/gitignore-do-vault` com passo no roteiro. Versões do Syncthing em `/srv/vault-versoes` (fora do vault).
+- Syncthing no canal `stable-v2`; `qemu-guest-agent` não aborta o script; fuso só impresso; `sudo tailscale funnel`.
+- Ordem do roteiro refeita: B7, parar só o servidor do Mac (B7b), dados (B10, com recuperação do `RENAME`),
+  conector (B8), testes (B9), desligar o Mac (B9b). Passo 0: scripts no GitHub (pré-condição do orquestrador).
+- Chave de deploy na ordem certa com `GIT_SSH_COMMAND`; túnel da GUI na porta 18384; ignorar padrões antes de salvar a pasta.
+- Inventário no Proxmox por `curl` como root; i7 antes de apagar o sistema; senha de root em branco no instalador.
+- Google: "URIs de redirecionamento autorizados" (e origens); key expiry desligada; `## Proxmox` antes dos blocos.
+- Não verificado: Synctrain com `.stignore`; versões fora da pasta no Synctrain; peça do vault ignorando `.stversions`
+  (por isso as versões ficam fora).
+
 ## Prompt do próximo passo
 
 > Passo 8e (pendências do Mac) feito em 2026-10-17 pelo Opus 5.5; falta o revisor e o commit do orquestrador.

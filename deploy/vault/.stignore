@@ -1,0 +1,38 @@
+// Padrões do Syncthing para o vault do Obsidian (copie para a raiz da pasta sincronizada).
+// Só a produção comita no git: o Syncthing nunca leva o .git de um aparelho para outro.
+// O Syncthing já ignora .stfolder e .stversions sozinho.
+// "(?d)" deixa o Syncthing apagar o item ignorado se ele impedir a remoção de uma pasta.
+
+// Git: histórico fica só na produção
+.git
+.git-mac-parado
+
+// Obsidian: estado de cada aparelho (janelas abertas, layout) conflita o tempo todo
+.obsidian/workspace*.json
+.obsidian/cache
+.trash
+
+// Temporários do Obsidian e de editores
+*.tmp
+*.swp
+*.swo
+*~
+.~lock.*
+~$*
+
+// macOS
+(?d).DS_Store
+(?d)._*
+.AppleDouble
+.Spotlight-V100
+.Trashes
+.fseventsd
+
+// Windows
+(?d)Thumbs.db
+(?d)desktop.ini
+$RECYCLE.BIN
+
+// Conflitos do iCloud e do Dropbox (não devem existir; se existirem, não propague)
+*.icloud
+*conflicted copy*

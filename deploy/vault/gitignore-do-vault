@@ -1,0 +1,22 @@
+# Modelo de .gitignore para o vault. Copie para /srv/vault/.gitignore e comite uma vez.
+# Defesa em camadas: o commit-diario.sh também exclui estes caminhos.
+
+# Syncthing (versões, marcador da pasta, temporários)
+.stversions/
+.stfolder/
+*.syncthing.*.tmp
+.syncthing.*
+
+# Cópia parada do .git do Mac (não deve existir dentro do vault)
+.git-mac-parado/
+
+# Obsidian: estado de cada aparelho
+.obsidian/workspace*.json
+.obsidian/cache
+.trash/
+
+# macOS e Windows
+.DS_Store
+._*
+Thumbs.db
+desktop.ini

@@ -1,0 +1,10 @@
+[Unit]
+Description=Commit diario do vault as 03:30
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+Unit=vault-commit.service
+
+[Install]
+WantedBy=timers.target
