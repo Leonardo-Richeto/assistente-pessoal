@@ -19,6 +19,9 @@ fica só na conversa.
 - Nenhum segredo no código ou no git; tudo pelo `.env`.
 - Ferramenta de peça pronta só fica visível depois de revisada e listada em `PERMITIDAS` (`servidor/assistente/servidor.py`); as irreversíveis ou que exponham dados vão também para `BLOQUEADAS`.
 
+## Regras de negócio
+Fichas de comportamento que o dono vê ficam em `docs/regras-de-negocio.md`. Ficha nova entra como "proposta"; só o Leonardo aprova. Escreva a ficha antes de implementar.
+
 ## Estilo
 - Python 3.12+, código e nomes em português, docstrings curtas (viram a descrição da ferramenta para o Claude).
 - Ferramentas com `annotations` (`LEITURA`/`ESCRITA`) e parâmetros tipados com `Field(description=...)`.

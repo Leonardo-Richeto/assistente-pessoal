@@ -67,7 +67,7 @@ Se este arquivo divergir de uma fonte acima, vale a fonte. Corrija este arquivo.
 | 5c | Correções do revisor do 5b: lista de permitidos na troca do código por token (conta fora da lista não recebe token), limite em `/consent`, `/token` e `/auth/callback`, teto global por caminho, prazo de cliente sem token de 1 dia, redirects só https e sem curinga, avisos de log sem inundar | A | Opus 5.5 | alto | supervisionado | 5b | Feito 2026-10-17; commit do orquestrador |
 | 6 | Teste ponta a ponta pelo iPhone: gasto → consultar → desfazer; ponto → horas. Conferir no banco as linhas e a auditoria. IMPLANTACAO A10 | C | Haiku 5.5 | baixo | supervisionado | 5 | Feito 2026-10-17 (Leonardo + Opus 5.5 orquestrador) |
 | 7 | Vault com uma **cópia** em `VAULT_PATH`: ler, buscar, criar nota; apagar continua bloqueado. IMPLANTACAO A11 | B | Sonnet 5.5 | médio | supervisionado | 6 | Feito 2026-10-17 (Sonnet 5.5; teste pelo app OK com o Leonardo) |
-| 8 | Projeto "Assistente" no claude.ai com instruções de uso (PLANO 1.6). O texto é de produto: vira ficha "proposta" antes | B | Sonnet 5.5 | médio | supervisionado | 6 | Pendente |
+| 8 | Projeto "Assistente" no claude.ai com instruções de uso (PLANO 1.6). O texto é de produto: vira ficha "proposta" antes | B | Sonnet 5.5 | médio | supervisionado | 6 | Ficha escrita 2026-10-17 (proposta, `docs/regras-de-negocio.md`); falta o ok do Leonardo e criar o Projeto no claude.ai |
 | 9 | Usar alguns dias e anotar o que faltou em `docs/IMPLANTACAO.md` (A12) | D | Leonardo | — | — | 6 | Pendente |
 | 10 | Fechar a sprint: consolidar em `CONTEXTO.md` e no vault, apagar `SPRINT.md` e `SPRINT_NOTAS.md` com o ok do Leonardo | C | Haiku 5.5 | baixo | supervisionado | 9 | Pendente |
 

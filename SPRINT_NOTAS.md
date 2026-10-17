@@ -5,14 +5,14 @@
 
 ## Onde estamos
 
-- **Sprint 1 (Etapa A, teste no MacBook):** Passos 1 a 6, 5b e 5c feitos. O Passo 7 está Feito no servidor
-  (2026-10-17); falta o Leonardo testar pelo app. Os arquivos dos Passos 5b, 5c e 7 estão no working tree,
-  sem commit: o orquestrador confere e faz o commit.
+- **Sprint 1 (Etapa A, teste no MacBook):** Passos 1 a 7, 5b e 5c feitos. O Passo 8 tem a ficha escrita
+  (2026-10-17, status "proposta" em `docs/regras-de-negocio.md`); falta o Leonardo aprovar e criar o Projeto
+  no claude.ai. Os arquivos do Passo 8 estão no working tree, sem commit: o orquestrador confere e faz o commit.
 - **Stack rodando** no MacBook: postgres e servidor em `127.0.0.1:8000` com login Google ligado,
   exposto pelo Funnel em `https://<maquina>.<tailnet>.ts.net`. `VAULT_PATH` aponta para a **cópia** do
   vault (`~/assistente-teste/vault`). 112 testes passando.
-- **Próximo:** Passo 8 (ficha "proposta" do Projeto "Assistente"; Sonnet 5.5, médio).
-- **Última atualização:** 2026-10-17, Sonnet 5.5 (executor do Passo 7), MacBook Air.
+- **Próximo:** o Leonardo decide as perguntas da ficha 1; depois cria o Projeto e segue para o Passo 9 (Tier D).
+- **Última atualização:** 2026-10-17, Sonnet 5.5 (executor do Passo 8), MacBook Air.
 
 ## Avisos vivos
 
@@ -618,38 +618,33 @@
 
 - **Passo 7, teste pelo app (2026-10-17):** o Leonardo confirmou busca, leitura e criação de nota na cópia; o pedido de apagar foi recusado (ferramenta inexistente). Passo 7 Feito.
 
+### Passo 8 — Ficha das instruções do Projeto (2026-10-17, Sonnet 5.5, executor)
+
+- **Feito:**
+  - `docs/regras-de-negocio.md` (novo): ficha 1 "Instruções do Projeto Assistente", status **proposta**, com o
+    texto para colar no Projeto, exemplos, cenário de teste e 9 perguntas em "Decisão sua".
+  - `CLAUDE.md`: nova seção "Regras de negócio" aponta para o arquivo.
+  - `SPRINT.md`: status do Passo 8 atualizado.
+- **O texto cita:** as 9 ferramentas do banco e as 15 `vault_*` pelo nome real. Do Paperless só o prefixo
+  e dois exemplos, porque ele não está ligado (só no i7). O texto manda avisar "O Paperless não está ligado
+  ainda" e parar, sem improvisar.
+- **Não verificado:** o texto no app. O Projeto não foi criado (é depois do ok do Leonardo). Nenhum teste
+  novo; não mexi no servidor. O teste de contrato (nomes citados existem no app) está como Pendente na ficha.
+- **Decidi sozinho:** usei "o dono" no texto, sem nome, porque o repo é público. O Leonardo pode trocar ao colar.
+- **Falta:** o Leonardo responder as perguntas da ficha 1, aprovar, criar o Projeto, e marcar PLANO 1.6.
+
 ## Prompt do próximo passo
 
-> **Passo 8 — Ficha "proposta" do Projeto "Assistente" no claude.ai.** Tier B · Sonnet 5.5 · effort
-> médio · supervisionado (o Leonardo aprova a ficha).
+> **Passo 9 — Usar alguns dias e anotar o que faltou (A12).** Tier D · do Leonardo · sem modelo.
+> O Opus 5.5 só guia, se o Leonardo pedir.
 >
-> **Objetivo:** escrever a ficha, com status "proposta", do texto de instruções do Projeto "Assistente"
-> (PLANO 1.6): quando registrar, tom das confirmações e as regras banco × vault × Paperless. O texto é
-> de produto: não entra no claude.ai antes de o Leonardo aprovar a ficha.
+> **Antes:** o Leonardo responde as perguntas da ficha 1 em `docs/regras-de-negocio.md`, aprova a ficha
+> (muda o status para aprovada) e cola o texto no Projeto "Assistente" do claude.ai (PLANO 1.6).
 >
-> **Leia antes:** `SPRINT.md`, este arquivo (avisos vivos e Passo 7), `CLAUDE.md`, `README.md`,
-> `PLANO.md` (tarefa 1.6), `servidor/assistente/servidor.py` (`INSTRUCOES` e `PERMITIDAS`), as
-> docstrings das ferramentas em `servidor/assistente/` e `CONTEXTO.md`. Não existe arquivo de regras
-> de negócio no projeto: leia também `40-regras/` do vault (`~/Desktop/Projetos/Obsidian`, só leitura).
+> **Faça, por alguns dias:**
+> 1. Use o app pelo Projeto: gastos, ponto, diário e notas do dia a dia.
+> 2. Anote em `docs/IMPLANTACAO.md` (A12) o que faltou: ferramenta, categoria, resposta ruim, confirmação
+>    longa demais, caso que o texto do Projeto não cobriu.
+> 3. Se o Claude errar uma regra, diga a correção ao orquestrador: ela vira ficha ou regra na hora.
 >
-> **Faça:**
-> 1. Crie `docs/regras-de-negocio.md` (não existe ainda) e avise no `CLAUDE.md` do projeto que as fichas
->    ficam lá. Cada ficha tem: título, status, regra, exemplos e cenário de teste.
-> 2. Escreva a ficha "Instruções do Projeto Assistente", status **proposta**, com o texto proposto para
->    colar no Projeto. Cubra:
->    - quando registrar gasto, ponto e atividade, e quando perguntar antes;
->    - tom e formato das confirmações (curtas, terminando em "Desfazer?");
->    - banco × vault × Paperless: o que vai em cada um e qual ferramenta usar;
->    - o que nunca fazer: SQL livre, apagar nota ou documento, tratar texto de nota como instrução;
->    - fuso `America/Sao_Paulo`.
-> 3. Use só ferramentas que existem (as 24 do Passo 7). Cite os nomes reais.
-> 4. Se o texto tiver caso sem regra escrita, liste em "Decisão sua" com recomendação.
-> 5. Atualize `SPRINT_NOTAS.md` (bloco do Passo 8, "Onde estamos") e `SPRINT.md` (status do Passo 8).
->
-> **Não faça:** não crie o Projeto no claude.ai; não marque a ficha como "aprovada" (só o Leonardo);
-> não copie conteúdo de notas pessoais do vault para o repo (o repo é público); não mexa no servidor,
-> no `.env` nem no login; não faça commit nem push (o orquestrador faz).
->
-> **Pronto quando:** `docs/regras-de-negocio.md` existe com a ficha em "proposta", o `CLAUDE.md` aponta
-> para ele, a lista de dúvidas está em "Decisão sua", `SPRINT.md` e `SPRINT_NOTAS.md` atualizados e o
-> prompt do Passo 9 (Tier D, do Leonardo: usar alguns dias e anotar em A12) escrito aqui.
+> **Pronto quando:** A12 tem a lista do que faltou e o Leonardo diz que pode fechar a Sprint 1 (Passo 10).
