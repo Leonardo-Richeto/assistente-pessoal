@@ -62,6 +62,12 @@ A sequência de **teste no MacBook → produção no i7** está em `docs/IMPLANT
 - [ ] 5.1 Tarefa agendada no claude.ai: resumo da manhã (agenda do dia + gastos de ontem + pendências do diário)
 - [ ] 5.2 Ferramenta `resumo_periodo(inicio, fim)` que junta gastos, horas e diário num só retorno (economiza chamadas)
 
+## Fase 5b — Saúde (Apple Watch / app Saúde) — ideia aprovada para planejar, 2026-10-17
+- [ ] 5b.1 Importar o histórico pelo `export.zip` do app Saúde (sem endpoint novo): tabelas de amostras, treinos e sono + migração; importação idempotente
+- [ ] ⚑ 5b.2 Endpoint só de ingestão (token próprio, só escrita, limite de chamadas) para a automação diária do app Atalhos do iOS
+- [ ] 5b.3 Ferramentas `consultar_saude` / `resumo_saude(periodo)`; comentários sobre treino ou sono vão para o vault ligados por id
+- Fora: app pago de exportação (premissa de não pagar nada além do Pro). Dado de saúde nunca vai para o vault nem para o GitHub.
+
 ## Fase 6 — WhatsApp (número dedicado)
 - [ ] ⚑ 6.1 Desenho do gateway: WAHA + fila + Claude Code headless (`claude -p` / Agent SDK) conectado a ESTE mesmo MCP; sessão por assunto; Jev escolhendo modelo
 - [ ] 6.2 WAHA no compose, pareado com o número dedicado; allowlist só do número do Leonardo
@@ -97,6 +103,7 @@ A sequência de **teste no MacBook → produção no i7** está em `docs/IMPLANT
 - Receitas, transferências e reembolsos (hoje o banco só tem gastos; ficha 1 de `docs/regras-de-negocio.md`).
 - Humor, energia e sono (nota 1–5 no banco; texto no vault, ligado por id).
 - Metas (ex.: teto mensal por categoria; o motivo fica no vault, ligado por id).
+- Saúde do Apple Watch/iPhone (passos, frequência cardíaca, HRV, treinos, sono): ver Fase 5b.
 
 ## Sempre que surgir um dado novo
 Seguir "Dado novo" no `README.md`: modelo → migração revisada → ferramentas `registrar_*`/`consultar_*` → testes.
