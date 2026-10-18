@@ -69,7 +69,7 @@ def _maiuscula(texto: str) -> str:
 
 TAMANHO_NOTA = 300  # = String(300) em _Registro.nota_vault (modelos.py), contado no caminho já limpo
 # Sem max_length no schema: o limite vale depois de tirar os espaços das pontas (caminho_da_nota).
-_DESCRICAO_CAMINHO = ("Caminho relativo da nota no vault, ex.: 00-inbox/estudo-postgres.md. Sem barra inicial, "
+_DESCRICAO_CAMINHO = ("Caminho relativo da nota no vault, ex.: 50-diario/2026/2026-10-20.md (nota do dia). Sem barra inicial, "
                       "sem '..', sem ':', sem pasta oculta, terminando em .md, até 300 caracteres.")
 NotaVault = Annotated[str | None, Field(
     description=_DESCRICAO_CAMINHO + " Nota com a parte subjetiva do registro. Vazio = sem nota.")]
@@ -125,7 +125,7 @@ def caminho_da_nota(caminho: str | None) -> str | None:
         motivo = "não termina em .md"
     else:
         return caminho
-    raise ToolError(f"Caminho de nota inválido ({motivo}): use algo como 00-inbox/nota.md.")
+    raise ToolError(f"Caminho de nota inválido ({motivo}): use algo como 50-diario/2026/2026-10-20.md.")
 
 
 def _brl(v: Decimal) -> str:
@@ -351,7 +351,7 @@ def criar_servidor_banco(bancos: Bancos, tz: ZoneInfo, nome: str = "Leonardo") -
         """
         novo = caminho_da_nota(caminho)
         if novo is None:
-            raise ToolError("Informe o caminho da nota, ex.: 00-inbox/nota.md.")
+            raise ToolError("Informe o caminho da nota, ex.: 50-diario/2026/2026-10-20.md.")
         classe = _MODELOS[tipo]
         with bancos.escrita.begin() as s:
             reg = s.get(classe, id, with_for_update=True)

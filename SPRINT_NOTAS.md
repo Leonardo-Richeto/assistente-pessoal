@@ -37,8 +37,9 @@ bloco do passo que precisar. **Esta seção é o único lugar do estado do proje
   banco por enquanto (B12 adiado); vault com Syncthing e GitHub. Consumo medido com a tomada medidora (PLANO 1.7).
   A implantação não aconteceu em 2026-10-18; o roteiro continua em `docs/IMPLANTACAO.md` § Roteiro da implantação.
 - **Melhorias de 2026-10-18 (`PLANO.md` M1–M4):** M3 (lint diário do vault, só arquivos no repo) e M4 (este arquivo
-  sem o histórico, agora em `SPRINT_HISTORICO.md`) feitos. M1 e M2 viraram a **Ficha 3, proposta**: falta o ok do
-  Leonardo para trocar o texto da Ficha 1 no Projeto e o exemplo de `nota_vault` em `banco.py`. 260 testes + 1 pulado.
+  sem o histórico, agora em `SPRINT_HISTORICO.md`) feitos. M1 e M2 (Ficha 3) e M5 (Ficha 4, resumo da conversa
+  a pedido) **aprovados e aplicados**: texto da Ficha 1, exemplo de `nota_vault` em `banco.py`, tag `diario` e formato
+  no `_diario` do vault. 262 testes + 1 pulado. **Falta o Leonardo colar o texto novo da Ficha 1 no Projeto.**
 - **Última atualização:** 2026-10-17, Opus 5.5 (orquestrador, depois do revisor do 8e), MacBook Air.
 
 ## Avisos vivos

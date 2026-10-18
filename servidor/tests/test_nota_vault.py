@@ -68,7 +68,8 @@ DIAS = {"inicio": "2020-01-01", "fim": "2099-12-31"}
 
 # ---------------- Formato do caminho ----------------
 
-@pytest.mark.parametrize("caminho", ["00-inbox/nota.md", "10-projetos/assistente-pessoal/Reunião com João.md", "a.md"])
+@pytest.mark.parametrize("caminho", ["00-inbox/nota.md", "10-projetos/assistente-pessoal/Reunião com João.md", "a.md",
+                                     "50-diario/2026/2026-10-20.md"])
 def test_caminho_valido_passa(caminho):
     assert caminho_da_nota(caminho) == caminho
     assert caminho_da_nota(f"  {caminho} ") == caminho
@@ -395,3 +396,12 @@ def test_migracao_0004_desce_offline_e_recusada():
     assert r.returncode != 0
     assert "Downgrade da 0004 não roda em modo --sql" in r.stderr
     assert "DROP COLUMN" not in r.stdout
+
+
+async def test_descricao_de_nota_vault_aponta_a_nota_do_dia(app):
+    """Ficha 3 (2026-10-18): o exemplo de caminho é a nota do dia em 50-diario, não a inbox."""
+    async with Client(app) as c:
+        ferramentas = {t.name: t for t in await c.list_tools()}
+    for nome in ("registrar_gasto", "registrar_ponto", "registrar_atividade"):
+        descricao = str(ferramentas[nome].input_schema["properties"]["nota_vault"])
+        assert "50-diario/2026/2026-10-20.md" in descricao and "00-inbox" not in descricao

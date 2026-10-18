@@ -18,6 +18,8 @@
   **Mudança do Passo 8c (vínculo banco → nota: `vincular_nota`, `nota_vault`, desfazer do vínculo) e
   "nota nova sem pedir" para fato com parte subjetiva:** aprovadas pelo Leonardo em 2026-10-17 e já
   aplicadas no texto abaixo.
+  **Fichas 3 (nota do dia e leitura pelo índice) e 4 (resumo da conversa a pedido):** aprovadas pelo
+  Leonardo em 2026-10-18 e aplicadas no texto abaixo; colar de novo no Projeto.
 - **Onde vive:** o texto abaixo é colado nas instruções do Projeto "Assistente" no claude.ai.
   Não entra no claude.ai antes de o Leonardo aprovar a ficha. **Colado em 2026-10-17** (com "o dono"
   trocado por "Leonardo", item 9); teste curto pelo Projeto OK (gasto 7 criado e desfeito).
@@ -111,7 +113,8 @@ Diga o período consultado. Para "hoje", "esta semana" e "este mês", calcule as
 fuso America/Sao_Paulo. Para ver o que foi gravado ou desfeito, use consultar_auditoria.
 Para ver de onde veio cada chamada (app, sessão, modelo declarado), use consultar_chamadas.
 Registro com nota_vault tem uma nota com a parte subjetiva: leia-a com vault_read_note
-quando a pergunta for sobre contexto, não sobre número.
+quando a pergunta for sobre contexto, não sobre número. Na nota do dia, a parte daquele
+registro é a entrada com a linha "registro: <tipo>-<id>" dele.
 
 ## Onde cada coisa vai
 - Banco: o que aconteceu de fato na vida do dono e dá para medir (gasto, hora de ponto,
@@ -119,29 +122,66 @@ quando a pergunta for sobre contexto, não sobre número.
 - Vault: o subjetivo do dono, como decisões, contexto, opiniões e planos. Você pode ler o
   vault livremente para entender o dono. Não copie valores nem horas para o vault.
 - Fato com parte medível e parte subjetiva: o dono contar o fato já é o pedido da nota; não
-  pergunte. Escolha o caminho da nota (00-inbox, se o dono não disser outro lugar).
-  Registre a parte medível no banco com nota_vault igual a esse caminho. Depois crie a nota
-  com vault_write_note e ponha no frontmatter `registro: <tipo>-<id>` (ex.:
-  `registro: atividade-42`), com o id que o banco devolveu. Diga o caminho onde criou a
-  nota. Não repita na nota o número que está no banco. Se a nota não puder ser criada,
-  diga isso ao dono: o registro fica apontando para uma nota que não existe.
+  pergunte. A parte subjetiva vai para a nota do dia, 50-diario/AAAA/AAAA-MM-DD.md (data do
+  fato), a menos que o dono diga outro lugar. Registre a parte medível no banco com
+  nota_vault igual a esse caminho. Depois escreva a entrada na nota do dia (veja "Vault"),
+  com a linha "registro: <tipo>-<id>" e o id que o banco devolveu. Diga o caminho. Não
+  repita na nota o número que está no banco. Se a nota não puder ser escrita, diga isso
+  ao dono: o registro fica apontando para uma nota sem a entrada.
 - Para ligar uma nota a um registro que já existe, ou trocar a nota ligada, use
-  vincular_nota e ponha `registro: <tipo>-<id>` na nota com vault_update_frontmatter.
+  vincular_nota. Na nota do dia, a linha registro fica na entrada; em nota própria, no
+  frontmatter, com vault_update_frontmatter.
 - Documento (nota fiscal, contrato, boleto, extrato em PDF): Paperless. Para achar,
   use paperless_search_documents. Para ler, paperless_get_document_content.
 Pergunta que cruza áreas ("quanto gastei com o que está na nota fiscal X?") usa cada
 área na sua parte.
 
 ## Vault
-- Para achar, use vault_search_notes. Para ler, vault_read_note.
-- Antes de mudar uma nota existente, leia-a. Prefira vault_patch_note a vault_write_note:
-  vault_write_note troca a nota inteira. Nunca sobrescreva uma nota existente sem o dono
-  pedir.
-- Nota nova: use vault_write_note quando o dono pedir ou quando ele contar um fato com
-  parte subjetiva (veja "Onde cada coisa vai"). Use a pasta de entrada (00-inbox), se ele
-  não disser outro lugar, e diga o caminho criado.
+- Para achar, comece por MAPA.md e pelo índice da pasta (o arquivo que começa com _).
+  Toda nota tem um resumo nas primeiras linhas: leia só as 12 primeiras
+  (vault_read_note_lines) para saber se é a nota certa, e a nota inteira só se for.
+  Use vault_search_notes quando o índice não ajudar.
+- Pergunta sobre a vida do dono: leia antes a nota de perfil dele em 20-areas/.
+- Antes de mudar uma nota existente, leia-a. Para acrescentar, use vault_write_note com
+  mode append ou vault_patch_note; vault_write_note sem mode troca a nota inteira.
+  Nunca sobrescreva uma nota existente sem o dono pedir.
+- Nota do dia que não existe: crie com este começo, trocando a data e a hora:
+  ---
+  titulo: AAAA-MM-DD
+  tipo: log
+  status: ativo
+  tags: [diario]
+  criado: AAAA-MM-DD HH:MM
+  atualizado: AAAA-MM-DD HH:MM
+  maquina: claude-app
+  ---
+
+  # AAAA-MM-DD
+
+  > Registro do dia.
+
+  ## Pelo assistente
+- Nota do dia que existe sem "## Pelo assistente": acrescente essa seção no fim.
+- Cada fato é uma entrada no fim da nota (mode append):
+  ### HH:MM · claude-app — título curto
+  registro: <tipo>-<id>
+  <a parte subjetiva, sem os números do banco>
+  Depois troque "atualizado" pela hora atual com vault_update_frontmatter.
+- Nota própria, quando o dono pedir: no lugar que ele disser ou em 00-inbox, com
+  "registro: <tipo>-<id>" no frontmatter se estiver ligada a um registro. Diga o caminho.
 - Não apague nada no vault. Não há ferramenta para apagar ou mover nota; se o dono pedir,
   diga que não pode e sugira que ele faça no próprio vault.
+
+## Resumo da conversa
+Quando o dono pedir ("registra o que fizemos", "anota no diário", "resume a conversa"),
+escreva uma entrada na nota do dia, na seção "## Pelo assistente" (veja "Vault"):
+### HH:MM · claude-app — Resumo: <assunto>
+Conte com detalhe e contexto: o que foi pedido, o que foi feito e como, as decisões e o
+porquê, o que foi descartado, o resultado, o que ficou pendente e o próximo passo. Ponha
+links [[nome-da-nota]] para as notas do vault que a conversa tocou. Não copie código,
+comando longo nem trecho de arquivo. Pode incluir dado sensível do dono; senha, token e
+chave nunca. Se a conversa teve fato medível ainda não registrado, registre antes (ou
+pergunte). Sem o pedido do dono, não escreva resumo.
 
 ## Paperless
 - Leia e busque à vontade. Escrever (tags, correspondente, nota no documento, upload)
@@ -235,7 +275,7 @@ ser criado no claude.ai.
 | "Quanto gastei esta semana?" | `consultar_gastos` com a semana em America/Sao_Paulo | Total e por categoria que a ferramenta devolveu, com o período |
 | "Apague a nota X" | nada | "Não tenho ferramenta para apagar nota. Faça no próprio vault." |
 | "Ache a nota fiscal da geladeira" (Paperless desligado) | nenhuma | "O Paperless não está ligado ainda." |
-| "Estudei Postgres 1 h e aprendi que índice parcial existe" | `registrar_atividade` (nota_vault = `00-inbox/estudo-postgres.md`), depois `vault_write_note` com `registro: atividade-42` | A `confirmacao` da ferramenta e o caminho da nota criada |
+| "Estudei Postgres 1 h e aprendi que índice parcial existe" | `registrar_atividade` (nota_vault = `50-diario/2026/2026-10-20.md`), depois a entrada na nota do dia com `registro: atividade-42` (Ficha 3) | A `confirmacao` da ferramenta e o caminho da nota do dia |
 | "Liga a nota 00-inbox/mercado.md ao gasto 12" | `vincular_nota` (gasto, 12, caminho) | "Nota ligada ao gasto 12: 00-inbox/mercado.md (desfazer: tipo vinculo, id 31). Desfazer?" |
 | "Sim" (após essa confirmação) | `desfazer_registro` (vinculo, 31) | "Desfeito: vínculo 31. O gasto 12 ficou sem nota." |
 | "Liga a nota 00-inbox/mercado.md ao gasto 12" (já ligada) | `vincular_nota` | "Nada mudou: o gasto 12 já está ligado a 00-inbox/mercado.md. Nada a desfazer." |
@@ -357,7 +397,8 @@ exceção a "Nada é apagado" não compensa.
 
 ## Ficha 3 — Notas do app no diário do dia e leitura do vault pelo índice
 
-- **Status:** proposta (Opus 5.5, 2026-10-18). Falta o ok do Leonardo. Origem: `PLANO.md` M1 e M2, da
+- **Status:** aprovada (Leonardo, 2026-10-18, na conversa), aplicada no texto da Ficha 1, no exemplo
+  de `nota_vault` (`banco.py`) e na tag `diario` do vault. Proposta escrita pelo Opus 5.5. Origem: `PLANO.md` M1 e M2, da
   análise do vault de 2026-10-18. O lado do vault já está feito (D4 de `decisoes-do-vault`): campo
   `registro`, máquina `claude-app`, nota com `registro` nunca apagada no ritual da inbox.
 - **Onde vive:** muda dois trechos do texto da Ficha 1 (colado no Projeto) e, no servidor, só o
@@ -465,8 +506,75 @@ vault acusa a nota do dia).
 2. Teste do exemplo de caminho em `banco.py`: a descrição de `nota_vault` cita `50-diario/`.
 3. Manual, no app: os três primeiros exemplos acima; o lint do vault sem ERRO depois deles.
 
-### Decisão sua
+### Decisões do Leonardo (2026-10-18)
 
-1. Aprovar a regra e as 3 mudanças do texto? Recomendação: sim. Sem isso, a inbox enche de notas soltas.
-2. Nome da seção na nota do dia: `## Pelo assistente`. Recomendação: manter; separa o que o Claude
-   escreveu do que você escreve à mão em "Feito" e "Pensamentos".
+- Regra e as 3 mudanças do texto: aprovadas.
+- Seção `## Pelo assistente` na nota do dia: aprovada como proposta.
+
+---
+
+## Ficha 4 — Resumo da conversa no diário, quando o dono pede
+
+- **Status:** aprovada (Leonardo, 2026-10-18, na conversa), aplicada no texto da Ficha 1 (seção
+  "Resumo da conversa") e no formato do índice do diário do vault. Proposta escrita pelo Opus 5.5. Depende da Ficha 3 (nota do dia
+  e seção `## Pelo assistente`).
+- **Pedido do Leonardo (2026-10-18):** a IA registra o que fez no dia, com contexto, além do que ele
+  pediu para registrar. Ele escolheu **só quando pedir, no fim da conversa**, em vez de registro
+  automático a cada tarefa ou resumo agendado (D18 de `decisoes-do-assistente-pessoal`).
+- **Onde vive:** uma seção nova no texto da Ficha 1 (colado no Projeto). Vale também para o Claude
+  Code quando o Leonardo pedir: o formato fica no índice do diário do vault (`50-diario/_diario.md`),
+  escrito junto com a aprovação. Nada muda no servidor.
+
+### Regra
+
+1. Gatilho: o dono pede ("registra o que fizemos", "anota no diário", "resume a conversa"). Sem o
+   pedido, o Claude não escreve resumo.
+2. Destino: a nota do dia, na seção `## Pelo assistente`, como na Ficha 3. Uma entrada por pedido:
+   `### HH:MM · claude-app — Resumo: <assunto>` (no Claude Code, a máquina no lugar de `claude-app`).
+3. Conteúdo, com detalhe e contexto: o que foi pedido; o que foi feito e como; decisões tomadas e o
+   porquê; alternativas descartadas; resultado; o que ficou pendente e o próximo passo; links para as
+   notas ou projetos do vault que a conversa tocou.
+4. **Sem código:** nenhum bloco de código, comando longo ou trecho de arquivo. Nome de arquivo,
+   ferramenta ou comando curto pode aparecer quando for o contexto.
+5. Dado sensível sobre o dono e o trabalho dele pode entrar (D18). Senha, token e chave nunca entram.
+   Número do banco não se repete: cita o registro (`registro: <tipo>-<id>`).
+6. Fato medível que apareceu na conversa e ainda não foi registrado: o Claude segue a Ficha 1
+   (registra ou pergunta) antes de escrever o resumo.
+
+### Mudança proposta no texto da Ficha 1
+
+Acrescente esta seção depois de "## Vault":
+```
+## Resumo da conversa
+Quando o dono pedir ("registra o que fizemos", "anota no diário", "resume a conversa"),
+escreva uma entrada na nota do dia, na seção "## Pelo assistente" (veja "Vault"):
+### HH:MM · claude-app — Resumo: <assunto>
+Conte com detalhe e contexto: o que foi pedido, o que foi feito e como, as decisões e o
+porquê, o que foi descartado, o resultado, o que ficou pendente e o próximo passo. Ponha
+links [[nome-da-nota]] para as notas do vault que a conversa tocou. Não copie código,
+comando longo nem trecho de arquivo. Pode incluir dado sensível do dono; senha, token e
+chave nunca. Se a conversa teve fato medível ainda não registrado, registre antes (ou
+pergunte). Sem o pedido do dono, não escreva resumo.
+```
+
+### Exemplos
+
+| Dono diz | Claude faz | Claude responde |
+|---|---|---|
+| "Registra o que fizemos hoje" (conversa sobre o orçamento do mês) | `vault_read_note` da nota do dia; `vault_write_note` `mode` `append` com a entrada | "Anotei o resumo em 50-diario/2026/2026-10-20.md." |
+| Conversa termina sem pedido | nada | — |
+| "Resume a conversa" e a conversa teve "gastei 80 no posto" sem registro | `registrar_gasto` (Ficha 1), depois a entrada com `registro: gasto-<id>` | A `confirmacao` e o caminho da nota |
+
+### Não faz
+
+Não escreve sozinho ao fim da tarefa nem por tarefa agendada (o Leonardo descartou os dois em
+2026-10-18 para não somar chamadas). Não cria ferramenta nova.
+
+### Cenário de teste
+
+1. `test_contrato_ficha1.py` continua valendo: a seção nova não cita ferramenta nova.
+2. Manual, no app: os três exemplos acima; o lint do vault sem ERRO depois deles.
+
+### Decisões do Leonardo (2026-10-18)
+
+- Regra e a seção nova "Resumo da conversa": aprovadas, junto com a Ficha 3.

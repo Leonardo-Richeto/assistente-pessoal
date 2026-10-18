@@ -147,15 +147,17 @@ para a Fase 6b (fábrica de ferramentas).
 ## Melhorias anotadas (Leonardo, 2026-10-18)
 Vieram da análise do vault de 2026-10-18. O lado do vault já está feito (D4 de `decisoes-do-vault`): campo
 `registro`, máquina `claude-app`, tipo `estado`, perfil e `90-meta/lint-do-vault.py`.
-- [ ] M1 (proposta escrita: Ficha 3; falta o ok do Leonardo para aplicar) Ficha nova "proposta" em `docs/regras-de-negocio.md` (muda a ficha 1): a parte subjetiva vai para a nota do
+- [x] M1 (Ficha 3 aprovada e aplicada em 2026-10-18; falta colar o texto no Projeto) Ficha nova "proposta" em `docs/regras-de-negocio.md` (muda a ficha 1): a parte subjetiva vai para a nota do
   dia `50-diario/AAAA/AAAA-MM-DD.md` (acrescenta no fim), entrada `### HH:MM · claude-app — título` com a linha
   `registro: <tipo>-<id>`; `nota_vault` aponta para a nota do dia. Hoje vai para `00-inbox`, que o vault esvazia
   toda semana e que viraria dezenas de notas por mês para classificar
-- [ ] M2 (na mesma Ficha 3, proposta) Na ficha 1, "como ler o vault": `MAPA.md` → índice `_*.md` da pasta → só as 12 primeiras linhas da nota
+- [x] M2 (Ficha 3, aplicada em 2026-10-18) Na ficha 1, "como ler o vault": `MAPA.md` → índice `_*.md` da pasta → só as 12 primeiras linhas da nota
   (`vault_read_note_lines`, frontmatter e resumo) → nota inteira só se for a certa. Para pergunta pessoal, ler
   antes `20-areas/perfil-do-leonardo.md`
 - [x] M3 (2026-10-18: `deploy/vault/lint-diario.sh` + timer, roteiro em `docs/SYNCTHING.md` §5; instalar no i7 junto com o B11) Lint do vault no i7: timer diário rodando `python3 -I /srv/vault/90-meta/lint-do-vault.py`, saída num
   arquivo que o resumo semanal (7b.3) lê; depois, se valer, ferramenta de leitura `saude_do_vault`
+- [x] M5 (Ficha 4 aprovada e aplicada em 2026-10-18) Resumo da conversa no diário **quando o Leonardo pede**, com
+  detalhe e contexto, sem código (D18 do vault). Registro automático por tarefa e resumo agendado descartados
 - [x] M4 (2026-10-18: `SPRINT_HISTORICO.md`; `SPRINT_NOTAS.md` de ~29 mil para ~4,4 mil tokens) Arquivos de sprint mais baratos de ler: "Passos feitos" do `SPRINT_NOTAS.md` (~1.090 linhas, ~24 mil
   tokens por sessão) vão para um `SPRINT_HISTORICO.md` que a sessão não lê no início; estado do projeto num lugar só
   (`SPRINT_NOTAS` durante a sprint, `CONTEXTO` fora dela); a nota `_assistente-pessoal` do vault fica com objetivo e
