@@ -54,7 +54,7 @@ depois de os dados estarem no lugar).
 7. [ ] (15 min) `.env` com senhas novas, subir a stack, `sudo tailscale funnel --bg 8000`, 401 sem token (B6, B7).
 8. [ ] (2 min) No Mac: `docker compose stop servidor`. O Postgres do Mac fica de pé e nada novo é gravado (B7b).
 9. [ ] (30 min) Dados do Mac: backup, `scp`, restaurar em banco novo, conferir, decidir e trocar (B10).
-10. [ ] (15 min) claude.ai: conector novo, trocar no Projeto "Assistente" (B8) e testes do A10 (B9).
+10. [ ] (20 min) claude.ai: conector novo, trocar no Projeto "Assistente", colar as instruções novas (B8) e testes (B9).
 11. [ ] (5 min) Só agora, no Mac: `tailscale funnel --https=443 off` e `docker compose stop` (B9b).
 12. [ ] (40 min) Vault e Syncthing e o timer do commit do vault (B11, `docs/SYNCTHING.md`).
 13. [ ] (5 min) Anote o consumo parado (lido no B2c) e comece os 7 dias de medição com a stack (`PLANO.md` 1.7).
@@ -184,8 +184,12 @@ cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor   # depois: powersave
          `docker compose exec -T postgres sh -c 'dropdb -U "$POSTGRES_USER" assistente_mac'`.
 - [ ] B8. No claude.ai: Configurações → Conectores → adicionar conector personalizado `https://<maquina>.<tailnet>.ts.net/mcp`
       e entrar com o Google. No Projeto "Assistente": trocar o conector do Mac pelo novo. Depois remova o conector
-      de teste.
-- [ ] B9. Repetir os testes do A10 pelo iPhone (gasto → consultar → desfazer; ponto → horas).
+      de teste. **Nas instruções do Projeto, troque o texto inteiro** pelo bloco "Texto proposto" da Ficha 1
+      (`docs/regras-de-negocio.md`), com "o dono" trocado por "Leonardo" e a 1ª frase "Você é o assistente pessoal
+      do Leonardo, dono deste Projeto." É a versão com as Fichas 3 e 4 (aprovadas em 2026-10-18), ainda não colada.
+- [ ] B9. Repetir os testes do A10 pelo iPhone (gasto → consultar → desfazer; ponto → horas). Testar também as
+      Fichas 3 e 4: "estudei X 1 h e aprendi Y" anota em `50-diario/AAAA/AAAA-MM-DD.md`, seção "Pelo assistente";
+      "registra o que fizemos" escreve o resumo na mesma nota; `python3 -I /srv/vault/90-meta/lint-do-vault.py` sem ERRO.
 - [ ] B9b. Só depois de B8 e B9 funcionarem, desligue o Mac:
       ```bash
       tailscale funnel --https=443 off                                  # no Mac (sudo, se pedir)

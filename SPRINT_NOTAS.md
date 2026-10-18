@@ -39,7 +39,7 @@ bloco do passo que precisar. **Esta seção é o único lugar do estado do proje
 - **Melhorias de 2026-10-18 (`PLANO.md` M1–M4):** M3 (lint diário do vault, só arquivos no repo) e M4 (este arquivo
   sem o histórico, agora em `SPRINT_HISTORICO.md`) feitos. M1 e M2 (Ficha 3) e M5 (Ficha 4, resumo da conversa
   a pedido) **aprovados e aplicados**: texto da Ficha 1, exemplo de `nota_vault` em `banco.py`, tag `diario` e formato
-  no `_diario` do vault. 262 testes + 1 pulado. **Falta o Leonardo colar o texto novo da Ficha 1 no Projeto.**
+  no `_diario` do vault. 262 testes + 1 pulado. **O texto novo da Ficha 1 entra no Projeto no B8, no i7** (o conector do Mac está desligado; teste no B9).
 - **Última atualização:** 2026-10-17, Opus 5.5 (orquestrador, depois do revisor do 8e), MacBook Air.
 
 ## Avisos vivos
