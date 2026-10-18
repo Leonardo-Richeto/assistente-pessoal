@@ -1,0 +1,9 @@
+[Unit]
+Description=Lint diario do vault (so le; relatorio em /srv/vault-lint/ultimo.md)
+
+[Service]
+Type=oneshot
+# Troque <usuario> pelo usuario dono de /srv/vault (o mesmo do Syncthing).
+User=<usuario>
+Environment=VAULT_PATH=/srv/vault LINT_DIR=/srv/vault-lint
+ExecStart=/bin/bash /srv/assistente/deploy/vault/lint-diario.sh

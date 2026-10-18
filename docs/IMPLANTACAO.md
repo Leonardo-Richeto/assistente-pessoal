@@ -28,19 +28,16 @@ Observações do teste:
 
 ## Etapa B — Produção
 
-Só começa com a Etapa A estável. A máquina ainda não foi decidida; os passos servem aos dois casos:
-
-- **B2a:** VM Debian 12 no Proxmox do i5-3330 (provisória ou definitiva).
-- **B2b:** i7-6700 com Debian 12 direto, sem virtualização.
-
-Tudo que é igual nos dois casos vem depois do B2. Troque `<usuario>` pelo seu usuário Linux e
+Só começa com a Etapa A estável. **Máquina decidida (Leonardo, 2026-10-18):** só o i7-6700 fica ligado, com
+Debian 12 direto, sem Proxmox; cada serviço roda no seu projeto Docker Compose. O i5 desliga depois que os
+serviços dele vierem para o i7 (`PLANO.md` Fase 1c). Sem backup do banco por enquanto (`PLANO.md` Fase 7). Troque `<usuario>` pelo seu usuário Linux e
 `<maquina>.<tailnet>.ts.net` pelo endereço real (nunca grave o real no repo, que é público).
 Scripts: `deploy/inventario.sh`, `deploy/preparar-maquina.sh`, `deploy/backup-banco.sh`,
 `deploy/restaurar-banco.sh`, `deploy/vault/`. Vault e Syncthing: `docs/SYNCTHING.md`.
 
-### Roteiro de amanhã (2026-10-18)
+### Roteiro da implantação
 
-Tempo total estimado: 3 a 4 horas. Marque conforme avança. A numeração dos passos B segue o `SPRINT.md`;
+Tempo total estimado: 3h a 4h. Marque conforme avança. A numeração dos passos B segue o `SPRINT.md`;
 a **ordem de execução** é a desta lista (B10 vem antes de B8 de propósito: o conector novo só entra
 depois de os dados estarem no lugar).
 
@@ -48,9 +45,9 @@ depois de os dados estarem no lugar).
    Confira: `git ls-remote https://github.com/Leonardo-Richeto/assistente-pessoal main` e
    `curl -fsI https://raw.githubusercontent.com/Leonardo-Richeto/assistente-pessoal/main/deploy/inventario.sh`
    (deve responder `200`). Se der 404, pare: o push não aconteceu.
-1. [ ] (5 min) Escolher a máquina: i5 em VM (B2a) ou i7 (B2b). Se o i5, lembre do aviso de backup abaixo.
+1. [ ] (5 min) Ligue o i7 na tomada medidora. A máquina está decidida: i7 com Debian direto (2026-10-18).
 2. [ ] (10 min) Inventário no host (B1). No i7, **antes** de apagar o sistema atual.
-3. [ ] (30 a 40 min) Criar a VM e instalar o Debian 12 (B2a) ou instalar o Debian no i7 (B2b).
+3. [ ] (40 a 60 min) BIOS, Debian 12 no i7 e economia de energia (B2).
 4. [ ] (10 min) Na máquina nova: clonar o repo e rodar `sudo bash deploy/preparar-maquina.sh` (B3).
 5. [ ] (10 min) `sudo tailscale up`, HTTPS e Funnel no painel, key expiry desligada (B4).
 6. [ ] (10 min) Google Cloud Console: acrescentar a URL nova ao cliente OAuth (B5).
@@ -60,11 +57,10 @@ depois de os dados estarem no lugar).
 10. [ ] (15 min) claude.ai: conector novo, trocar no Projeto "Assistente" (B8) e testes do A10 (B9).
 11. [ ] (5 min) Só agora, no Mac: `tailscale funnel --https=443 off` e `docker compose stop` (B9b).
 12. [ ] (40 min) Vault e Syncthing e o timer do commit do vault (B11, `docs/SYNCTHING.md`).
-13. [ ] (10 min) Backup diário do banco (B12).
+13. [ ] (5 min) Anote o consumo parado (lido no B2c) e comece os 7 dias de medição com a stack (`PLANO.md` 1.7).
 
-> **Aviso (Fase 7):** se a produção for o i5, o backup não pode ficar só no próprio i5. O destino
-> da cópia é o i7 ou um HD avulso. O `backup-banco.sh` grava na própria máquina; sem a cópia
-> para fora, perder o disco perde tudo. Isso fecha na Fase 7 (`PLANO.md` 7.1).
+> **Aviso:** sem backup do banco (decisão de 2026-10-18), uma falha do SSD do i7 perde todos os
+> registros. Olhe a saúde do SSD no inventário (B1) antes de apagar o sistema atual.
 
 ### Passos
 
@@ -74,41 +70,47 @@ depois de os dados estarem no lugar).
       - **Host Proxmox do i5** (o repo não está lá e o Proxmox não tem sudo): entre como root e rode
         `apt-get install -y smartmontools` e depois
         `curl -fsSLO https://raw.githubusercontent.com/Leonardo-Richeto/assistente-pessoal/main/deploy/inventario.sh && bash inventario.sh`.
-      - **i7 (B2b)**: rode **antes de apagar o sistema atual** (se não houver Linux nele, use um pendrive live
+      - **i7**: rode **antes de apagar o sistema atual** (se não houver Linux nele, use um pendrive live
         do Debian, instale `smartmontools` e rode o mesmo comando).
       - O arquivo tem hostname e IP: guarde no vault, não no git. Resumo sem dados reais vai para
         `docs/inventario.md` (roteiro em `CONTEXTO.md`).
 
-#### B2a. VM no Proxmox do i5
+#### B2. BIOS e Debian 12 no i7
 
-- [ ] B2a. Na interface web do Proxmox, **Create VM**:
-  - ISO: Debian 12 netinst (`debian-12.x-amd64-netinst.iso`), enviada ao armazenamento de ISOs.
-  - Sistema: BIOS padrão (SeaBIOS) ou OVMF; **Qemu Agent** marcado.
-  - Disco: 60 GB no **SSD** (Discard e SSD emulation ligados se o armazenamento deixar).
-  - CPU: 2 a 4 vCPU, **Type: host**.
-  - RAM: 6 GB (6144 MiB). A stack atual cabe, e sobram 10 GB para as outras VMs do i5.
-  - Rede: bridge `vmbr0` (a mesma da rede de casa).
-  - Depois de criar: Options → **Start at boot: yes**. Marque o Qemu Agent **já na criação** (aba System).
-    Se ligar com a VM já criada, faça **Shutdown e Start** pelo Proxmox; reiniciar por dentro não basta.
-  - Instalação do Debian: sem ambiente gráfico; marque "servidor SSH" e "utilitários padrão do sistema".
-    Crie seu usuário comum (o `<usuario>`). **Deixe a senha de root em branco**: assim o instalador
-    instala o `sudo` e põe o usuário no grupo. IP fixo (reserva no roteador) é melhor.
-    Se já definiu a senha de root: `su -`, `apt install sudo && usermod -aG sudo <usuario>`, saia e entre de novo.
-  - Dados futuros do Paperless: **sugestão**, crie um segundo disco virtual no HD de 500 GB (Add → Hard Disk,
-    armazenamento do HD) e monte em `/srv/paperless` quando chegar a Fase 2. O Postgres e o sistema ficam
-    no SSD; o HD guarda os documentos. Pode ser adicionado depois sem recriar a VM.
-  - Se o i5 for só provisório, mudar para o i7 (Debian direto) é refazer B3 a B12, incluindo B10 (dados) e o
-    Syncthing; não é restaurar backup do Proxmox.
-
-#### B2b. i7 sem virtualização
-
+- [ ] B2a. BIOS (`PLANO.md` 1.0): ligue os C-states com o package C-state no máximo e o ASPM. Desligue áudio,
+      porta serial e controladoras sem uso. Ligue o "AC power restore", para a máquina voltar sozinha depois
+      de queda de luz. Anote o que mudou na nota `maquinas-do-assistente-pessoal` do vault.
 - [ ] B2b. Instale Debian 12 direto no i7 (netinst por pendrive): sem ambiente gráfico, "servidor SSH" e
-      "utilitários padrão". Disco inteiro no SSD, usuário comum `<usuario>`. **Deixe a senha de root em branco** (o instalador
-      instala o `sudo` e põe o usuário no grupo). Se já definiu: `su -`, `apt install sudo && usermod -aG sudo <usuario>`,
-      saia e entre de novo. IP fixo no roteador. No BIOS, ajuste
-      "AC power restore" para ligar sozinho, para voltar depois de queda de luz.
+      "utilitários padrão". Disco inteiro no SSD, usuário comum `<usuario>`. **Deixe a senha de root em branco**
+      (o instalador instala o `sudo` e põe o usuário no grupo). Se já definiu: `su -`,
+      `apt install sudo && usermod -aG sudo <usuario>`, saia e entre de novo. IP fixo, reservado no roteador.
+- [ ] B2c. Economia de energia. Por SSH, como `<usuario>`:
 
-#### Igual nos dois casos
+```bash
+sudo apt-get install -y linux-cpupower powertop
+cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor   # antes
+sudo tee /etc/systemd/system/economia.service >/dev/null <<'EOF'
+[Unit]
+Description=Economia de energia: governador powersave e powertop
+After=multi-user.target
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/cpupower frequency-set -g powersave
+ExecStart=/usr/sbin/powertop --auto-tune
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo systemctl daemon-reload && sudo systemctl enable --now economia.service
+cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor   # depois: powersave
+```
+
+      Se a rede cair ou ficar instável depois disso, apague a linha do `powertop` no serviço e reinicie: o
+      `--auto-tune` liga economia na placa de rede, e algumas placas não aguentam. Deixe o i7 parado e anote
+      o consumo da tomada (`PLANO.md` 1.7).
+      Documentos do Paperless (Fase 2): quando o HD de 500 GB for para o i7 (`PLANO.md` 1c.3), monte-o em
+      `/srv/paperless`. O sistema e o Postgres ficam no SSD.
+
+#### Depois do Debian instalado
 
 - [ ] B3. Preparar a máquina. Entre por SSH como `<usuario>`:
       ```bash
@@ -125,8 +127,8 @@ depois de os dados estarem no lugar).
       Confira: `docker compose version` e o fuso: `timedatectl`. Se não for `America/Sao_Paulo`:
       `sudo timedatectl set-timezone America/Sao_Paulo` (o script só imprime; não muda sozinho).
 - [ ] B4. Tailscale: `sudo tailscale up` (abra o link no navegador e entre na tailnet).
-      Nome da máquina: um nome neutro (opção `--hostname=<nome>`) deixa trocar de i5 para i7 depois mantendo
-      a URL, desde que remova a máquina antiga no painel. No painel do Tailscale: HTTPS e Funnel para a máquina.
+      Nome da máquina: um nome neutro (opção `--hostname=<nome>`) mantém a URL se a máquina for trocada um dia,
+      desde que remova a máquina antiga no painel. No painel do Tailscale: HTTPS e Funnel para a máquina.
       No painel, desligue o **key expiry** desta máquina (senão ela cai da tailnet em meses).
       Depois que a stack responder (B7): `sudo tailscale funnel --bg 8000` (no Linux o Funnel pede sudo) e anote
       `https://<maquina>.<tailnet>.ts.net`.
@@ -193,34 +195,6 @@ depois de os dados estarem no lugar).
       versionamento Staggered com as versões em `/srv/vault-versoes`, `.gitignore` do vault, timer do commit às
       03:30, `VAULT_PATH=/srv/vault` no `.env`). **Não verificado:** se o Synctrain aceita padrões de ignorar, e se o
       Obsidian do iPhone abre a pasta do Synctrain.
-- [ ] B12. Backup diário do banco, às 03:50 (depois do commit do vault). Dois arquivos systemd (o `sed` troca `<usuario>` pelo seu usuário):
-
-```bash
-sudo tee /etc/systemd/system/backup-banco.service >/dev/null <<'EOF'
-[Unit]
-Description=Backup diario do Postgres do assistente
-[Service]
-Type=oneshot
-User=<usuario>
-Environment=BACKUP_DIR=/srv/backups/postgres BACKUP_RETENCAO=14
-ExecStart=/bin/bash /srv/assistente/deploy/backup-banco.sh
-EOF
-sudo tee /etc/systemd/system/backup-banco.timer >/dev/null <<'EOF'
-[Unit]
-Description=Backup diario do Postgres as 03:50
-[Timer]
-OnCalendar=*-*-* 03:50:00
-Persistent=true
-[Install]
-WantedBy=timers.target
-EOF
-sudo sed -i "s/<usuario>/$USER/" /etc/systemd/system/backup-banco.service
-sudo install -d -o "$USER" -g "$USER" /srv/backups/postgres
-sudo systemctl daemon-reload && sudo systemctl enable --now backup-banco.timer
-sudo systemctl start backup-banco.service && journalctl -u backup-banco.service -n 20 --no-pager
-```
-
-Mantém os 14 mais novos e só apaga arquivos `assistente-AAAAMMDD-HHMMSS.dump` criados por ele.
-Teste de restauração: `deploy/restaurar-banco.sh <dump> teste_restauro`, conferir e apagar com `dropdb`.
-Cópia para outra máquina fica para a Fase 7 (gancho comentado no fim do script).
+- [ ] B12. **Adiado** (Leonardo, 2026-10-18): sem backup do banco por enquanto (`PLANO.md` Fase 7). O roteiro do
+      timer com o `deploy/backup-banco.sh` está no histórico do git (commit `73b0c87`, este arquivo).
 - [ ] B13. Seguir para a Fase 2 do `PLANO.md` (Paperless).

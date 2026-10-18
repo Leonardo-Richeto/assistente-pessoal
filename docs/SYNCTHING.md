@@ -1,6 +1,6 @@
 # Vault: Syncthing e commit diário
 
-Roteiro do Leonardo. A produção (i5 em VM ou i7) é o **nó central**: ela guarda o vault em
+Roteiro do Leonardo. A produção (o i7) é o **nó central**: ela guarda o vault em
 `/srv/vault`, faz o commit diário e é a única que fala com o GitHub. Mac, PC Windows e iPhone
 sincronizam com ela. Decisões: D10 (nada pago além do Pro), D15 (só a produção comita).
 
@@ -197,6 +197,21 @@ echo 'VAULT_PUSH=1' | sudo tee /etc/default/vault-commit
 
 Sem esse arquivo (ou sem o `1`), o serviço só comita localmente. Teste outra vez com
 `systemctl start` e confira no journal a linha "push feito".
+
+**Lint diário** (`PLANO.md` M3). Roda às 03:40, depois do commit, o `90-meta/lint-do-vault.py` do próprio
+vault. Só lê. O relatório fica em `/srv/vault-lint/ultimo.md`, fora do vault, para não entrar no commit:
+
+```bash
+sudo install -d -o "$USER" -g "$USER" /srv/vault-lint
+sudo cp /srv/assistente/deploy/vault/vault-lint.service /etc/systemd/system/
+sudo cp /srv/assistente/deploy/vault/vault-lint.timer   /etc/systemd/system/
+sudo sed -i "s/<usuario>/$USER/" /etc/systemd/system/vault-lint.service
+sudo systemctl daemon-reload && sudo systemctl enable --now vault-lint.timer
+sudo systemctl start vault-lint.service; cat /srv/vault-lint/ultimo.md | head -20
+```
+
+Com ERRO no vault, o serviço fica como falho (`systemctl --failed` mostra). Corrija a nota e rode de novo.
+AVISO não marca falha.
 
 ## 6. Apontar o assistente para o vault
 

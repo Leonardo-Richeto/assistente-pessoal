@@ -1,0 +1,10 @@
+[Unit]
+Description=Lint diario do vault as 03:40 (depois do commit das 03:30)
+
+[Timer]
+OnCalendar=*-*-* 03:40:00
+Persistent=true
+Unit=vault-lint.service
+
+[Install]
+WantedBy=timers.target

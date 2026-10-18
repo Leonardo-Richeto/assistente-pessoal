@@ -352,3 +352,121 @@ Proposta do Passo 8d, recusada pelo Leonardo em 2026-10-17: guardar o detalhe po
 resumir por dia (ferramenta, resultado, cliente, contagem, soma da duração) e apagar o detalhe por
 um job mensal com usuário de banco próprio. Motivo da recusa: o custo de guardar é pequeno e a
 exceção a "Nada é apagado" não compensa.
+
+---
+
+## Ficha 3 — Notas do app no diário do dia e leitura do vault pelo índice
+
+- **Status:** proposta (Opus 5.5, 2026-10-18). Falta o ok do Leonardo. Origem: `PLANO.md` M1 e M2, da
+  análise do vault de 2026-10-18. O lado do vault já está feito (D4 de `decisoes-do-vault`): campo
+  `registro`, máquina `claude-app`, nota com `registro` nunca apagada no ritual da inbox.
+- **Onde vive:** muda dois trechos do texto da Ficha 1 (colado no Projeto) e, no servidor, só o
+  exemplo de caminho do parâmetro `nota_vault` (`servidor/assistente/banco.py`, `_DESCRICAO_CAMINHO`
+  e as duas mensagens de erro com `00-inbox/nota.md`). Nada entra no claude.ai nem no código antes do ok.
+- **Por quê:** hoje cada fato com parte subjetiva vira uma nota solta em `00-inbox`. O vault esvazia a
+  inbox toda semana; com uso diário, seriam dezenas de notas por mês para classificar à mão. O lugar
+  que o vault já tem para "o que aconteceu ou foi pensado numa data" é a nota do dia em `50-diario/`.
+  Na leitura, o texto atual só manda buscar e abrir a nota inteira, mas toda nota do vault tem um
+  resumo nas primeiras linhas e cada pasta tem um índice: ler isso primeiro gasta menos tokens.
+
+### Regra
+
+1. Fato com parte subjetiva, sem lugar dito pelo dono: a parte subjetiva vira uma **entrada na nota do
+   dia** `50-diario/AAAA/AAAA-MM-DD.md` (data do fato, fuso America/Sao_Paulo). O `nota_vault` do
+   registro é o caminho dessa nota. Vários fatos do mesmo dia são várias entradas na mesma nota.
+2. Antes de escrever, o Claude lê a nota do dia. Se ela não existe, cria com o começo padrão (abaixo).
+   Se existe sem a seção `## Pelo assistente`, acrescenta a seção no fim. A entrada sempre entra no fim,
+   com `vault_write_note` em `mode` `append`. Nota existente nunca é sobrescrita.
+3. Entrada: `### HH:MM · claude-app — título curto`, a linha `registro: <tipo>-<id>` e o texto
+   subjetivo, sem repetir número do banco. Depois, `atualizado` da nota recebe a hora atual.
+4. Dono pede nota própria ou outro lugar ("crie uma nota sobre X"): nota própria nesse lugar (ou em
+   `00-inbox`), com `registro: <tipo>-<id>` no frontmatter, como hoje.
+5. Leitura: começa por `MAPA.md` e pelo índice da pasta (`_*.md`); para decidir se abre uma nota, lê só
+   as 12 primeiras linhas (`vault_read_note_lines`); lê a nota inteira só se for a certa. Busca
+   (`vault_search_notes`) quando o índice não ajuda. Pergunta sobre a vida do dono: lê antes a nota de
+   perfil em `20-areas/`.
+
+### Mudança proposta no texto da Ficha 1
+
+1. Em "Onde cada coisa vai", troque o item "Fato com parte medível e parte subjetiva" por:
+   ```
+   - Fato com parte medível e parte subjetiva: o dono contar o fato já é o pedido da nota; não
+     pergunte. A parte subjetiva vai para a nota do dia, 50-diario/AAAA/AAAA-MM-DD.md (data do
+     fato), a menos que o dono diga outro lugar. Registre a parte medível no banco com
+     nota_vault igual a esse caminho. Depois escreva a entrada na nota do dia (veja "Vault"),
+     com a linha "registro: <tipo>-<id>" e o id que o banco devolveu. Diga o caminho. Não
+     repita na nota o número que está no banco. Se a nota não puder ser escrita, diga isso
+     ao dono: o registro fica apontando para uma nota sem a entrada.
+   ```
+2. No item seguinte ("Para ligar uma nota a um registro..."), troque o fim por: "Na nota do dia, a
+   linha registro fica na entrada; em nota própria, no frontmatter, com vault_update_frontmatter."
+3. Troque a seção "## Vault" inteira por:
+   ```
+   ## Vault
+   - Para achar, comece por MAPA.md e pelo índice da pasta (o arquivo que começa com _).
+     Toda nota tem um resumo nas primeiras linhas: leia só as 12 primeiras
+     (vault_read_note_lines) para saber se é a nota certa, e a nota inteira só se for.
+     Use vault_search_notes quando o índice não ajudar.
+   - Pergunta sobre a vida do dono: leia antes a nota de perfil dele em 20-areas/.
+   - Antes de mudar uma nota existente, leia-a. Para acrescentar, use vault_write_note com
+     mode append ou vault_patch_note; vault_write_note sem mode troca a nota inteira.
+     Nunca sobrescreva uma nota existente sem o dono pedir.
+   - Nota do dia que não existe: crie com este começo, trocando a data e a hora:
+     ---
+     titulo: AAAA-MM-DD
+     tipo: log
+     status: ativo
+     tags: [diario]
+     criado: AAAA-MM-DD HH:MM
+     atualizado: AAAA-MM-DD HH:MM
+     maquina: claude-app
+     ---
+
+     # AAAA-MM-DD
+
+     > Registro do dia.
+
+     ## Pelo assistente
+   - Nota do dia que existe sem "## Pelo assistente": acrescente essa seção no fim.
+   - Cada fato é uma entrada no fim da nota (mode append):
+     ### HH:MM · claude-app — título curto
+     registro: <tipo>-<id>
+     <a parte subjetiva, sem os números do banco>
+     Depois troque "atualizado" pela hora atual com vault_update_frontmatter.
+   - Nota própria, quando o dono pedir: no lugar que ele disser ou em 00-inbox, com
+     "registro: <tipo>-<id>" no frontmatter se estiver ligada a um registro. Diga o caminho.
+   - Não apague nada no vault. Não há ferramenta para apagar ou mover nota; se o dono pedir,
+     diga que não pode e sugira que ele faça no próprio vault.
+   ```
+
+### Exemplos
+
+| Dono diz | Claude faz | Claude responde |
+|---|---|---|
+| "Estudei Postgres 1 h e aprendi que índice parcial existe" (sem nota do dia) | `registrar_atividade` (nota_vault = `50-diario/2026/2026-10-20.md`); `vault_read_note` (não existe); `vault_write_note` com o começo padrão e a entrada | A `confirmacao` e "Anotei em 50-diario/2026/2026-10-20.md." |
+| "Dormi mal e acordei cansado" (nota do dia já existe com a seção) | registro no banco quando houver ferramenta de sono; hoje, `registrar_atividade`; `vault_write_note` `mode` `append` com a entrada | A `confirmacao` e o caminho |
+| "Cria uma nota sobre a viagem de dezembro" | `vault_write_note` em `00-inbox/viagem-de-dezembro.md` | "Criei 00-inbox/viagem-de-dezembro.md." |
+| "O que eu decidi sobre o carro?" | `MAPA.md`, índice da pasta, 12 linhas das candidatas, depois a nota certa | A resposta, citando a nota |
+
+### Não faz
+
+Não move as notas que já estão em `00-inbox` (o ritual da inbox classifica). Não cria ferramenta nova.
+Não muda o banco: vários registros apontando para a mesma nota do dia já é permitido.
+
+### Depende de
+
+Tag `diario` registrada em `90-meta/taxonomia.md` (feito junto com a aprovação; sem ela, o lint do
+vault acusa a nota do dia).
+
+### Cenário de teste
+
+1. `servidor/tests/test_contrato_ficha1.py` continua valendo depois da troca do texto: os nomes novos
+   (`vault_read_note_lines`, `vault_update_frontmatter`) já existem e não estão bloqueados.
+2. Teste do exemplo de caminho em `banco.py`: a descrição de `nota_vault` cita `50-diario/`.
+3. Manual, no app: os três primeiros exemplos acima; o lint do vault sem ERRO depois deles.
+
+### Decisão sua
+
+1. Aprovar a regra e as 3 mudanças do texto? Recomendação: sim. Sem isso, a inbox enche de notas soltas.
+2. Nome da seção na nota do dia: `## Pelo assistente`. Recomendação: manter; separa o que o Claude
+   escreveu do que você escreve à mão em "Feito" e "Pensamentos".

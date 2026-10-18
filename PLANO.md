@@ -17,18 +17,33 @@ A sequência de **teste no MacBook → produção no i7** está em `docs/IMPLANT
 - [x] docker-compose (Postgres, migração, servidor, cloudflared opcional)
 
 ## Fase 1 — Colocar no ar (Leonardo) — passo a passo em `docs/IMPLANTACAO.md`
+**Máquina (Leonardo, 2026-10-18):** só o i7 fica ligado, com Debian 12 direto, sem Proxmox. Cada serviço roda no
+seu próprio projeto Docker Compose; o que hoje está no i5 vem para o i7 (Fase 1c) e o i5 fica desligado. Motivo: conta de luz (as duas ligadas: estimativa
+de R$ 29 a 47/mês). Sem backup do banco por enquanto; o vault tem Syncthing e GitHub (Fase 7).
+- [ ] 1.0 BIOS do i7 para economia (na instalação): C-states e package C-state no máximo, ASPM ligado, áudio e
+  portas sem uso desligados, "AC power restore" ligado (volta sozinho depois de queda de luz)
 - [ ] 1.1 Inventário completo de todas as máquinas: especificações, configuração, saúde SMART de cada HD/SSD, VMs → nota no vault + resumo em `docs/inventario.md` (roteiro em `CONTEXTO.md`)
-- [ ] 1.2 Instalar Docker no i7 (Debian/Ubuntu Server mínimo)
+- [ ] 1.2 Instalar Debian 12 direto no i7, com governador da CPU `powersave` e `powertop --auto-tune` no boot, e
+  Docker (`docs/IMPLANTACAO.md` B2)
 - [x] 1.3 Exposição: Tailscale Funnel (decidido)
 - [ ] 1.3b Instalar Tailscale no i7, habilitar HTTPS + Funnel, `tailscale funnel --bg 8000`
 - [ ] 1.4 Criar o cliente OAuth do Google de produção (decisão de 2026-10-17; GitHub fica como alternativa), preencher `.env`, `docker compose up -d --build`
   - Pronto quando: `docker compose ps` tudo saudável e `curl <url>/.well-known/oauth-protected-resource/mcp` responde
 - [ ] 1.5 Adicionar conector personalizado no claude.ai e testar do iPhone: registrar → consultar → desfazer
 - [x] 1.6 Criar um Projeto no claude.ai "Assistente" com instruções de uso (quando registrar, tom das confirmações). Feito 2026-10-17 com o texto da ficha 1; no i7, só trocar o conector
+- [ ] 1.7 Medir o consumo com a tomada medidora: i7 parado (24 h, só o Debian), depois com a stack (7 dias). Anotar
+  W médio e R$/mês na nota `maquinas-do-assistente-pessoal` do vault. Pronto quando: os dois números estão lá
 
 ## Fase 1b — Instância da esposa (opcional, depois da sua estar estável)
 - [ ] 1b.1 Segunda instância (README → "Segunda instância"), login Google, porta 8001 / Funnel 8443
 - [ ] 1b.2 Ela pede ao GPT para despejar no vault tudo o que ele sabe dela; depois conecta o Claude dela e confirma que ele usa esse contexto
+
+## Fase 1c — Desligar o i5 (depois da Fase 1 estável)
+- [ ] 1c.1 Inventário do i5 (B1): o que roda em cada VM, RAM e disco de cada serviço; conferir se cabe nos 16 GB do i7
+- [ ] 1c.2 Subir no i7 cada serviço do i5 como projeto Docker Compose próprio, com rede e `.env` separados:
+  agente-whatsapp (`-p agentewhatsapp`, dados por dump do banco dele) e os serviços de rede (AdGuard, WireGuard)
+- [ ] 1c.3 Desligar o i5. O HD de 500 GB livre pode ir para o i7 (documentos do Paperless, Fase 2)
+- [ ] 1c.4 Medir de novo (1.7) com tudo no i7
 
 ## Fase 2 — Documentos e vault
 - [ ] 2.1 Subir Paperless-ngx com o compose oficial (rede Docker compartilhada com este stack); gerar token; preencher `PAPERLESS_URL`/`PAPERLESS_API_KEY`
@@ -96,7 +111,10 @@ no i7 (B11 da Sprint 2 e 6.1). Antes de implementar: ficha "proposta" em `docs/r
   401 sem token conferido; o status do pedido vira `no_ar` e o Claude avisa
 
 ## Fase 7 — Backup
-- [ ] 7.1 `pg_dump` diário + vault (git) + mídia do Paperless para o i5 (Proxmox), com retenção
+**Adiada (Leonardo, 2026-10-18):** sem backup do banco por enquanto. O vault fica protegido pelo Syncthing
+(versões em `/srv/vault-versoes`) e pelo GitHub privado. Risco aceito: se o SSD do i7 falhar, os registros do banco
+se perdem. Rever quando o banco tiver dado difícil de refazer (Pluggy, saúde).
+- [ ] 7.1 (adiada) `pg_dump` diário + mídia do Paperless para fora do SSD do i7, com retenção
 - [ ] 7.2 Teste de restauração documentado
 
 ---
@@ -105,12 +123,12 @@ no i7 (B11 da Sprint 2 e 6.1). Antes de implementar: ficha "proposta" em `docs/r
 
 ## Fase 7b — Monitoramento de casa (só na máquina de produção, rede de casa) — planejado em 2026-10-17
 Só faz sentido com o servidor ligado 24 h na rede de casa; no MacBook não roda.
-**Sem terminal (Leonardo, 2026-10-17):** o modelo nunca ganha shell na VM, no Proxmox nem no roteador. Cada serviço
-(AdGuard, WireGuard, Proxmox) ganha um agente pequeno com **ações fixas**, por API interna com token próprio; o
+**Sem terminal (Leonardo, 2026-10-17):** o modelo nunca ganha shell no i7 nem no roteador. Cada serviço
+(AdGuard, WireGuard) ganha um agente pequeno com **ações fixas**, por API interna com token próprio; o
 servidor MCP chama só essas ações. Escrita com confirmação, auditoria e desfazer. Pedido que nenhuma ação cobre vai
 para a Fase 6b (fábrica de ferramentas).
 - [ ] ⚑ 7b.1 Saúde do armazenamento: script no host (fora do container, porque `smartctl` precisa do disco) roda `smartctl -j` e `df` a cada hora e grava num diretório que um worker importa; tabela de leituras + ferramenta `consultar_saude_armazenamento` (SMART, uso do disco, tamanho do Postgres, idade do último backup); alerta quando setor realocado/pendente sobe, desgaste do SSD passa do limite ou o disco passa de 85%
-- [ ] ⚑ 7b.2 Rede: DNS local (AdGuard Home, grátis) na VM de serviços de rede do i5 ou no i7, com o roteador apontando para ele; worker importa consultas por aparelho e consumo; ferramentas `consultar_rede` e `bloquear_dominio` (escrita, com confirmação). Cobre o "bloqueio de distrações" da nota `infraestrutura-de-casa` do vault
+- [ ] ⚑ 7b.2 Rede: DNS local (AdGuard Home, grátis) em container no i7 (1c.2), com o roteador apontando para ele; worker importa consultas por aparelho e consumo; ferramentas `consultar_rede` e `bloquear_dominio` (escrita, com confirmação). Cobre o "bloqueio de distrações" da nota `infraestrutura-de-casa` do vault
 - [ ] 7b.4 WireGuard: `estado_wireguard` (leitura: peers, último handshake, bytes por peer) por um agente no host
   do WireGuard; ligar ou desligar peer (`alternar_peer_wireguard`, escrita com confirmação) fica para depois
 - [ ] ⚑ 7b.5 Tráfego por aparelho: `consultar_trafego(aparelho, periodo)` (leitura). Fonte a escolher: coletor
@@ -125,6 +143,23 @@ para a Fase 6b (fábrica de ferramentas).
 - [ ] 8.4 Canal Telegram (bot oficial, allowlist do Leonardo)
 - [ ] 8.5 Canal Discord (bot, servidor privado)
 - Todos os canais falam com o MESMO servidor MCP; nenhum acesso novo ao banco por fora dele.
+
+## Melhorias anotadas (Leonardo, 2026-10-18)
+Vieram da análise do vault de 2026-10-18. O lado do vault já está feito (D4 de `decisoes-do-vault`): campo
+`registro`, máquina `claude-app`, tipo `estado`, perfil e `90-meta/lint-do-vault.py`.
+- [ ] M1 (proposta escrita: Ficha 3; falta o ok do Leonardo para aplicar) Ficha nova "proposta" em `docs/regras-de-negocio.md` (muda a ficha 1): a parte subjetiva vai para a nota do
+  dia `50-diario/AAAA/AAAA-MM-DD.md` (acrescenta no fim), entrada `### HH:MM · claude-app — título` com a linha
+  `registro: <tipo>-<id>`; `nota_vault` aponta para a nota do dia. Hoje vai para `00-inbox`, que o vault esvazia
+  toda semana e que viraria dezenas de notas por mês para classificar
+- [ ] M2 (na mesma Ficha 3, proposta) Na ficha 1, "como ler o vault": `MAPA.md` → índice `_*.md` da pasta → só as 12 primeiras linhas da nota
+  (`vault_read_note_lines`, frontmatter e resumo) → nota inteira só se for a certa. Para pergunta pessoal, ler
+  antes `20-areas/perfil-do-leonardo.md`
+- [x] M3 (2026-10-18: `deploy/vault/lint-diario.sh` + timer, roteiro em `docs/SYNCTHING.md` §5; instalar no i7 junto com o B11) Lint do vault no i7: timer diário rodando `python3 -I /srv/vault/90-meta/lint-do-vault.py`, saída num
+  arquivo que o resumo semanal (7b.3) lê; depois, se valer, ferramenta de leitura `saude_do_vault`
+- [x] M4 (2026-10-18: `SPRINT_HISTORICO.md`; `SPRINT_NOTAS.md` de ~29 mil para ~4,4 mil tokens) Arquivos de sprint mais baratos de ler: "Passos feitos" do `SPRINT_NOTAS.md` (~1.090 linhas, ~24 mil
+  tokens por sessão) vão para um `SPRINT_HISTORICO.md` que a sessão não lê no início; estado do projeto num lugar só
+  (`SPRINT_NOTAS` durante a sprint, `CONTEXTO` fora dela); a nota `_assistente-pessoal` do vault fica com objetivo e
+  porquê, sem "Estado em". Muda a regra `registro-temporario-de-sprint-na-raiz` do vault
 
 ## Ideias sem data
 - ~~Monitor de rede em casa~~ → virou a Fase 7b.2 (2026-10-17).

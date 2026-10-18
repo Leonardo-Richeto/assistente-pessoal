@@ -1,6 +1,7 @@
 # Convenções do projeto
 
-**Durante uma sprint, leia antes `SPRINT.md` e `SPRINT_NOTAS.md`** (plano, passo atual, modelo por passo e passagem entre sessões; arquivos temporários). Depois **leia `CONTEXTO.md`** (estado atual, histórico, pendências e o prompt da próxima etapa).
+**Durante uma sprint, leia antes `SPRINT.md` e `SPRINT_NOTAS.md`** (plano, passo atual, modelo por passo e passagem entre sessões; arquivos temporários). O histórico
+dos passos fica em `SPRINT_HISTORICO.md`: não leia no começo, só o bloco de que precisar. Depois **leia `CONTEXTO.md`** (estado atual, histórico, pendências e o prompt da próxima etapa).
 Depois `README.md` (arquitetura e princípios) e a próxima tarefa aberta em `PLANO.md`.
 Uma tarefa por vez; ao terminar, testes passando, `[x]` no plano e commit.
 

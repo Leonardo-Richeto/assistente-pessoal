@@ -316,14 +316,16 @@ async def test_consultar_chamadas_filtro_vazio_nao_filtra(app, url, vazio):
 
 async def test_consultar_chamadas_acha_a_chamada_das_22h_locais(app, url):
     """22h em Brasília = 01h UTC do dia seguinte: o dia local tem de achá-la, e o dia seguinte não."""
-    momento = datetime(2026, 10, 18, 1, 0, tzinfo=ZoneInfo("UTC"))  # 2026-10-17 22:00 em America/Sao_Paulo
+    # Data no passado: com uma data recente, a própria chamada de consulta (gravada com a hora de agora)
+    # caía no "dia seguinte" quando o teste rodava nesse dia (falhou em 2026-10-18).
+    momento = datetime(2020, 1, 2, 1, 0, tzinfo=ZoneInfo("UTC"))  # 2020-01-01 22:00 em America/Sao_Paulo
     with Session(create_engine(url)) as s, s.begin():
         s.add(Chamada(momento=momento, ferramenta="registrar_gasto", resultado="ok", duracao_ms=1))
     async with Client(app, client_info=CLIENTE) as c:
-        dia = (await c.call_tool("consultar_chamadas", {"inicio": "2026-10-17", "fim": "2026-10-17"})).data
-        seguinte = (await c.call_tool("consultar_chamadas", {"inicio": "2026-10-18", "fim": "2026-10-18"})).data
+        dia = (await c.call_tool("consultar_chamadas", {"inicio": "2020-01-01", "fim": "2020-01-01"})).data
+        seguinte = (await c.call_tool("consultar_chamadas", {"inicio": "2020-01-02", "fim": "2020-01-02"})).data
     assert [x["ferramenta"] for x in dia] == ["registrar_gasto"]
-    assert dia[0]["momento"] == "2026-10-17T22:00:00-03:00"
+    assert dia[0]["momento"] == "2020-01-01T22:00:00-03:00"
     assert seguinte == []
 
 

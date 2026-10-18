@@ -11,10 +11,11 @@ Leitura complementar: `README.md` (arquitetura e princípios), `PLANO.md` (fases
 
 ## Estado atual
 
-- **Fase:** 0 concluída (esqueleto). Sprint 1 aberta (Etapa A, teste no MacBook): passos, modelos e passagem em `SPRINT.md` e `SPRINT_NOTAS.md`.
-- **Última atualização:** 2026-10-16, Claude Opus 5.5 (conversa no app do Claude).
-- **Testes:** 17 passando (`cd servidor && uv run pytest`), também validados contra Postgres 16 real.
-- **Não testado ainda:** build da imagem Docker (o ambiente onde foi escrito não tinha Docker rodando).
+- **Durante uma sprint, o estado vivo fica só em `SPRINT_NOTAS.md` § Onde estamos** (decisão de 2026-10-18,
+  `PLANO.md` M4). Esta seção guarda o que vale entre sprints. Sprint 1 aberta (Etapa A, teste no MacBook).
+- **Última atualização:** 2026-10-18, Opus 5.5 (Claude Code, MacBook Air): máquina decidida e melhorias M1–M4.
+- **Máquina (Leonardo, 2026-10-18):** só o i7 fica ligado, com Debian 12 direto e cada serviço no seu Docker
+  Compose (sem Proxmox); o i5 desliga depois da Fase 1c do `PLANO.md`. Sem backup do banco por enquanto. Motivo: conta de luz.
 
 ## Histórico
 
@@ -67,10 +68,11 @@ Leitura complementar: `README.md` (arquitetura e princípios), `PLANO.md` (fases
 ## O que já se sabe (dito pelo Leonardo, ainda não conferido nas máquinas)
 
 **Máquinas**
-- **i7-6700**, 16 GB DDR4, SSD SATA 240 GB, sem GPU → dedicada só ao assistente pessoal (produção).
+- **i7-6700**, 16 GB DDR4, SSD SATA 240 GB, sem GPU → produção, Debian 12 direto (decisão de 2026-10-18): o
+  assistente e, depois, os serviços que vêm do i5, cada um no seu Docker Compose.
 - **i5-3330**, 16 GB, SSD SATA 240 GB + HD 500 GB, sem GPU → roda Proxmox com a VM do atendente de
   WhatsApp (projeto comercial à parte, em Python) e uma VM de serviços de rede. WireGuard já
-  configurado ali, parado desde a mudança de casa. Também vai receber o backup e outros serviços.
+  configurado ali, parado desde a mudança de casa. Vai ser desligado (2026-10-18): os serviços vão para o i7.
 - Um segundo HD de 500 GB está livre. Compra armazenamento se precisar.
 - **MacBook**: ambiente de teste (Etapa A).
 

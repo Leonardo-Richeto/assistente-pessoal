@@ -3,7 +3,8 @@
 > Arquivo temporário da sprint. Sai do repo quando a sprint fechar, depois de
 > consolidado em `CONTEXTO.md` e no vault. Regras do vault:
 > `sprint-com-um-passo-por-sessao-e-modelo` e `registro-temporario-de-sprint-na-raiz`.
-> A passagem entre sessões fica em `SPRINT_NOTAS.md`.
+> A passagem entre sessões fica em `SPRINT_NOTAS.md`; o histórico dos passos, em `SPRINT_HISTORICO.md`
+> (não é lido no começo da sessão).
 
 ## O que é o projeto
 
@@ -37,7 +38,8 @@ Se este arquivo divergir de uma fonte acima, vale a fonte. Corrija este arquivo.
    O modelo guia e confere; não faz por ele.
 6. Leia `SPRINT_NOTAS.md` antes de tudo. Anote nele durante a sessão.
 7. Ao terminar: testes passando, `[x]` em `docs/IMPLANTACAO.md` ou `PLANO.md`,
-   status na tabela abaixo, bloco novo em `SPRINT_NOTAS.md` e commit (sem push).
+   status na tabela abaixo, bloco do passo no fim de `SPRINT_HISTORICO.md`, "Onde estamos" de
+   `SPRINT_NOTAS.md` atualizado e commit (sem push).
 8. Segredo nunca entra nestes arquivos nem no git.
 9. **Orquestração:** por padrão, uma sessão do Opus roda cada passo como
    subagente, com o modelo e o effort do passo, e confere antes de seguir.
@@ -75,14 +77,14 @@ Se este arquivo divergir de uma fonte acima, vale a fonte. Corrija este arquivo.
 | 8c | Vínculo banco → nota do vault: coluna `nota_vault` em gastos, ponto e atividades (migração 0004 aditiva), parâmetro nas `registrar_*` e ferramenta `vincular_nota` auditada (ficha 1, item 6) | A | Opus 5.5 | alto | supervisionado | 8d | Feito 2026-10-17 (Opus 5.5); desfazer do vínculo por `desfazer_registro` tipo `vinculo`; revisor rodou, correções feitas; ficha 1 aprovada e aplicada; commit do orquestrador |
 | 8e | Pendências do Mac: teste de classificação sem prefixo (item 8 do revisor do 8b), downgrade da 0002 recusa em `--sql`, `vincular_nota` sob concorrência no Postgres (teste com banco de rascunho), leitura com erro ou cancelada em INFO sem dados, aviso da paginação em `consultar_chamadas`, teste de contrato da ficha 1 | A | Opus 5.5 | alto | supervisionado | 8c | Feito 2026-10-17 (Opus 5.5); revisor passou, commit do orquestrador |
 | 9 | Usar alguns dias e anotar o que faltou em `docs/IMPLANTACAO.md` (A12) | D | Leonardo | — | — | 6 | Pendente |
-| 10 | Fechar a sprint: consolidar em `CONTEXTO.md` e no vault, apagar `SPRINT.md` e `SPRINT_NOTAS.md` com o ok do Leonardo | C | Haiku 5.5 | baixo | supervisionado | 9 | Pendente |
+| 10 | Fechar a sprint: consolidar em `CONTEXTO.md` e no vault, apagar `SPRINT.md`, `SPRINT_NOTAS.md` e `SPRINT_HISTORICO.md` com o ok do Leonardo | C | Haiku 5.5 | baixo | supervisionado | 9 | Pendente |
 
 ## Sprint 2 — Etapa B: produção no i7 (planejar em detalhe quando a Sprint 1 fechar)
 
 | Passo | O que é | Tier | Modelo | Effort |
 |---|---|---|---|---|
 | B1 | Inventário de todas as máquinas, com SMART → vault + `docs/inventario.md` | C | Haiku 5.5 | baixo |
-| B2–B4 | Debian/Ubuntu Server, Docker, Git, clone, Tailscale Funnel no i7 | D | Leonardo (Sonnet 5.5 guia) | baixo |
+| B2–B4 | BIOS e Debian 12 direto no i7, economia de energia, Docker, Git, clone, Tailscale Funnel | D | Leonardo (Sonnet 5.5 guia) | baixo |
 | B5–B7 | OAuth App de produção, `.env` com senhas novas, subir a stack | A | Opus 5.5 | alto |
 | B8–B9 | Conector de produção no claude.ai e testes do A10 | C | Haiku 5.5 | baixo |
 | B10 | Levar os registros do teste ou começar limpo | D | Leonardo | — |
@@ -90,7 +92,7 @@ Se este arquivo divergir de uma fonte acima, vale a fonte. Corrija este arquivo.
 | B12 | Sincronização do vault em todos os aparelhos (decisão do Leonardo, 2026-10-17): **Syncthing** entre i7, Mac, iPhone e PC Windows, **mantendo o GitHub privado por enquanto**. Só o i7 faz commit e push (job diário); o Syncthing ignora `.git` (`.stignore`) para não corromper o repositório. PC do trabalho: só o conector MCP, sem cópia do vault | B | Sonnet 5.5 | médio |
 | B13 | Bateria de perguntas ao Leonardo para popular os dados iniciais de cada bloco implementado (`PLANO.md` § Dados novos previstos), inclusive as 3 perguntas adiadas | B | Sonnet 5.5 | médio |
 
-Preparação feita em 2026-10-17 (Sonnet 5.5): scripts (`deploy/inventario.sh`, `preparar-maquina.sh`, `backup-banco.sh`, `restaurar-banco.sh`, `deploy/vault/`) e roteiros (`docs/IMPLANTACAO.md` Etapa B, `docs/SYNCTHING.md`) prontos para os dois casos (VM no i5 ou i7 direto). A máquina continua por decidir.
+Preparação feita em 2026-10-17 (Sonnet 5.5): scripts (`deploy/inventario.sh`, `preparar-maquina.sh`, `backup-banco.sh`, `restaurar-banco.sh`, `deploy/vault/`) e roteiros (`docs/IMPLANTACAO.md` Etapa B, `docs/SYNCTHING.md`) prontos. Máquina decidida em 2026-10-18 (Leonardo): só o i7, com Debian 12 direto e cada serviço no seu Docker Compose (sem Proxmox); o i5 desliga depois da Fase 1c do `PLANO.md`. Sem backup do banco por enquanto (B12 adiado).
 
 ## Fases seguintes do `PLANO.md` (cada fase vira uma sprint)
 
@@ -104,7 +106,7 @@ Tarefa com ⚑ no plano é Tier A. O resto segue a regra abaixo.
 | 4b E-mail | 4b.1 conector nativo (D), ⚑ 4b.2 e-mail multi-conta (A), 4b.3 envio (A) | A |
 | 5 Rotinas | 5.1 tarefa agendada (C), 5.2 `resumo_periodo` (B) | B |
 | 6 WhatsApp | ⚑ 6.1 desenho (A), 6.2–6.5 (B) | B |
-| 7 Backup | 7.1 rotina (B), 7.2 teste de restauração (A) | A |
+| 7 Backup | adiada em 2026-10-18 (sem backup do banco); 7.1 rotina (B), 7.2 teste de restauração (A) | A |
 
 ## Prompt de abertura
 
@@ -117,6 +119,7 @@ Leia SPRINT.md e SPRINT_NOTAS.md na raiz, depois CONTEXTO.md, CLAUDE.md e
 docs/IMPLANTACAO.md. Execute só o Passo N da Sprint 1.
 Confira se você está no tier do passo; se estiver abaixo, pare e avise.
 Anote em SPRINT_NOTAS.md durante a sessão. Ao terminar: testes passando,
-[x] no IMPLANTACAO/PLANO, status na tabela do SPRINT.md, bloco do passo em
-SPRINT_NOTAS.md ("Onde estamos" atualizado) e commit sem push.
+[x] no IMPLANTACAO/PLANO, status na tabela do SPRINT.md, bloco do passo no fim
+de SPRINT_HISTORICO.md (não leia o resto dele), "Onde estamos" do SPRINT_NOTAS.md
+atualizado e commit sem push.
 ```
