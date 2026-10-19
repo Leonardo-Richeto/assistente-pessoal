@@ -29,6 +29,7 @@ Princípios (não mude sem decidir de novo):
 | `servidor/assistente/modelos.py` | Tabelas (SQLAlchemy) |
 | `servidor/alembic/` | Migrações |
 | `deploy/postgres/01-papeis.sh` | Cria os usuários de leitura e escrita |
+| `scripts/` | `preparar_host`, `exportar`, `importar`, `verificar` (backup e migração, `docs/MIGRACAO.md`) |
 | `PLANO.md` | Próximas fases, quebradas em tarefas |
 | `docs/IMPLANTACAO.md` | Passo a passo: teste no MacBook → produção no i7 |
 
@@ -36,13 +37,14 @@ Princípios (não mude sem decidir de novo):
 
 Sequência completa com checklist em `docs/IMPLANTACAO.md`.
 
-1. **Docker** instalado (`docker compose version` funcionando).
-2. **Tailscale** no host, logado na sua tailnet. No painel do Tailscale, habilite HTTPS
-   e Funnel para a máquina. Depois:
-   ```bash
-   tailscale funnel --bg 8000          # -> https://<maquina>.<tailnet>.ts.net
-   ```
-   Esse endereço é o `PUBLIC_BASE_URL`.
+Layout (portabilidade, `docs/MIGRACAO.md`): o código fica em `<home>/app` (este repositório) e todo o
+estado em `<home>` (`ASSISTENTE_HOME`, padrão `/srv/assistente`): `.env`, `data/`, `vault/`, `backups/`.
+O compose roda sempre com `--env-file ../.env` (no i7, `app/.env` é um link para `../.env`).
+
+1. **Docker** instalado (`docker compose version` funcionando). No Debian: `sudo bash scripts/preparar_host.sh`.
+2. **Tailscale em container** (perfil `tailscale`): `COMPOSE_PROFILES=tailscale`, `TS_NOME=assistente` e uma
+   `TS_AUTHKEY` no `.env`. No painel do Tailscale, habilite HTTPS e Funnel. A URL fica
+   `https://<TS_NOME>.<tailnet>.ts.net` em qualquer máquina e rede: é o `PUBLIC_BASE_URL`.
 3. **Login** — crie as credenciais do provedor escolhido em `AUTH_PROVEDOR`.
    Callback (nos dois): `<PUBLIC_BASE_URL>/auth/callback`.
    - *GitHub:* Settings → Developer settings → OAuth Apps → New. Homepage = `PUBLIC_BASE_URL`.
@@ -51,11 +53,12 @@ Sequência completa com checklist em `docs/IMPLANTACAO.md`.
      (tipo Externo, adicione o e-mail como usuário de teste) → Credenciais → Criar ID do
      cliente OAuth → Aplicativo da Web → URI de redirecionamento = callback acima.
      Preencha `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` e `GOOGLE_EMAILS_PERMITIDOS`.
-4. `cp .env.example .env` e preencha (senhas e `JWT_SIGNING_KEY` com `openssl rand -base64 32`).
-5. Subir:
+4. `cp .env.example ../.env` e preencha (senhas e `JWT_SIGNING_KEY` com `openssl rand -base64 48`).
+5. Subir e conferir:
    ```bash
-   docker compose up -d --build
-   docker compose logs -f servidor
+   docker compose --env-file ../.env up -d --build
+   docker compose --env-file ../.env logs -f servidor
+   bash scripts/verificar.sh
    ```
 6. **Conectar no Claude:** claude.ai → Configurações → Conectores → adicionar conector
    personalizado → URL `<PUBLIC_BASE_URL>/mcp`. Abre o login do provedor; entre com a conta
@@ -65,13 +68,16 @@ Sequência completa com checklist em `docs/IMPLANTACAO.md`.
 
 ### Segunda instância na mesma máquina (ex.: esposa)
 
-Banco, vault e login separados — nada é compartilhado.
+Banco, vault, login e nó Tailscale separados — nada é compartilhado. Outra `ASSISTENTE_HOME`:
 ```bash
-git clone <este repo> ~/assistente-esposa && cd ~/assistente-esposa
-cp .env.example .env    # NOME_USUARIO, PORTA_HOST=8001, AUTH_PROVEDOR=google, VAULT_PATH próprio
-tailscale funnel --bg --https=8443 8001          # PUBLIC_BASE_URL=https://<maquina>...ts.net:8443
-docker compose -p assistente-esposa up -d --build
+sudo ASSISTENTE_HOME=/srv/assistente-esposa bash scripts/preparar_host.sh
+git clone <este repo> /srv/assistente-esposa/app && cd /srv/assistente-esposa/app
+cp .env.example ../.env   # ASSISTENTE_HOME=/srv/assistente-esposa, COMPOSE_PROJECT_NAME=assistente-esposa,
+                          # PORTA_HOST=8001, TS_NOME=assistente-esposa, NOME_USUARIO, senhas novas
+docker compose --env-file ../.env up -d --build   # URL: https://assistente-esposa.<tailnet>.ts.net
 ```
+O backup diário instalado pelo `preparar_host.sh` é da instância principal; para esta, rode
+`ASSISTENTE_HOME=/srv/assistente-esposa bash scripts/exportar.sh --retencao` num timer próprio.
 
 ## Desenvolvimento
 

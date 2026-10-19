@@ -19,7 +19,8 @@ A sequência de **teste no MacBook → produção no i7** está em `docs/IMPLANT
 ## Fase 1 — Colocar no ar (Leonardo) — passo a passo em `docs/IMPLANTACAO.md`
 **Máquina (Leonardo, 2026-10-18):** só o i7 fica ligado, com Debian 12 direto, sem Proxmox. Cada serviço roda no
 seu próprio projeto Docker Compose; o que hoje está no i5 vem para o i7 (Fase 1c) e o i5 fica desligado. Motivo: conta de luz (as duas ligadas: estimativa
-de R$ 29 a 47/mês). Sem backup do banco por enquanto; o vault tem Syncthing e GitHub (Fase 7).
+de R$ 29 a 47/mês). Sem backup do banco por enquanto; o vault tem Syncthing e GitHub (Fase 7). Revisto em 2026-10-19: backup diário
+cifrado e migração pelo mesmo pacote (Fase 7, `docs/MIGRACAO.md`).
 - [ ] 1.0 BIOS do i7 para economia (na instalação): C-states e package C-state no máximo, ASPM ligado, áudio e
   portas sem uso desligados, "AC power restore" ligado (volta sozinho depois de queda de luz)
 - [ ] 1.1 Inventário completo de todas as máquinas: especificações, configuração, saúde SMART de cada HD/SSD, VMs → nota no vault + resumo em `docs/inventario.md` (roteiro em `CONTEXTO.md`)
@@ -48,7 +49,7 @@ de R$ 29 a 47/mês). Sem backup do banco por enquanto; o vault tem Syncthing e G
 ## Fase 2 — Documentos e vault
 - [ ] 2.1 Subir Paperless-ngx com o compose oficial (rede Docker compartilhada com este stack); gerar token; preencher `PAPERLESS_URL`/`PAPERLESS_API_KEY`
   - Pronto quando: "me mostra o último documento que entrou" funciona pelo app
-- [ ] 2.2 Migrar o vault para `/srv/vault` no i7, Syncthing com todos os aparelhos (Mac, iPhone, PC Windows) e GitHub privado mantido por enquanto (decisão de 2026-10-17); preencher `VAULT_PATH`. Detalhe: `SPRINT.md` B12
+- [ ] 2.2 Migrar o vault para `/srv/assistente/vault` no i7, Syncthing com todos os aparelhos (Mac, iPhone, PC Windows) e GitHub privado mantido por enquanto (decisão de 2026-10-17); preencher `VAULT_PATH`. Detalhe: `SPRINT.md` B12
 - [ ] 2.2b Levar para o vault a "Regra de passagem" (`CONTEXTO.md`) e a nota de inventário das máquinas
 - [ ] 2.3 Job diário de commit do vault (`git add -A && git commit`) para ter histórico de tudo que a IA escrever
 - [ ] ⚑ 2.4 Definir o envio de arquivos para o servidor (pasta "consumir" do Paperless sincronizada pelo Syncthing é o caminho mais simples)
@@ -110,12 +111,18 @@ no i7 (B11 da Sprint 2 e 6.1). Antes de implementar: ficha "proposta" em `docs/r
 - [ ] ⚑ 6b.6 Deploy depois do sim: merge, nome em `PERMITIDAS` e na classificação, `docker compose up -d --build`,
   401 sem token conferido; o status do pedido vira `no_ar` e o Claude avisa
 
-## Fase 7 — Backup
-**Adiada (Leonardo, 2026-10-18):** sem backup do banco por enquanto. O vault fica protegido pelo Syncthing
-(versões em `/srv/vault-versoes`) e pelo GitHub privado. Risco aceito: se o SSD do i7 falhar, os registros do banco
-se perdem. Rever quando o banco tiver dado difícil de refazer (Pluggy, saúde).
-- [ ] 7.1 (adiada) `pg_dump` diário + mídia do Paperless para fora do SSD do i7, com retenção
-- [ ] 7.2 Teste de restauração documentado
+## Fase 7 — Backup e portabilidade
+**Retomada (Leonardo, 2026-10-19, "Plano de Portabilidade do Servidor"):** backup e migração são o mesmo processo.
+Substitui o adiamento de 2026-10-18. Procedimento em `docs/MIGRACAO.md`.
+- [x] 7.0 Portabilidade (2026-10-19): estado em `ASSISTENTE_HOME` (bind mounts), imagens com digest, Tailscale em
+  container com nome fixo, `scripts/{preparar_host,exportar,importar,verificar}.sh`, pacote `.tar.age` com manifesto
+  e SHA-256. Ensaio com dados sintéticos passou no Windows (`scripts/testes/ensaio_migracao.sh`)
+- [x] 7.1 Backup diário: `assistente-backup.timer` (03:15), 7 diários e 4 semanais. Falta no i7: ligar com
+  `AGE_DESTINATARIO` e apontar `BACKUP_DESTINO` para o HD externo (fora do SSD)
+- [ ] 7.2 Ensaio de restauração mensal numa máquina ou VM descartável (o i5 vai ser desligado: rever onde)
+- [ ] 7.3 Paperless no pacote (`document_exporter`/`document_importer`), junto com a Fase 2.1. Até lá os scripts
+  param com erro se o compose tiver `paperless`
+- [ ] 7.4 Migração Mac → i7 com `verificar.sh` sem erro e teste com o i7 em outra rede (4G do celular)
 
 ---
 

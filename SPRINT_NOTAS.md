@@ -44,6 +44,11 @@ bloco do passo que precisar. **Esta seção é o único lugar do estado do proje
 
 ## Avisos vivos
 
+- **Desde 2026-10-19 (portabilidade, `docs/MIGRACAO.md`): layout novo.** Estado em `ASSISTENTE_HOME` (bind mounts),
+  `.env` fora do repositório, Tailscale em container (perfil `tailscale`), `VAULT_PATH` = `/vault` ou vazio.
+  **No Mac, não dê `git pull` antes de tirar o backup do banco antigo** (o compose novo não vê os volumes
+  nomeados; roteiro em `docs/MIGRACAO.md` § Limites). O roteiro do i7 (`docs/IMPLANTACAO.md`) já está no layout novo.
+
 - **Desde 2026-10-18: `uv run pytest` no Mac não acha o pacote `assistente`.** O `.pth` editável do `.venv` está
   com a flag `hidden` do macOS, e o Python 3.14 ignora `.pth` oculto. Rode `PYTHONPATH=. uv run pytest`, ou tire a
   flag uma vez: `chflags nohidden .venv/lib/python3.14/site-packages/*.pth`. No i7 (Linux) não acontece.

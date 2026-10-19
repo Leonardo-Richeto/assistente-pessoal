@@ -1,0 +1,10 @@
+[Unit]
+Description=Backup diario do assistente as 03:15
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

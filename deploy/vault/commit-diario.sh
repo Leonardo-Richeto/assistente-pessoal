@@ -2,11 +2,11 @@
 # Commit diário do vault (histórico de tudo que a IA e o Leonardo escreveram).
 # Só comita se houver mudança. Só faz push se VAULT_PUSH=1. Não apaga nada.
 # Chamado pelo vault-commit.service; também roda à mão:
-#   VAULT_PATH=/srv/vault bash deploy/vault/commit-diario.sh
+#   VAULT_PATH=/srv/assistente/vault bash deploy/vault/commit-diario.sh
 # Saída vai para o journal: journalctl -u vault-commit.service
 set -u
 
-VAULT_PATH="${VAULT_PATH:-/srv/vault}"
+VAULT_PATH="${VAULT_PATH:-/srv/assistente/vault}"
 VAULT_PUSH="${VAULT_PUSH:-0}"
 
 log() { echo "vault-commit: $*"; }

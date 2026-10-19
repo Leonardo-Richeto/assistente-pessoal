@@ -1,13 +1,28 @@
-# Stack do assistente pessoal (máquina i7).
-#   docker compose up -d                          -> Postgres + migração + servidor MCP
-#   docker compose --profile cloudflare up -d     -> idem + Cloudflare Tunnel (alternativa)
-# O servidor MCP só escuta em 127.0.0.1:${PORTA_HOST}; quem expõe para a internet é o
-# Tailscale Funnel no host. Segunda instância (ex.: esposa): outro diretório com outro .env
-# e `docker compose -p <nome> up -d`, PORTA_HOST diferente.
+# Stack do assistente pessoal. Portabilidade: docs/MIGRACAO.md.
+#
+# Código no git (esta pasta, "app"); todo o estado fica em ${ASSISTENTE_HOME}:
+#   ${ASSISTENTE_HOME}/.env            configuração e senhas (fora do git)
+#   ${ASSISTENTE_HOME}/data/postgres   dados internos do Postgres (nunca copiar crus entre máquinas)
+#   ${ASSISTENTE_HOME}/data/sessoes    estado do login OAuth (oauth/) e, no futuro, outras sessões
+#   ${ASSISTENTE_HOME}/data/tailscale  identidade do nó Tailscale
+#   ${ASSISTENTE_HOME}/vault           vault do Obsidian (git + Syncthing)
+#
+# Rodar sempre com o .env de fora do repositório:
+#   docker compose --env-file ../.env up -d          (no i7, app/.env é um link para ../.env)
+# Os scripts em scripts/ já fazem isso.
+#
+# Perfis (COMPOSE_PROFILES no .env):
+#   (nenhum)    Postgres + migração + servidor MCP em 127.0.0.1:${PORTA_HOST}
+#   tailscale   + nó Tailscale "${TS_NOME}" com Funnel para o servidor (só na produção)
+#
+# Imagens com versão e digest fixos (multi-arch: amd64 e arm64). Para atualizar: troque a tag
+# e o digest juntos (docker buildx imagetools inspect <imagem>:<tag>) e leia o changelog.
+
+name: ${COMPOSE_PROJECT_NAME:-assistente}
 
 services:
   postgres:
-    image: postgres:16
+    image: postgres:16.15@sha256:ca0bd484cb98bf4b24eb1010e73fb3fcbd6714d240fbc1a10eea5b7dbecb641d
     restart: unless-stopped
     environment:
       POSTGRES_DB: assistente
@@ -17,12 +32,17 @@ services:
       SENHA_ESCRITA: ${SENHA_ESCRITA:?defina SENHA_ESCRITA no .env}
       TZ: America/Sao_Paulo
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - ${ASSISTENTE_HOME:?defina ASSISTENTE_HOME no .env}/data/postgres:/var/lib/postgresql/data
+      # Cria os usuários de leitura e escrita com as senhas do .env (só na primeira subida).
       - ./deploy/postgres/01-papeis.sh:/docker-entrypoint-initdb.d/01-papeis.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U assistente_dono -d assistente"]
+      # Por TCP: na primeira subida, o servidor temporário do initdb só ouve no socket Unix e o
+      # pg_isready pelo socket diria "pronto" antes de os usuários existirem.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U assistente_dono -d assistente"]
       interval: 5s
-      retries: 10
+      timeout: 5s
+      start_period: 120s
+      retries: 30
 
   # Roda as migrações com o usuário dono e termina. O servidor só sobe depois.
   migracao:
@@ -42,7 +62,7 @@ services:
       DATABASE_URL_LEITURA: postgresql+psycopg://assistente_leitura:${SENHA_LEITURA}@postgres/assistente
       DATABASE_URL_ESCRITA: postgresql+psycopg://assistente_escrita:${SENHA_ESCRITA}@postgres/assistente
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?defina PUBLIC_BASE_URL no .env}
-      AUTH_PROVEDOR: ${AUTH_PROVEDOR:-github}
+      AUTH_PROVEDOR: ${AUTH_PROVEDOR:-google}
       # AUTH_DESATIVADA não entra aqui de propósito: o servidor exposto nunca sobe sem login.
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
@@ -60,27 +80,64 @@ services:
       PROXIES_CONFIAVEIS: ${PROXIES_CONFIAVEIS:-}
       CLIENTES_TTL_DIAS: ${CLIENTES_TTL_DIAS:-1}
       NOME_USUARIO: ${NOME_USUARIO:-Leonardo}
-      VAULT_PATH: ${VAULT_PATH:+/vault}
+      # Caminho DENTRO do container: vazio desliga o vault; /vault liga.
+      VAULT_PATH: ${VAULT_PATH:-}
       PAPERLESS_URL: ${PAPERLESS_URL:-}
       PAPERLESS_API_KEY: ${PAPERLESS_API_KEY:-}
       TZ: America/Sao_Paulo
     volumes:
-      # Pasta do vault no host (sincronizada por Syncthing, versionada com git).
-      - ${VAULT_PATH:-./vazio}:/vault
-      # Clientes OAuth registrados e tokens (cifrados). Sem isto, todo rebuild exige reconectar.
-      - oauth:/home/assistente/.local/share/fastmcp
+      - ${ASSISTENTE_HOME}/vault:/vault
+      # Clientes OAuth registrados e tokens (cifrados com a JWT_SIGNING_KEY). Dono: uid 1000.
+      - ${ASSISTENTE_HOME}/data/sessoes/oauth:/home/assistente/.local/share/fastmcp
     ports:
       - "127.0.0.1:${PORTA_HOST:-8000}:8000"
+    # Saudável só se /mcp sem token responde 401. 200 sem token (login desligado) conta como doente.
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import sys, urllib.request, urllib.error
+          try:
+              urllib.request.urlopen("http://127.0.0.1:8000/mcp", timeout=5)
+          except urllib.error.HTTPError as e:
+              sys.exit(0 if e.code == 401 else 1)
+          except Exception:
+              sys.exit(1)
+          sys.exit(1)
+      interval: 60s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
     depends_on:
       migracao: { condition: service_completed_successfully }
 
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    profiles: ["cloudflare"]
+  # Nó Tailscale com nome fixo (${TS_NOME}). Divide a rede do servidor: o Funnel entrega em
+  # 127.0.0.1:8000, que o limite de requisições já trata como proxy confiável.
+  # URL: https://${TS_NOME}.<tailnet>.ts.net, a mesma em qualquer rede e em qualquer máquina.
+  tailscale:
+    image: tailscale/tailscale:v1.104.1@sha256:87c55d6be56ad85b3d8bceca5f87f73de288c609131460dd1be1874c250cc41d
+    profiles: ["tailscale"]
     restart: unless-stopped
-    command: ["tunnel", "--no-autoupdate", "run", "--token", "${CLOUDFLARE_TUNNEL_TOKEN}"]
-    depends_on: [servidor]
-
-volumes:
-  pgdata:
-  oauth:
+    network_mode: service:servidor
+    environment:
+      # Só na primeira subida; depois a identidade fica em data/tailscale.
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      TS_HOSTNAME: ${TS_NOME:-assistente}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: "true"
+      TS_SERVE_CONFIG: /config/funnel.json
+      TS_ENABLE_HEALTH_CHECK: "true"
+      TS_LOCAL_ADDR_PORT: 127.0.0.1:9002
+    volumes:
+      - ${ASSISTENTE_HOME}/data/tailscale:/var/lib/tailscale
+      - ./deploy/tailscale/funnel.json:/config/funnel.json:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9002/healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    depends_on:
+      servidor: { condition: service_started }

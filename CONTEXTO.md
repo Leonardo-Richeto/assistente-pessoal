@@ -15,7 +15,11 @@ Leitura complementar: `README.md` (arquitetura e princípios), `PLANO.md` (fases
   `PLANO.md` M4). Esta seção guarda o que vale entre sprints. Sprint 1 aberta (Etapa A, teste no MacBook).
 - **Última atualização:** 2026-10-18, Opus 5.5 (Claude Code, MacBook Air): máquina decidida e melhorias M1–M4.
 - **Máquina (Leonardo, 2026-10-18):** só o i7 fica ligado, com Debian 12 direto e cada serviço no seu Docker
-  Compose (sem Proxmox); o i5 desliga depois da Fase 1c do `PLANO.md`. Sem backup do banco por enquanto. Motivo: conta de luz.
+  Compose (sem Proxmox); o i5 desliga depois da Fase 1c do `PLANO.md`. Motivo: conta de luz.
+- **Portabilidade (2026-10-19, Opus 5.5 no Kiro, PC Windows):** feita e ensaiada com dados sintéticos
+  (`docs/MIGRACAO.md`, `PLANO.md` Fase 7). Backup diário cifrado volta a existir (substitui o "sem backup" de 10-18).
+- **PC Windows (2026-10-19, Leonardo):** é a máquina do trabalho (domínio corporativo). Uso: testar o sistema
+  completo **sem dados reais**, só sintéticos, sem Tailscale/Funnel e sem credencial real. Produção continua no i7.
 
 ## Histórico
 
@@ -62,6 +66,56 @@ Leitura complementar: `README.md` (arquitetura e princípios), `PLANO.md` (fases
 - E-mail: Gmail via conector nativo já; ferramenta própria multi-conta na fase 4b
   (Hotmail exige OAuth2; corporativo depende da política da corporação).
 - Ligação pela operadora: ideia sem data.
+
+### 2026-10-19 — Portabilidade do servidor (Opus 5.5, Kiro, PC Windows)
+
+**Pedido:** "Plano de Portabilidade do Servidor" do Leonardo: migrar para outra máquina, inclusive em outra rede,
+em ~30 min e sem perder dados; backup e migração pelo mesmo processo.
+
+**O que foi feito**
+- Repositório local: o `.git` errado na pasta pai (`Desktop\Projetos`, remote do vault, sem commits) foi
+  removido; esta pasta agora é o clone do GitHub. Cópia da pasta antiga em `Desktop\Projetos\assistente-pessoal.bak-2026-10-19`.
+- `docker-compose.yml`: `name: ${COMPOSE_PROJECT_NAME}`; bind mounts em `${ASSISTENTE_HOME}` (`data/postgres`,
+  `data/sessoes/oauth`, `data/tailscale`, `vault`); `postgres:16.15` e `tailscale/tailscale:v1.104.1` com digest
+  (multi-arch); healthchecks (Postgres por TCP; servidor saudável só com `/mcp` sem token = 401); Tailscale em
+  container no perfil `tailscale`, `network_mode: service:servidor`, Funnel por `deploy/tailscale/funnel.json`.
+  `cloudflared` removido (usava `latest`; a entrada única passa a ser o Tailscale).
+- `.env.example`: `ASSISTENTE_HOME`, `COMPOSE_PROJECT_NAME`, `COMPOSE_PROFILES`, `TS_NOME`, `TS_AUTHKEY`,
+  `AGE_DESTINATARIO`, `BACKUP_DESTINO`. **`VAULT_PATH` mudou de sentido:** agora é o caminho dentro do container
+  (vazio ou `/vault`); a pasta é sempre `<home>/vault`. Os scripts recusam outro valor.
+- `scripts/`: `lib.sh`, `preparar_host.sh` (substitui `deploy/preparar-maquina.sh`; Debian 12 ou 13; instala age e o
+  timer do backup), `exportar.sh`, `importar.sh`, `verificar.sh`; testes em `scripts/testes/`. `deploy/backup-banco.sh`
+  removido (o exportar o substitui; continua no git, commit `8d2ec8d`). `deploy/restaurar-banco.sh` mantido para os dados do Mac.
+- `servidor/assistente/verificacao.py` (consulta de leitura pelas ferramentas MCP em memória, sem gravar nada, e
+  HTTP local) + `tests/test_verificacao.py`. `_alembic` dos testes com `PYTHONIOENCODING=utf-8` (falhava no Windows).
+- `deploy/systemd/assistente-backup.{service,timer}` (03:15); `deploy/ferramentas/Dockerfile` (age sem instalar no host).
+- Caminhos do vault: `/srv/assistente/vault`, versões em `/srv/assistente/data/vault-versoes`, lint em
+  `/srv/assistente/logs/vault-lint` (units, scripts, `SYNCTHING.md`, `IMPLANTACAO.md`).
+- Docs: `docs/MIGRACAO.md` (novo), `README.md`, `docs/IMPLANTACAO.md` (B3–B8, B10–B12), `PLANO.md` Fase 7.
+
+**Testes:** `uv run pytest` 267 passam, 1 pulado. `scripts/testes/test_retencao.sh` ok. `scripts/testes/ensaio_migracao.sh`
+passou duas vezes no Windows (Docker Desktop, Git Bash, ~140 s): contagens, vault e `.env` iguais; `verificar.sh` ok.
+Conferido também: backup diário religa o servidor; importar recusa `data/postgres` com dados e chave errada.
+Bugs achados no ensaio e corrigidos: healthcheck do Postgres pelo socket dava "pronto" durante o initdb (a
+migração falhava na primeira subida); `SHA256SUMS` listava o próprio temporário; `git` do Windows precisa de `C:/`.
+
+**Decisões tomadas (sem perguntar, reversíveis)**
+- Tailscale do container divide a rede do servidor: o Funnel chega por 127.0.0.1, já confiável para o
+  `X-Forwarded-For`; sem IP fixo de rede Docker. O Tailscale do host fica só para SSH (dois nós).
+- O importar só restaura `data/tailscale` com `--assumir-tailscale`; padrão = nó novo (evita duas máquinas com a
+  mesma identidade).
+- O "init.sql" do plano é o `deploy/postgres/01-papeis.sh` (precisa ler as senhas do `.env`, o que um `.sql` não faz).
+- Retenção 7 diários + 4 semanais com a semântica do restic (o mais novo de cada dia e de cada semana ISO).
+
+**Não testado / pendências**
+- Tailscale em container e Funnel: só `docker compose config`; nunca subiu (máquina do trabalho, sem Tailscale).
+- `preparar_host.sh` e o timer do systemd: só `bash -n`; rodar no i7 (`--dry-run` antes).
+- Passagem ARM → x86 (Mac → i7) e o i7 em outra rede (4G): `PLANO.md` 7.4.
+- Paperless fora do pacote (`PLANO.md` 7.3); os scripts param com erro se o serviço existir.
+- Mac: depois do `git pull`, o compose novo não enxerga os volumes antigos (banco aparece vazio; o volume fica
+  intacto). Para levar os dados do Mac, ver `docs/MIGRACAO.md` § Limites, **antes** de atualizar o código lá.
+- O plano pede ensaio mensal numa VM do Proxmox do i5, mas o i5 vai ser desligado (decisão de 10-18): rever onde.
+- Nada commitado (aguardando o Leonardo).
 
 ---
 
@@ -136,5 +190,26 @@ Vale para todo projeto longo dividido em fases, executado por modelos diferentes
 ## Prompt para a próxima etapa
 
 Enquanto houver sprint aberta, o prompt de abertura e o passo atual ficam em `SPRINT.md`
-(§ Prompt de abertura) e `SPRINT_NOTAS.md` (§ Onde estamos). A "Regra de passagem" acima já
+(§ Prompt de abertura) e `SPRINT_NOTAS.md` (§ Onde estamos).
+
+**Próxima fase (depois da portabilidade, 2026-10-19): implementar o sistema completo no PC Windows, só com dados
+sintéticos.** Modelo: Opus 5.5, effort alto (toca schema e dado). Prompt:
+
+```
+Leia CONTEXTO.md (entrada de 2026-10-19), CLAUDE.md, README.md, docs/MIGRACAO.md e PLANO.md.
+Máquina: PC Windows do trabalho (domínio corporativo), Docker Desktop + Git Bash. Regras desta máquina:
+só dados sintéticos; nenhuma credencial real (Google, Pluggy, Tailscale); nada de Tailscale/Funnel nem
+porta exposta além de 127.0.0.1; ASSISTENTE_HOME numa pasta de teste fora do repositório.
+
+Objetivo: implementar as fases seguintes do PLANO.md que dão para testar sem dado real, uma tarefa por
+vez, começando pela Fase 2.1 (Paperless-ngx no mesmo compose, com bind mounts em data/paperless e
+versão/digest fixos) junto com a 7.3 (document_exporter/document_importer no exportar/importar, tirando
+a trava que hoje para os scripts quando há o serviço paperless). Depois: Fase 3 (workers), 4.2 e 5.2.
+Ficha nova em docs/regras-de-negocio.md antes de comportamento que o Leonardo vê; mudança de tabela só
+com migração Alembic revisada à mão.
+
+Pronto quando, a cada tarefa: uv run pytest passa; bash scripts/testes/ensaio_migracao.sh <pasta vazia>
+passa (o ensaio cobre o que entrou no pacote); [x] no PLANO.md; CONTEXTO.md atualizado com o que foi
+feito, o que não foi testado e o prompt seguinte. Não commitar sem o ok do Leonardo.
+``` A "Regra de passagem" acima já
 foi levada para o vault em 2026-10-16 (`40-regras/programacao/registro-temporario-de-sprint-na-raiz.md`).

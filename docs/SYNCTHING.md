@@ -1,10 +1,10 @@
 # Vault: Syncthing e commit diário
 
 Roteiro do Leonardo. A produção (o i7) é o **nó central**: ela guarda o vault em
-`/srv/vault`, faz o commit diário e é a única que fala com o GitHub. Mac, PC Windows e iPhone
+`/srv/assistente/vault`, faz o commit diário e é a única que fala com o GitHub. Mac, PC Windows e iPhone
 sincronizam com ela. Decisões: D10 (nada pago além do Pro), D15 (só a produção comita).
 
-Pré-requisito: `deploy/preparar-maquina.sh` já rodou (Syncthing instalado, `/srv/vault` criada).
+Pré-requisito: `scripts/preparar_host.sh` já rodou (Syncthing instalado, `/srv/assistente/vault` criada).
 Troque `<usuario>` pelo seu usuário na produção e `<maquina>` pelo nome dela na tailnet.
 
 ## Regras que não mudam
@@ -46,10 +46,10 @@ Na primeira visita:
 3. Anote o **ID do dispositivo** da produção (Ações → Mostrar ID).
 4. Apague a pasta "Default Folder", que o Syncthing cria sozinho.
 
-## 2. Primeiro sync: levar o vault atual para `/srv/vault`
+## 2. Primeiro sync: levar o vault atual para `/srv/assistente/vault`
 
 Objetivo: o vault de hoje (Mac, `~/Desktop/Projetos/Obsidian`, com `.git` e GitHub privado)
-aparece em `/srv/vault` sem duplicar e sem conflito. Receita: a produção **clona** o repositório
+aparece em `/srv/assistente/vault` sem duplicar e sem conflito. Receita: a produção **clona** o repositório
 do GitHub (fica com o `.git`); o Mac **aponta o Syncthing para a pasta que já existe**, com o mesmo
 conteúdo. Arquivos idênticos não geram conflito.
 
@@ -74,28 +74,28 @@ nesta ordem.
    ```
 2. No GitHub: repositório do vault → Settings → Deploy keys → Add deploy key → cole a chave.
    Marque **Allow write access** se for usar `VAULT_PUSH=1` (seção 5); sem push, deixe só leitura.
-3. Clone. `/srv/vault` já existe, vazia (o `preparar-maquina.sh` criou); o clone para pasta vazia funciona.
+3. Clone. `/srv/assistente/vault` já existe, vazia (o `preparar_host.sh` criou); o clone para pasta vazia funciona.
    Clone **antes** de adicionar a pasta no Syncthing, que cria o `.stfolder` e deixaria a pasta não vazia.
    ```bash
    GIT_SSH_COMMAND='ssh -i ~/.ssh/vault_deploy -o IdentitiesOnly=yes' \
-     git clone git@github.com:<conta>/<repositorio-do-vault>.git /srv/vault
-   git -C /srv/vault config core.sshCommand 'ssh -i ~/.ssh/vault_deploy -o IdentitiesOnly=yes'
-   git -C /srv/vault log -1 --oneline    # tem de ser o mesmo hash do Mac
+     git clone git@github.com:<conta>/<repositorio-do-vault>.git /srv/assistente/vault
+   git -C /srv/assistente/vault config core.sshCommand 'ssh -i ~/.ssh/vault_deploy -o IdentitiesOnly=yes'
+   git -C /srv/assistente/vault log -1 --oneline    # tem de ser o mesmo hash do Mac
    ```
    Se o clone recusar por pasta não vazia, não apague nada: pare e confira o que há nela.
 4. `.gitignore` do vault (defesa para o commit diário não levar `.stversions`, `.stfolder` e temporários).
    O comando acrescenta ao arquivo que já existir, sem sobrescrever:
    ```bash
-   cat /srv/assistente/deploy/vault/gitignore-do-vault >> /srv/vault/.gitignore
+   cat /srv/assistente/app/deploy/vault/gitignore-do-vault >> /srv/assistente/vault/.gitignore
    ```
    O primeiro `systemctl start vault-commit.service` (seção 5) comita esse arquivo.
 
 **Pasta no Syncthing da produção:**
 
-1. GUI → Adicionar pasta. Rótulo `vault`, ID `vault`, caminho `/srv/vault`.
+1. GUI → Adicionar pasta. Rótulo `vault`, ID `vault`, caminho `/srv/assistente/vault`.
 2. Aba Compartilhamento: marque os aparelhos (depois da seção 3).
 3. Aba **Versionamento de arquivos**: **Staggered**, "Maximum Age" 30 dias (`2592000` s) e
-   **"Versions Path" = `/srv/vault-versoes`** (crie antes: `sudo install -d -o "$USER" -g "$USER" /srv/vault-versoes`).
+   **"Versions Path" = `/srv/assistente/data/vault-versoes`** (crie antes: `sudo install -d -o "$USER" -g "$USER" /srv/assistente/data/vault-versoes`).
    Esta é a rede de segurança contra apagar ou sobrescrever por engano. As versões ficam **fora**
    do vault de propósito: assim a busca do assistente não acha notas velhas e o git não as vê.
    (O `.gitignore` e o `commit-diario.sh` também ignoram `.stversions` por defesa.)
@@ -162,7 +162,7 @@ direto pela tailnet evita relays públicos.
 Copie o arquivo do repositório para a raiz da pasta sincronizada **em cada aparelho**:
 
 ```bash
-cp /srv/assistente/deploy/vault/.stignore /srv/vault/.stignore    # na produção
+cp /srv/assistente/app/deploy/vault/.stignore /srv/assistente/vault/.stignore    # na produção
 ```
 
 No Mac/Windows/iPhone, cole o conteúdo na aba "Ignorar padrões" da pasta (mesmo efeito). Ele ignora
@@ -173,8 +173,8 @@ No Mac/Windows/iPhone, cole o conteúdo na aba "Ignorar padrões" da pasta (mesm
 Roda às 03:30, só comita se houver mudança, com mensagem datada. Não apaga nada.
 
 ```bash
-sudo cp /srv/assistente/deploy/vault/vault-commit.service /etc/systemd/system/
-sudo cp /srv/assistente/deploy/vault/vault-commit.timer   /etc/systemd/system/
+sudo cp /srv/assistente/app/deploy/vault/vault-commit.service /etc/systemd/system/
+sudo cp /srv/assistente/app/deploy/vault/vault-commit.timer   /etc/systemd/system/
 sudo sed -i "s/<usuario>/$USER/" /etc/systemd/system/vault-commit.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now vault-commit.timer
@@ -199,15 +199,15 @@ Sem esse arquivo (ou sem o `1`), o serviço só comita localmente. Teste outra v
 `systemctl start` e confira no journal a linha "push feito".
 
 **Lint diário** (`PLANO.md` M3). Roda às 03:40, depois do commit, o `90-meta/lint-do-vault.py` do próprio
-vault. Só lê. O relatório fica em `/srv/vault-lint/ultimo.md`, fora do vault, para não entrar no commit:
+vault. Só lê. O relatório fica em `/srv/assistente/logs/vault-lint/ultimo.md`, fora do vault, para não entrar no commit:
 
 ```bash
-sudo install -d -o "$USER" -g "$USER" /srv/vault-lint
-sudo cp /srv/assistente/deploy/vault/vault-lint.service /etc/systemd/system/
-sudo cp /srv/assistente/deploy/vault/vault-lint.timer   /etc/systemd/system/
+sudo install -d -o "$USER" -g "$USER" /srv/assistente/logs/vault-lint
+sudo cp /srv/assistente/app/deploy/vault/vault-lint.service /etc/systemd/system/
+sudo cp /srv/assistente/app/deploy/vault/vault-lint.timer   /etc/systemd/system/
 sudo sed -i "s/<usuario>/$USER/" /etc/systemd/system/vault-lint.service
 sudo systemctl daemon-reload && sudo systemctl enable --now vault-lint.timer
-sudo systemctl start vault-lint.service; cat /srv/vault-lint/ultimo.md | head -20
+sudo systemctl start vault-lint.service; cat /srv/assistente/logs/vault-lint/ultimo.md | head -20
 ```
 
 Com ERRO no vault, o serviço fica como falho (`systemctl --failed` mostra). Corrija a nota e rode de novo.
@@ -215,32 +215,32 @@ AVISO não marca falha.
 
 ## 6. Apontar o assistente para o vault
 
-No `.env` de `/srv/assistente`:
+No `/srv/assistente/.env` (o caminho é o de dentro do container; a pasta é sempre `/srv/assistente/vault`):
 
 ```
-VAULT_PATH=/srv/vault
+VAULT_PATH=/vault
 ```
 
 Depois:
 
 ```bash
-cd /srv/assistente && docker compose up -d
+cd /srv/assistente/app && docker compose up -d
 ```
 
-O compose monta `/srv/vault` em `/vault` dentro do container. Confira no app: peça "liste as pastas do
+O compose monta `/srv/assistente/vault` em `/vault` dentro do container. Confira no app: peça "liste as pastas do
 vault". O container roda com uid 1000, igual ao primeiro usuário do Debian. Confira com `id -u`: se der 1000, a escrita funciona. Se for outro uid e aparecer erro de permissão ao criar
 nota, veja `docker compose logs servidor` e avise antes de mudar `chown` ou `chmod`.
 
 ## 7. Conferir que funciona
 
-1. Crie uma nota no Mac. Ela aparece em `/srv/vault` em segundos (`ls -lt /srv/vault | head`).
+1. Crie uma nota no Mac. Ela aparece em `/srv/assistente/vault` em segundos (`ls -lt /srv/assistente/vault | head`).
 2. Peça ao Claude para criar uma nota em `00-inbox`. Ela aparece no Mac e no iPhone.
-3. Apague uma nota de teste no Mac. Ela some da produção e sobra uma cópia em `/srv/vault/.stversions`.
-4. Na manhã seguinte, `git -C /srv/vault log --oneline | head` mostra o commit das 03:30.
+3. Apague uma nota de teste no Mac. Ela some da produção e sobra uma cópia em `/srv/assistente/vault/.stversions`.
+4. Na manhã seguinte, `git -C /srv/assistente/vault log --oneline | head` mostra o commit das 03:30.
 
 ## Se algo der errado
 
 - Apareceu `.sync-conflict-*`: junte à mão e apague o arquivo de conflito.
 - Syncthing "Desatualizado" por muito tempo: veja se o outro aparelho está ligado e na tailnet.
-- Apagou nota por engano: recupere de `.stversions` (produção) ou do `git` (`git -C /srv/vault checkout -- <arquivo>`).
+- Apagou nota por engano: recupere de `.stversions` (produção) ou do `git` (`git -C /srv/assistente/vault checkout -- <arquivo>`).
 - Dois aparelhos comitaram: pare, não force push, e peça ajuda antes de mexer.

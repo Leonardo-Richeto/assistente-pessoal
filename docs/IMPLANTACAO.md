@@ -30,10 +30,15 @@ Observações do teste:
 
 Só começa com a Etapa A estável. **Máquina decidida (Leonardo, 2026-10-18):** só o i7-6700 fica ligado, com
 Debian 12 direto, sem Proxmox; cada serviço roda no seu projeto Docker Compose. O i5 desliga depois que os
-serviços dele vierem para o i7 (`PLANO.md` Fase 1c). Sem backup do banco por enquanto (`PLANO.md` Fase 7). Troque `<usuario>` pelo seu usuário Linux e
-`<maquina>.<tailnet>.ts.net` pelo endereço real (nunca grave o real no repo, que é público).
-Scripts: `deploy/inventario.sh`, `deploy/preparar-maquina.sh`, `deploy/backup-banco.sh`,
-`deploy/restaurar-banco.sh`, `deploy/vault/`. Vault e Syncthing: `docs/SYNCTHING.md`.
+serviços dele vierem para o i7 (`PLANO.md` Fase 1c). Backup diário do banco, vault e sessões desde 2026-10-19 (`docs/MIGRACAO.md`). Troque `<usuario>` pelo seu usuário Linux e
+`assistente.<tailnet>.ts.net` pelo endereço real (nunca grave o real no repo, que é público).
+Scripts: `deploy/inventario.sh`, `scripts/preparar_host.sh`, `scripts/exportar.sh`, `scripts/importar.sh`,
+`scripts/verificar.sh`, `deploy/restaurar-banco.sh` (só para os dados do Mac), `deploy/vault/`. Vault e Syncthing:
+`docs/SYNCTHING.md`. Backup e migração: `docs/MIGRACAO.md`.
+
+> **Layout novo (2026-10-19, portabilidade):** código em `/srv/assistente/app`, estado em `/srv/assistente`
+> (`.env`, `data/`, `vault/`, `backups/`). O Funnel sai de um **container** Tailscale com nome fixo (`TS_NOME`,
+> perfil `tailscale`); o Tailscale do host fica só para SSH. Os passos abaixo já estão neste layout.
 
 ### Roteiro da implantação
 
@@ -48,10 +53,10 @@ depois de os dados estarem no lugar).
 1. [ ] (5 min) Ligue o i7 na tomada medidora. A máquina está decidida: i7 com Debian direto (2026-10-18).
 2. [ ] (10 min) Inventário no host (B1). No i7, **antes** de apagar o sistema atual.
 3. [ ] (40 a 60 min) BIOS, Debian 12 no i7 e economia de energia (B2).
-4. [ ] (10 min) Na máquina nova: clonar o repo e rodar `sudo bash deploy/preparar-maquina.sh` (B3).
-5. [ ] (10 min) `sudo tailscale up`, HTTPS e Funnel no painel, key expiry desligada (B4).
-6. [ ] (10 min) Google Cloud Console: acrescentar a URL nova ao cliente OAuth (B5).
-7. [ ] (15 min) `.env` com senhas novas, subir a stack, `sudo tailscale funnel --bg 8000`, 401 sem token (B6, B7).
+4. [ ] (10 min) Na máquina nova: clonar em `/srv/assistente/app` e rodar `sudo bash scripts/preparar_host.sh` (B3).
+5. [ ] (10 min) `sudo tailscale up` do host (só SSH), chave de autenticação para o nó `assistente`, HTTPS e Funnel no painel (B4).
+6. [ ] (10 min) Google Cloud Console: acrescentar a URL `https://assistente.<tailnet>.ts.net` ao cliente OAuth (B5).
+7. [ ] (15 min) `/srv/assistente/.env` com senhas novas e a chave pública do age, subir a stack com o perfil `tailscale`, `scripts/verificar.sh` (B6, B7).
 8. [ ] (2 min) No Mac: `docker compose stop servidor`. O Postgres do Mac fica de pé e nada novo é gravado (B7b).
 9. [ ] (30 min) Dados do Mac: backup, `scp`, restaurar em banco novo, conferir, decidir e trocar (B10).
 10. [ ] (20 min) claude.ai: conector novo, trocar no Projeto "Assistente", colar as instruções novas (B8) e testes (B9).
@@ -115,53 +120,59 @@ cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor   # depois: powersave
 - [ ] B3. Preparar a máquina. Entre por SSH como `<usuario>`:
       ```bash
       sudo apt-get update && sudo apt-get install -y git
-      sudo git clone https://github.com/Leonardo-Richeto/assistente-pessoal /srv/assistente
-      sudo chown -R "$USER": /srv/assistente
-      sudo bash /srv/assistente/deploy/preparar-maquina.sh --dry-run    # leia a saída
-      sudo bash /srv/assistente/deploy/preparar-maquina.sh
+      sudo install -d -o "$USER" -g "$(id -gn)" /srv/assistente
+      git clone https://github.com/Leonardo-Richeto/assistente-pessoal /srv/assistente/app
+      sudo bash /srv/assistente/app/scripts/preparar_host.sh --dry-run    # leia a saída
+      sudo bash /srv/assistente/app/scripts/preparar_host.sh
       ```
-      O clone é por HTTPS: o repositório é público, sem credencial. O script recusa se não for Debian 12,
-      é idempotente, instala Docker + compose, Tailscale, Syncthing, smartmontools e (só em VM) qemu-guest-agent.
-      Não roda `tailscale up`, não mexe no `.env`. Saia e entre de novo na sessão (grupo `docker`).
-      Se `/srv/assistente` já existir vazia (criada pelo script), clone com `git clone <url> .` dentro dela.
+      O clone é por HTTPS: o repositório é público, sem credencial. O script recusa se não for Debian 12 ou 13,
+      é idempotente, instala Docker + compose, age, Tailscale (host), Syncthing, smartmontools e (só em VM)
+      qemu-guest-agent; cria `/srv/assistente/{data,vault,backups,logs}`, o link `app/.env -> ../.env` e o timer
+      do backup diário. Não roda `tailscale up`, não mexe no `.env`. Saia e entre de novo na sessão (grupo `docker`).
       Confira: `docker compose version` e o fuso: `timedatectl`. Se não for `America/Sao_Paulo`:
       `sudo timedatectl set-timezone America/Sao_Paulo` (o script só imprime; não muda sozinho).
-- [ ] B4. Tailscale: `sudo tailscale up` (abra o link no navegador e entre na tailnet).
-      Nome da máquina: um nome neutro (opção `--hostname=<nome>`) mantém a URL se a máquina for trocada um dia,
-      desde que remova a máquina antiga no painel. No painel do Tailscale: HTTPS e Funnel para a máquina.
-      No painel, desligue o **key expiry** desta máquina (senão ela cai da tailnet em meses).
-      Depois que a stack responder (B7): `sudo tailscale funnel --bg 8000` (no Linux o Funnel pede sudo) e anote
-      `https://<maquina>.<tailnet>.ts.net`.
+- [ ] B4. Tailscale. São dois nós:
+      - **Host** (administração por SSH): `sudo tailscale up --hostname=<nome-do-host>`. Sem Funnel. Desligue o
+        key expiry dele no painel.
+      - **Assistente** (container, nome fixo `TS_NOME=assistente`): no painel, Settings → Keys → gere uma
+        chave de autenticação (uso único basta) para o `TS_AUTHKEY` do B6. Habilite HTTPS e Funnel na tailnet
+        (Funnel liberado para o nó na política de acesso, `nodeAttrs` com `funnel`). Depois que o nó entrar (B7),
+        desligue o key expiry dele. A URL fica `https://assistente.<tailnet>.ts.net`, a mesma em qualquer
+        máquina e rede.
 - [ ] B5. Login. No Google Cloud Console, no cliente OAuth do projeto `assistente-pessoal` (como no Passo 4 da
       Sprint 1), **acrescente** a URL nova: em "Origens JavaScript autorizadas" a
-      `https://<maquina>.<tailnet>.ts.net` e em "URIs de redirecionamento autorizados" a
-      `https://<maquina>.<tailnet>.ts.net/auth/callback`. Não remova as do Mac até a troca terminar.
+      `https://assistente.<tailnet>.ts.net` e em "URIs de redirecionamento autorizados" a
+      `https://assistente.<tailnet>.ts.net/auth/callback`. Não remova as do Mac até a troca terminar.
       A mudança pode levar alguns minutos para valer. Se preferir um cliente de produção separado, crie outro
       e use as credenciais dele. O **desligamento do Mac** é o último passo (B9b), não este.
-- [ ] B6. `.env` novo em `/srv/assistente` (`cp .env.example .env`; o `.env` nunca vai para o git):
+- [ ] B6. `.env` novo em `/srv/assistente` (`cp /srv/assistente/app/.env.example /srv/assistente/.env`; nunca vai para o git):
+      - `ASSISTENTE_HOME=/srv/assistente`, `COMPOSE_PROFILES=tailscale`, `TS_NOME=assistente`, `TS_AUTHKEY` do B4.
       - Senhas novas e diferentes: `SENHA_DONO`, `SENHA_LEITURA`, `SENHA_ESCRITA` e `JWT_SIGNING_KEY`.
         Gere uma por vez: `openssl rand -base64 48`. **Nunca reaproveite as do Mac.**
-      - `PUBLIC_BASE_URL=https://<maquina>.<tailnet>.ts.net`, `AUTH_PROVEDOR=google`, credenciais do Google,
+      - `PUBLIC_BASE_URL=https://assistente.<tailnet>.ts.net`, `AUTH_PROVEDOR=google`, credenciais do Google,
         `GOOGLE_EMAILS_PERMITIDOS=<seu e-mail>`. Sem `AUTH_DESATIVADA`.
-      - `VAULT_PATH` vazio por enquanto (entra no B11).
-      Proteja o arquivo: `chmod 600 .env`.
-- [ ] B7. Subir: `cd /srv/assistente && docker compose up -d --build` e `docker compose logs -f servidor`.
-      Depois `sudo tailscale funnel --bg 8000`. Confira:
+      - Chave do age (`docs/MIGRACAO.md` § Chave do age), gerada **fora** do i7: `AGE_DESTINATARIO=age1...`.
+        `BACKUP_DESTINO` = pasta do HD externo montado (vazio = mesmo disco).
+      - `VAULT_PATH` vazio por enquanto (entra no B11 como `/vault`).
+      Proteja o arquivo: `chmod 600 /srv/assistente/.env`. Rode `sudo bash scripts/preparar_host.sh` de novo para
+      ligar o timer do backup.
+- [ ] B7. Subir: `cd /srv/assistente/app && docker compose up -d --build` (o link `app/.env` aponta para o
+      `.env` de fora) e `docker compose logs -f servidor tailscale`. Confira:
       ```bash
-      docker compose ps                                                 # tudo saudável; migracao terminou
-      curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8000/mcp    # 401 (sem token)
-      curl -s -o /dev/null -w '%{http_code}\n' https://<maquina>.<tailnet>.ts.net/mcp   # 401
-      curl -s https://<maquina>.<tailnet>.ts.net/.well-known/oauth-protected-resource/mcp   # responde
+      bash scripts/verificar.sh      # serviços, consulta pelo MCP, /mcp local = 401 e Funnel = 401
+      curl -s https://assistente.<tailnet>.ts.net/.well-known/oauth-protected-resource/mcp   # responde
       ```
-      Se o `/mcp` responder 200 sem token: **pare**, desligue o Funnel (`sudo tailscale funnel --https=443 off`) e investigue.
+      Se o `/mcp` responder 200 sem token: **pare**, `docker compose stop tailscale` e investigue. Depois que o nó
+      entrar, apague o valor de `TS_AUTHKEY` do `.env` (a identidade fica em `data/tailscale`).
 - [ ] B7b. No Mac, pare só o servidor: `cd ~/Desktop/Projetos/assistente-pessoal && docker compose stop servidor`.
       O Postgres do Mac continua de pé (o backup do B10 precisa dele) e nada novo é gravado.
 - [ ] B10. Decidir se os registros do Mac vão para a produção ou se começa limpo. Para levar:
-      1. No Mac, na pasta do projeto (o Postgres de pé, o servidor parado pelo B7b):
-         `BACKUP_DIR=~/backup-mac bash deploy/backup-banco.sh`
+      1. No Mac, na pasta do projeto (o Postgres de pé, o servidor parado pelo B7b), **sem atualizar o código do
+         Mac antes** (o compose novo não enxerga os volumes antigos; ver `docs/MIGRACAO.md` § Limites):
+         `git show 8d2ec8d:deploy/backup-banco.sh > /tmp/backup-banco.sh && BACKUP_DIR=~/backup-mac bash /tmp/backup-banco.sh`
       2. Copie: `scp ~/backup-mac/assistente-<data>.dump <usuario>@<maquina>:/tmp/`
       3. Na produção, restaure num banco **novo** (o script recusa o nome `assistente`):
-         `bash /srv/assistente/deploy/restaurar-banco.sh /tmp/assistente-<data>.dump assistente_mac`
+         `bash /srv/assistente/app/deploy/restaurar-banco.sh /tmp/assistente-<data>.dump assistente_mac`
          e confira a contagem de linhas impressa (gastos, ponto, auditoria) contra o Mac.
       4. Só então decida. Para adotar os dados, com aviso: isto troca o banco que o servidor usa.
          ```bash
@@ -182,23 +193,25 @@ cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor   # depois: powersave
          Depois `docker compose up -d`.
       5. Para começar limpo: apague o banco de conferência com
          `docker compose exec -T postgres sh -c 'dropdb -U "$POSTGRES_USER" assistente_mac'`.
-- [ ] B8. No claude.ai: Configurações → Conectores → adicionar conector personalizado `https://<maquina>.<tailnet>.ts.net/mcp`
+- [ ] B8. No claude.ai: Configurações → Conectores → adicionar conector personalizado `https://assistente.<tailnet>.ts.net/mcp`
       e entrar com o Google. No Projeto "Assistente": trocar o conector do Mac pelo novo. Depois remova o conector
       de teste. **Nas instruções do Projeto, troque o texto inteiro** pelo bloco "Texto proposto" da Ficha 1
       (`docs/regras-de-negocio.md`), com "o dono" trocado por "Leonardo" e a 1ª frase "Você é o assistente pessoal
       do Leonardo, dono deste Projeto." É a versão com as Fichas 3 e 4 (aprovadas em 2026-10-18), ainda não colada.
 - [ ] B9. Repetir os testes do A10 pelo iPhone (gasto → consultar → desfazer; ponto → horas). Testar também as
       Fichas 3 e 4: "estudei X 1 h e aprendi Y" anota em `50-diario/AAAA/AAAA-MM-DD.md`, seção "Pelo assistente";
-      "registra o que fizemos" escreve o resumo na mesma nota; `python3 -I /srv/vault/90-meta/lint-do-vault.py` sem ERRO.
+      "registra o que fizemos" escreve o resumo na mesma nota; `python3 -I /srv/assistente/vault/90-meta/lint-do-vault.py` sem ERRO.
 - [ ] B9b. Só depois de B8 e B9 funcionarem, desligue o Mac:
       ```bash
       tailscale funnel --https=443 off                                  # no Mac (sudo, se pedir)
       cd ~/Desktop/Projetos/assistente-pessoal && docker compose stop   # sem -v, os dados do Mac ficam
       ```
-- [ ] B11. Vault e Syncthing: siga `docs/SYNCTHING.md` (Syncthing como serviço, pasta `/srv/vault`, aparelhos,
-      versionamento Staggered com as versões em `/srv/vault-versoes`, `.gitignore` do vault, timer do commit às
-      03:30, `VAULT_PATH=/srv/vault` no `.env`). **Não verificado:** se o Synctrain aceita padrões de ignorar, e se o
+- [ ] B11. Vault e Syncthing: siga `docs/SYNCTHING.md` (Syncthing como serviço, pasta `/srv/assistente/vault`, aparelhos,
+      versionamento Staggered com as versões em `/srv/assistente/data/vault-versoes`, `.gitignore` do vault, timer do
+      commit às 03:30, `VAULT_PATH=/vault` no `.env`). **Não verificado:** se o Synctrain aceita padrões de ignorar, e se o
       Obsidian do iPhone abre a pasta do Synctrain.
-- [ ] B12. **Adiado** (Leonardo, 2026-10-18): sem backup do banco por enquanto (`PLANO.md` Fase 7). O roteiro do
-      timer com o `deploy/backup-banco.sh` está no histórico do git (commit `73b0c87`, este arquivo).
+- [ ] B12. Backup diário (2026-10-19, portabilidade; substitui o adiamento de 2026-10-18): o `preparar_host.sh` já
+      instalou o `assistente-backup.timer`. Confira `systemctl list-timers assistente-backup.timer`, rode uma vez à mão
+      (`sudo systemctl start assistente-backup.service`, `journalctl -u assistente-backup -n 30`) e faça um ensaio de
+      restauração (`docs/MIGRACAO.md` § Ensaio). Guarde a identidade do age fora do i7.
 - [ ] B13. Seguir para a Fase 2 do `PLANO.md` (Paperless).

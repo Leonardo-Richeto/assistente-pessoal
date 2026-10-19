@@ -3,12 +3,12 @@
 # Só lê o vault; não muda nota nenhuma. Sai com o código do lint (1 = há ERRO), para o
 # systemd marcar o serviço como falho e aparecer em `systemctl --failed`.
 # Chamado pelo vault-lint.service; também roda à mão:
-#   VAULT_PATH=/srv/vault LINT_DIR=/srv/vault-lint bash deploy/vault/lint-diario.sh
+#   VAULT_PATH=/srv/assistente/vault LINT_DIR=/srv/assistente/logs/vault-lint bash deploy/vault/lint-diario.sh
 # O relatório fica FORA do vault, para não virar nota nem entrar no commit diário.
 set -u
 
-VAULT_PATH="${VAULT_PATH:-/srv/vault}"
-LINT_DIR="${LINT_DIR:-/srv/vault-lint}"
+VAULT_PATH="${VAULT_PATH:-/srv/assistente/vault}"
+LINT_DIR="${LINT_DIR:-/srv/assistente/logs/vault-lint}"
 LINT="$VAULT_PATH/90-meta/lint-do-vault.py"
 
 log() { echo "vault-lint: $*"; }

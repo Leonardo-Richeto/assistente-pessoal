@@ -1,4 +1,4 @@
-# Modelo de .gitignore para o vault. Copie para /srv/vault/.gitignore e comite uma vez.
+# Modelo de .gitignore para o vault. Copie para /srv/assistente/vault/.gitignore e comite uma vez.
 # Defesa em camadas: o commit-diario.sh também exclui estes caminhos.
 
 # Syncthing (versões, marcador da pasta, temporários)

@@ -5,10 +5,10 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-# Troque <usuario> pelo usuario dono de /srv/vault (o mesmo do Syncthing).
+# Troque <usuario> pelo usuario dono de /srv/assistente/vault (o mesmo do Syncthing).
 User=<usuario>
-# Arquivo opcional: VAULT_PATH=/srv/vault e VAULT_PUSH=1 (veja docs/SYNCTHING.md).
+# Arquivo opcional: VAULT_PATH=/srv/assistente/vault e VAULT_PUSH=1 (veja docs/SYNCTHING.md).
 EnvironmentFile=-/etc/default/vault-commit
-Environment=VAULT_PATH=/srv/vault
-ExecStart=/bin/bash /srv/assistente/deploy/vault/commit-diario.sh
+Environment=VAULT_PATH=/srv/assistente/vault
+ExecStart=/bin/bash /srv/assistente/app/deploy/vault/commit-diario.sh
 # Push precisa de credencial do usuario (chave SSH ou token) no git do proprio usuario.

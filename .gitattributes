@@ -1,0 +1,11 @@
+# Scripts e arquivos lidos dentro de containers Linux ficam sempre com LF, mesmo no Windows.
+*.sh        text eol=lf
+*.service   text eol=lf
+*.timer     text eol=lf
+*.json      text eol=lf
+*.yml       text eol=lf
+*.py        text eol=lf
+Dockerfile  text eol=lf
+.env.example text eol=lf
+.stignore   text eol=lf
+gitignore-do-vault text eol=lf

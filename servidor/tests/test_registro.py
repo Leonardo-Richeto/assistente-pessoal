@@ -555,7 +555,7 @@ def test_classificacao_bate_com_a_revisao_nome_por_nome():
 def _alembic(url: str, *args: str) -> None:
     # Em subprocesso: o env.py do Alembic reconfigura o logging (fileConfig) e afetaria os outros testes.
     subprocess.run([sys.executable, "-m", "alembic", *args], cwd=SERVIDOR, check=True, capture_output=True,
-                   env={**os.environ, "DATABASE_URL_MIGRACAO": url})
+                   env={**os.environ, "DATABASE_URL_MIGRACAO": url, "PYTHONIOENCODING": "utf-8"})
 
 
 def _registro_id_aceita_vazio(engine) -> bool:

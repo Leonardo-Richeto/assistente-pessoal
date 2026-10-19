@@ -1,0 +1,13 @@
+[Unit]
+Description=Backup diario do assistente (scripts/exportar.sh --retencao)
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# <usuario> e <home> sao trocados pelo scripts/preparar_host.sh.
+User=<usuario>
+Environment=ASSISTENTE_HOME=<home>
+ExecStart=/bin/bash <home>/app/scripts/exportar.sh --retencao
+# O servidor fica parado durante o dump (alguns segundos) e volta sozinho no fim.
+TimeoutStartSec=1h
