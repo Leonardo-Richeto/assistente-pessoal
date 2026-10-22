@@ -20,7 +20,7 @@ A sequência de **teste no MacBook → produção no i7** está em `docs/IMPLANT
 **Máquina (Leonardo, 2026-10-18):** só o i7 fica ligado, com Debian 12 direto, sem Proxmox. Cada serviço roda no
 seu próprio projeto Docker Compose; o que hoje está no i5 vem para o i7 (Fase 1c) e o i5 fica desligado. Motivo: conta de luz (as duas ligadas: estimativa
 de R$ 29 a 47/mês). Sem backup do banco por enquanto; o vault tem Syncthing e GitHub (Fase 7). Revisto em 2026-10-19: backup diário
-cifrado e migração pelo mesmo pacote (Fase 7, `docs/MIGRACAO.md`).
+cifrado e migração pelo mesmo pacote (Fase 7, `docs/MIGRACAO.md`). Em 2026-10-21 (Leonardo): no início, sem backup ligado.
 - [ ] 1.0 BIOS do i7 para economia (na instalação): C-states e package C-state no máximo, ASPM ligado, áudio e
   portas sem uso desligados, "AC power restore" ligado (volta sozinho depois de queda de luz)
 - [ ] 1.1 Inventário completo de todas as máquinas: especificações, configuração, saúde SMART de cada HD/SSD, VMs → nota no vault + resumo em `docs/inventario.md` (roteiro em `CONTEXTO.md`)
@@ -74,7 +74,8 @@ podem escrever. Itens que mudam o que o Claude do app faz (2b.2, 2b.6, 2b.7, 2b.
   resolve (resolvido, iria para o contexto do modelo). O `commit-diario.sh` roda o gitleaks antes do commit
 - [ ] ⚑ 2b.3a Vaultwarden no i7 (Leonardo, 2026-10-21), em Docker Compose próprio, guarda os valores do 2b.3.
   Proposta: acesso só pela Tailscale, sem Funnel. Os dados dele entram no backup cifrado da Fase 7 (`exportar.sh`)
-  - Pronto quando: o backup da Fase 7 leva o volume do Vaultwarden para fora do SSD do i7 e a restauração foi testada, antes do primeiro segredo
+  - Pronto quando: o backup da Fase 7 leva o volume do Vaultwarden para fora do SSD do i7 e a restauração foi testada, antes do primeiro segredo.
+    Enquanto o 7.1 estiver desligado (2026-10-21), o 2b.3a espera
 - [ ] 2b.4 Commit por escrita: depois de cada escrita da IA, commit só do arquivo escrito, autor `claude-app`; o
   commit diário (2.3) fica para as edições do Leonardo. Ferramentas `historico_nota(caminho)` e
   `restaurar_nota(caminho, versao)`; depois, rever o bloqueio de `vault_move_note` e `vault_move_file`
@@ -161,6 +162,7 @@ no i7 (B11 da Sprint 2 e 6.1). Antes de implementar: ficha "proposta" em `docs/r
 ## Fase 7 — Backup e portabilidade
 **Retomada (Leonardo, 2026-10-19, "Plano de Portabilidade do Servidor"):** backup e migração são o mesmo processo.
 Substitui o adiamento de 2026-10-18. Procedimento em `docs/MIGRACAO.md`.
+**No início, sem backup (Leonardo, 2026-10-21):** o i7 sobe sem ligar o 7.1, só uma máquina; o pacote continua servindo à migração.
 - [x] 7.0 Portabilidade (2026-10-19): estado em `ASSISTENTE_HOME` (bind mounts), imagens com digest, Tailscale em
   container com nome fixo, `scripts/{preparar_host,exportar,importar,verificar}.sh`, pacote `.tar.age` com manifesto
   e SHA-256. Ensaio com dados sintéticos passou no Windows (`scripts/testes/ensaio_migracao.sh`)
