@@ -71,7 +71,7 @@ tabela; eu confiro testes e diff antes de seguir. Effort max nunca.
 | 0 | Branch `fase-2b`; Ficha 5 aprovada (o texto da Ficha 1 muda em cada passo, junto com a ferramenta); vault sintético em `tests/fixtures/vault/` (~15 notas com acento, links, frontmatter) | B | Sonnet 5.5 | médio | aprovação | Feito 2026-10-21 (Sonnet 5.5) |
 | 1 | 2b.1 `buscar_vault` + CLI; testes de acento, pesos, filtros, query hostil (`"`, `:`, `NEAR`, 10 KiB) | B | Sonnet 5.5 | médio | 0 | Feito 2026-10-21 (Sonnet 5.5) |
 | 2 | 2b.10 medida: executor + 25 perguntas no vault (decisão 4); rodar, ajustar pesos, anotar no `PLANO.md` | B | Sonnet 5.5 | médio | 1 | Feito 2026-10-21 (Sonnet 5.5) |
-| 3 | 2b.5 `notas_recentes` + 2b.7 `ler_nota` com `versao` e relacionadas; função única de caminho seguro | B | Sonnet 5.5 | médio | 0 | Pendente |
+| 3 | 2b.5 `notas_recentes` + 2b.7 `ler_nota` com `versao` e relacionadas; função única de caminho seguro | B | Sonnet 5.5 | médio | 0 | Feito 2026-10-21 (Sonnet 5.5) |
 | 4 | ⚑ 2b.2 `escrever_nota` com versão + trava do `vault_write_note`; testes de corrida, caminho hostil, link simbólico | A | Opus 5.5 | alto | 3 | Pendente |
 | 5 | 2b.3 barreira de segredo no middleware + gitleaks no `commit-diario.sh` | A | Opus 5.5 | alto | 4 | Pendente |
 | 6 | 2b.4 commit por escrita, `historico_nota`, `restaurar_nota`; `git` na imagem; `docker build` local | A | Opus 5.5 | alto | 4 | Pendente |
@@ -143,3 +143,13 @@ Um bloco por passo, do mais velho para o mais novo: o que fez, verificado, não 
 - Resultado: 24/25 entre as 5, 19/25 em 1º, MRR 0.847, ~3 ms. 8 variações de peso empataram ou perderam: `PESOS` fica
   (10, 8, 5, 4, 1). Fora das 5: "quais tipos de nota existem e quando usar cada um" (esperava `90-meta/taxonomia.md`).
 - Verificado: 38 testes da busca passam; lint do vault sem ERRO no arquivo novo.
+
+### Passo 3 — 2b.5 `notas_recentes` e 2b.7 `ler_nota` (Sonnet 5.5, 2026-10-21)
+
+- Fez: em `servidor/assistente/vault.py`, `caminho_seguro` (formato pelo `caminho_da_nota`, `realpath` dentro da raiz,
+  recusa `.git`/`.obsidian`/`.stversions`/`.trash`), `versao_de` (16 hex do sha256), `GrafoVault` (links e backlinks em
+  cache), `ler_nota` (conteúdo, versão, até 10 relacionadas) e `notas_recentes`. Ficha 1 com as duas ferramentas.
+  Orquestrador: `FORA_DA_BUSCA` em `vault_busca.py` tira `90-meta/perguntas-da-busca.md` do resultado da busca real.
+- Verificado: 337 passam, 1 pulado; medida igual (24/25, MRR 0.847).
+- Não verificado: nome de arquivo em NFD vindo do Mac pelo Syncthing para o Linux do i7. O índice e o grafo leem o
+  vault duas vezes por mudança (custo pequeno com ~125 notas; juntar no fechamento se valer).

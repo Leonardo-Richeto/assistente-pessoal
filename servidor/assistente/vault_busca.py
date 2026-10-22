@@ -21,6 +21,9 @@ log = logging.getLogger(__name__)
 
 IGNORADOS = {".git", ".obsidian", ".stversions", ".trash", "anexos", "templates"}
 PADRAO_CONFLITO = re.compile(r"\.sync-conflict-")
+# Notas que ficam fora do resultado da busca: o arquivo de perguntas da medida (2b.10) tem todas as palavras
+# das perguntas e apareceria em 1º em buscas de verdade. Continuam legíveis por ler_nota.
+FORA_DA_BUSCA = frozenset({"90-meta/perguntas-da-busca.md"})
 # Pesos do bm25, na ordem das colunas indexadas: titulo, arquivo, tags, resumo, corpo. Ajuste no Passo 2.
 PESOS = (10, 8, 5, 4, 1)
 LIMITE_PADRAO = 5
@@ -208,6 +211,8 @@ class IndiceVault:
         limite = max(1, min(int(limite), LIMITE_MAXIMO))
         sql = ["SELECT caminho, titulo, resumo, bm25(t, %s) AS r FROM t WHERE t MATCH ?" % ", ".join(map(str, PESOS))]
         args: list[object] = [consulta]
+        sql.append("AND caminho NOT IN (%s)" % ", ".join("?" * len(FORA_DA_BUSCA)))
+        args += sorted(FORA_DA_BUSCA)
         if tipo:
             sql.append("AND lower(tipo) = lower(?)")
             args.append(tipo.strip())

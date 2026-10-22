@@ -497,6 +497,7 @@ CLASSIFICACAO_REVISADA = {
     "vault_list_directory": LE, "vault_get_note_outline": LE, "vault_get_notes_info": LE,
     "vault_get_frontmatter": LE, "vault_get_vault_stats": LE, "vault_list_all_tags": LE,
     "buscar_vault": LE,  # nossa (vault.py): índice em memória das notas; só lê
+    "ler_nota": LE, "notas_recentes": LE,  # nossas (vault.py): só lêem
     "vault_wiki_link": LE,  # lê a nota pelo nome (basename) e devolve o conteúdo; não escreve
     "vault_write_note": ESCREVE, "vault_patch_note": ESCREVE, "vault_update_frontmatter": ESCREVE,
     "vault_manage_tags": ESCREVE,  # operation=list é leitura, conferido em registro.py na hora da chamada

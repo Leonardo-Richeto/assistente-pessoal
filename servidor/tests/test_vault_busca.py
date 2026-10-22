@@ -236,3 +236,15 @@ async def test_vault_nosso_vai_para_a_tabela_vault_e_so_com_caminho(raiz, tmp_pa
     assert vault.LEITURAS_VAULT <= middleware._leituras
     assert registro.caminhos_do_vault({"caminho": "a/b.md", "texto": "segredo", "versao": "x"}) == {"caminho": "a/b.md"}
     assert registro.caminhos_do_vault({"texto": "segredo", "pasta": "p"}) == {}
+
+
+def test_arquivo_de_perguntas_fica_fora_da_busca(tmp_path):
+    """O arquivo da medida (2b.10) tem todas as palavras das perguntas; não pode aparecer na busca real."""
+    import shutil
+
+    from assistente.vault_busca import IndiceVault
+    raiz = tmp_path / "vault"
+    shutil.copytree(Path(__file__).parent / "fixtures" / "vault", raiz)
+    (raiz / "90-meta" / "perguntas-da-busca.md").write_text("# Perguntas\n\n| adubo compostagem | x |\n", encoding="utf-8")
+    achados = [r["caminho"] for r in IndiceVault(raiz).buscar("adubo compostagem", limite=20)]
+    assert achados and "90-meta/perguntas-da-busca.md" not in achados

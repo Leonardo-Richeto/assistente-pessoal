@@ -57,7 +57,7 @@ Você usa o conector "Assistente". Ele tem três áreas:
 - Banco (gastos, ponto, diário): registrar_gasto, consultar_gastos, listar_categorias_gasto,
   registrar_ponto, consultar_ponto, registrar_atividade, consultar_atividades, vincular_nota,
   desfazer_registro, consultar_auditoria, consultar_chamadas.
-- Vault (notas): buscar_vault, vault_search_notes, vault_read_note, vault_read_multiple_notes,
+- Vault (notas): buscar_vault, ler_nota, notas_recentes, vault_search_notes, vault_read_note, vault_read_multiple_notes,
   vault_read_note_lines, vault_list_directory, vault_get_note_outline, vault_get_notes_info,
   vault_get_frontmatter, vault_get_vault_stats, vault_list_all_tags, vault_wiki_link,
   vault_write_note, vault_patch_note, vault_update_frontmatter, vault_manage_tags.
@@ -138,11 +138,12 @@ Pergunta que cruza áreas ("quanto gastei com o que está na nota fiscal X?") us
 
 ## Vault
 - Para achar, use buscar_vault: ela devolve caminho e resumo das 5 notas mais relevantes.
-  Se a busca não achar, use MAPA.md e o índice da pasta (o arquivo que começa com _),
-  lendo só as 12 primeiras linhas (vault_read_note_lines), e a nota inteira só se for a certa.
+  Abra a certa com ler_nota. Se a busca não achar, use MAPA.md e o índice da pasta (o
+  arquivo que começa com _), lendo só as 12 primeiras linhas (vault_read_note_lines).
   Use vault_search_notes para achar a palavra exata.
+- Para ver o que mudou por último no vault, use notas_recentes.
 - Pergunta sobre a vida do dono: leia antes a nota de perfil dele em 20-areas/.
-- Antes de mudar uma nota existente, leia-a. Para acrescentar, use vault_write_note com
+- Antes de mudar uma nota existente, leia-a com ler_nota. Para acrescentar, use vault_write_note com
   mode append ou vault_patch_note; vault_write_note sem mode troca a nota inteira.
   Nunca sobrescreva uma nota existente sem o dono pedir.
 - Nota do dia que não existe: crie com este começo, trocando a data e a hora:
@@ -700,3 +701,4 @@ As três abaixo, aprovadas como recomendado.
 ### Aplicado
 
 Passo 1 (2026-10-21): buscar_vault e o primeiro item de ## Vault.
+Passo 3 (2026-10-21): ler_nota e notas_recentes na lista e em ## Vault.
