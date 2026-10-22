@@ -22,7 +22,7 @@ from sqlalchemy import create_engine, inspect, select, text
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
-from assistente import banco, registro, servidor
+from assistente import banco, registro, servidor, vault
 from assistente.auth import GitHubRestrito, GoogleRestrito
 from assistente.config import Config
 from assistente.modelos import Auditoria, Base
@@ -496,6 +496,7 @@ CLASSIFICACAO_REVISADA = {
     "vault_read_note": LE, "vault_read_note_lines": LE, "vault_read_multiple_notes": LE, "vault_search_notes": LE,
     "vault_list_directory": LE, "vault_get_note_outline": LE, "vault_get_notes_info": LE,
     "vault_get_frontmatter": LE, "vault_get_vault_stats": LE, "vault_list_all_tags": LE,
+    "buscar_vault": LE,  # nossa (vault.py): índice em memória das notas; só lê
     "vault_wiki_link": LE,  # lê a nota pelo nome (basename) e devolve o conteúdo; não escreve
     "vault_write_note": ESCREVE, "vault_patch_note": ESCREVE, "vault_update_frontmatter": ESCREVE,
     "vault_manage_tags": ESCREVE,  # operation=list é leitura, conferido em registro.py na hora da chamada
@@ -541,8 +542,8 @@ def test_cada_permitida_esta_em_uma_lista_so():
 
 def test_classificacao_bate_com_a_revisao_nome_por_nome():
     """Cada nome visível (peças e banco) foi revisado à mão; sem revisão, o teste falha (sem olhar prefixo)."""
-    leituras = servidor.LEITURAS_PECAS | banco.LEITURAS_BANCO
-    escritas = servidor.ESCRITAS_PECAS | banco.ESCRITAS_BANCO
+    leituras = servidor.LEITURAS_PECAS | banco.LEITURAS_BANCO | vault.LEITURAS_VAULT
+    escritas = servidor.ESCRITAS_PECAS | banco.ESCRITAS_BANCO | vault.ESCRITAS_VAULT
     sem_revisao = sorted((leituras | escritas) - CLASSIFICACAO_REVISADA.keys())
     assert not sem_revisao, f"Classifique à mão em CLASSIFICACAO_REVISADA: {sem_revisao}"
     sobrando = sorted(CLASSIFICACAO_REVISADA.keys() - leituras - escritas)

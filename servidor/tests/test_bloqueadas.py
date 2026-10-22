@@ -112,8 +112,9 @@ async def test_so_permitidas_aparecem_nas_pecas(app):
     assert {f"{ns}_{NOVA}" for ns in NAMESPACES} & visiveis == set()
     das_pecas = {n for n in visiveis if n.startswith(tuple(f"{ns}_" for ns in NAMESPACES))}
     assert das_pecas == servidor.PERMITIDAS
-    # As do banco (sem namespace) continuam todas.
+    # As do banco e a busca nossa do vault (sem namespace) continuam todas.
     assert visiveis - das_pecas == {
+        "buscar_vault",
         "consultar_atividades", "consultar_auditoria", "consultar_chamadas", "consultar_gastos", "consultar_ponto",
         "desfazer_registro",
         "listar_categorias_gasto", "registrar_atividade", "registrar_gasto", "registrar_ponto", "vincular_nota",

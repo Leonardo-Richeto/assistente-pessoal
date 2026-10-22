@@ -57,7 +57,7 @@ Você usa o conector "Assistente". Ele tem três áreas:
 - Banco (gastos, ponto, diário): registrar_gasto, consultar_gastos, listar_categorias_gasto,
   registrar_ponto, consultar_ponto, registrar_atividade, consultar_atividades, vincular_nota,
   desfazer_registro, consultar_auditoria, consultar_chamadas.
-- Vault (notas): vault_search_notes, vault_read_note, vault_read_multiple_notes,
+- Vault (notas): buscar_vault, vault_search_notes, vault_read_note, vault_read_multiple_notes,
   vault_read_note_lines, vault_list_directory, vault_get_note_outline, vault_get_notes_info,
   vault_get_frontmatter, vault_get_vault_stats, vault_list_all_tags, vault_wiki_link,
   vault_write_note, vault_patch_note, vault_update_frontmatter, vault_manage_tags.
@@ -137,10 +137,10 @@ Pergunta que cruza áreas ("quanto gastei com o que está na nota fiscal X?") us
 área na sua parte.
 
 ## Vault
-- Para achar, comece por MAPA.md e pelo índice da pasta (o arquivo que começa com _).
-  Toda nota tem um resumo nas primeiras linhas: leia só as 12 primeiras
-  (vault_read_note_lines) para saber se é a nota certa, e a nota inteira só se for.
-  Use vault_search_notes quando o índice não ajudar.
+- Para achar, use buscar_vault: ela devolve caminho e resumo das 5 notas mais relevantes.
+  Se a busca não achar, use MAPA.md e o índice da pasta (o arquivo que começa com _),
+  lendo só as 12 primeiras linhas (vault_read_note_lines), e a nota inteira só se for a certa.
+  Use vault_search_notes para achar a palavra exata.
 - Pergunta sobre a vida do dono: leia antes a nota de perfil dele em 20-areas/.
 - Antes de mudar uma nota existente, leia-a. Para acrescentar, use vault_write_note com
   mode append ou vault_patch_note; vault_write_note sem mode troca a nota inteira.
@@ -578,3 +578,125 @@ Não escreve sozinho ao fim da tarefa nem por tarefa agendada (o Leonardo descar
 ### Decisões do Leonardo (2026-10-18)
 
 - Regra e a seção nova "Resumo da conversa": aprovadas, junto com a Ficha 3.
+
+---
+
+## Ficha 5 — Vault inteligente: busca, leitura com versão, histórico e sessões do Claude Code
+
+- **Status:** aprovada (Leonardo, 2026-10-21, na conversa: "tudo o que sugeriu está aprovado"), inclusive as 3
+  decisões abaixo como recomendado. Proposta escrita pelo Opus 5.5. O texto da Ficha 1 muda passo a passo, junto com
+  cada ferramenta (o teste de contrato exige). Origem: `PLANO.md` Fase 2b, do estudo do
+  ai-memory (`60-planos/metas/memoria-automatica-e-busca-no-vault.md` do vault). Plano de execução em `SPRINT_2B.md`.
+- **Onde vive:** ferramentas novas no servidor (`servidor/assistente/`), trava na escrita do vault, migrações 0005 e 0006,
+  hooks do Claude Code em `ferramentas/sessoes/` e mudança no texto da Ficha 1 (colar no Projeto no B8, no i7).
+  Nada vai para o claude.ai antes do ok.
+- **Fronteira (D5 do vault):** o vault guarda o curado. Sessões, marcas de "desatualizada" e capturas ficam no banco e
+  nunca viram nota sozinhas. O servidor não executa arquivo do vault.
+
+### Regra
+
+1. **Busca (2b.1):** `buscar_vault(texto, tipo?, status?, pasta?)` acha por palavra, com ou sem acento, e ordena por
+   relevância (peso maior no título, no nome do arquivo, nas tags e no resumo `>`). Devolve até 5 notas: caminho, título,
+   resumo e pontuação. Não devolve o corpo. É o primeiro passo para achar nota.
+2. **Leitura (2b.7):** `ler_nota(caminho, relacionadas=true)` devolve o conteúdo, a `versao` (hash curto do conteúdo) e,
+   com `relacionadas`, as notas ligadas a um salto (links e backlinks), só caminho, título e resumo, até 10.
+3. **Recentes (2b.5):** `notas_recentes(n=10, pasta?)` lista as notas por `atualizado` do frontmatter (sem ele, pela data
+   do arquivo), com caminho, título e data. Máximo 30.
+4. **Troca da nota inteira só com versão (2b.2):** `escrever_nota(caminho, conteudo, versao)` grava só se a nota ainda
+   tem a `versao` lida por `ler_nota`. Se mudou (Syncthing, outro aparelho), recusa: "A nota mudou desde a leitura. Leia
+   de novo." Nota nova: `versao` = `"nova"`, e recusa se a nota já existe. `vault_write_note` só aceita `mode` `append`
+   ou `prepend`; sem `mode` (ou `overwrite`) é recusada com "Use escrever_nota". `vault_patch_note` continua.
+5. **Barreira de segredo (2b.3):** escrita no vault ou no banco com cara de token, chave privada ou senha é recusada
+   inteira, sem gravar nada: "Recusei: o texto parece ter um segredo (<tipo>). Guarde o valor no cofre e escreva
+   {{segredo:NOME}}." A referência `{{segredo:NOME}}` passa e o servidor nunca a resolve. O commit diário do vault roda
+   o gitleaks e não comita se ele achar segredo (avisa no log).
+6. **Histórico (2b.4):** toda escrita da IA no vault vira um commit só daquele arquivo, autor `claude-app`. Se o commit
+   falhar, a escrita continua valendo e o log avisa. `historico_nota(caminho, n=10)` lista as versões (data, autor,
+   mensagem, id curto). `restaurar_nota(caminho, versao_git)` grava o conteúdo antigo como versão **nova** (nada se
+   perde; dá para restaurar de volta). Sem `.git` no vault, não há commit nem histórico, e as duas ferramentas dizem isso.
+   O bloqueio de `vault_move_note` e `vault_move_file` continua; rever depois (decisão do Leonardo).
+7. **Contexto inicial (2b.6):** `contexto_inicial()` junta numa chamada, até 6.000 caracteres: as 12 primeiras linhas do
+   perfil (`20-areas/perfil-do-leonardo.md`), a seção "Trabalho em andamento" de `00-inbox/onde-parei.md`, a nota do dia
+   (se existe) e quantas notas estão marcadas desatualizadas. O Claude chama uma vez, no começo da conversa sobre a vida
+   ou o trabalho do dono; não chama em registro rápido ("gastei 30").
+8. **Nota desatualizada (2b.8):** `marcar_desatualizada(caminho, motivo)` grava no banco (tabela `notas_desatualizadas`,
+   linha `criar` na auditoria), não mexe na nota e devolve `id` e "Desfazer?". Desfazer: `desfazer_registro` com tipo
+   `desatualizada`. `consultar_desatualizadas()` lista as marcas em vigor. O lint diário lista as notas marcadas.
+9. **Sessões do Claude Code (2b.9):** ao fim de cada sessão do Claude Code, um hook grava um resumo **por regra, sem IA**:
+   projeto, máquina, início, fim, duração, título (primeira mensagem do dono, 120 caracteres), arquivos tocados (só
+   caminhos, até 50), comandos (os 200 primeiros caracteres, até 30, segredos tirados), commits (id curto e primeira linha)
+   e se houve passagem. **Nunca** o texto das mensagens nem o conteúdo dos arquivos. Houve passagem quando a sessão editou
+   `onde-parei.md`, `SPRINT_NOTAS.md`, `CONTEXTO.md` ou `ACOMPANHAMENTO.md`. Fila local por máquina, com chave contra
+   duplicata; envio para a tabela `sessoes` do i7 pela Tailscale (SSH), sem rota nova na internet. Na sessão seguinte do
+   mesmo projeto e máquina, se a anterior acabou sem passagem, aparece uma linha: "A sessão anterior (AAAA-MM-DD HH:MM,
+   N min) terminou sem passagem: <título>." Retenção: guardar tudo (como a Ficha 2). O hook nunca trava a sessão: falhou,
+   segue em silêncio (log local).
+
+### Mudança proposta no texto da Ficha 1
+
+1. Em "O que você tem", a linha do Vault passa a começar por:
+   `buscar_vault, ler_nota, notas_recentes, contexto_inicial, escrever_nota, historico_nota, restaurar_nota,`
+   e a do Banco ganha `, marcar_desatualizada, consultar_desatualizadas`.
+2. Na seção "## Vault", troque o primeiro item e o de "Antes de mudar uma nota existente" por:
+   ```
+   - Para achar, use buscar_vault: ela devolve caminho e resumo das 5 notas mais relevantes.
+     Abra a certa com ler_nota. Se a busca não achar, use MAPA.md e o índice da pasta (o
+     arquivo que começa com _), lendo só as 12 primeiras linhas (vault_read_note_lines).
+   - No começo de uma conversa sobre a vida ou o trabalho do dono, chame contexto_inicial
+     uma vez. Em registro rápido (gasto, ponto), não chame.
+   - Antes de mudar uma nota existente, leia-a com ler_nota. Para acrescentar, use
+     vault_write_note com mode append ou vault_patch_note. Para trocar a nota inteira, use
+     escrever_nota com a versao que ler_nota devolveu; se ela recusar porque a nota mudou,
+     leia de novo e refaça. Nunca troque uma nota inteira sem o dono pedir.
+   - Nota que parece velha ou errada: marque com marcar_desatualizada e diga ao dono; não
+     corrija sozinho.
+   - Para ver ou voltar uma versão antiga, use historico_nota e restaurar_nota (restaurar
+     cria uma versão nova; nada se perde). Confirme com o dono antes de restaurar.
+   ```
+3. Em "## O que nunca fazer", acrescente:
+   ```
+   - Não escreva senha, token ou chave em nota nem em registro. Se o dono pedir, escreva
+     {{segredo:NOME}} e diga que o valor vai para o cofre.
+   ```
+4. Em "Como confirmar", a linha do parâmetro `modelo` ganha `marcar_desatualizada`.
+
+### Exemplos
+
+| Dono diz | Claude faz | Claude responde |
+|---|---|---|
+| "O que eu decidi sobre o carro?" | `buscar_vault("carro decisão")`, `ler_nota` da primeira | A resposta, citando a nota |
+| "Reescreve a nota X com o texto novo" | `ler_nota(X)`, `escrever_nota(X, texto, versao)` | "Reescrevi X." |
+| Mesmo pedido, nota mudou no Mac no meio | `escrever_nota` recusa; `ler_nota` de novo; mostra a diferença e pergunta | "A nota mudou no meio. Quer que eu aplique sobre a versão nova?" |
+| "Anota que a senha do roteador é abc123" | nada é gravado | "Não guardo senha. Ponha no cofre; eu anoto {{segredo:roteador}}." |
+| "Volta a nota Y para ontem" | `historico_nota(Y)`, pergunta qual; `restaurar_nota` | "Restaurei Y para a versão de AAAA-MM-DD HH:MM." |
+| "Essa nota do plano está velha" | `marcar_desatualizada(caminho, motivo)` | "Marquei como desatualizada (id 3). Desfazer?" |
+| Abre sessão no Claude Code; a anterior caiu sem passagem | hook `SessionStart` | uma linha de aviso antes da primeira resposta |
+
+### Não faz
+
+Não usa vetores nem LLM para ordenar a busca (2b.12 e 2b.13 só se a busca por palavra falhar). Não move, não apaga e
+não compacta nota. Não resolve `{{segredo:NOME}}`. Não cria nota a partir de sessão. Não guarda texto de conversa do
+Claude Code. Não instala Vaultwarden (2b.3a espera o backup ligado).
+
+### Cenário de teste
+
+1. `test_contrato_ficha1.py` com o texto novo: toda ferramenta nova citada e nenhuma bloqueada.
+2. Testes em memória (`fastmcp.Client`) com um vault sintético em `servidor/tests/fixtures/vault/`: busca sem acento,
+   pesos, filtros; versão recusada; nota nova recusada se existe; `vault_write_note` sem `mode` recusada; segredo
+   recusado e `{{segredo:X}}` aceito; commit por escrita num repositório git temporário; restaurar cria commit novo;
+   marca e desfazer; contexto com limite; hook com transcript sintético, fila sem duplicata, aviso sem passagem.
+3. Medida da busca (2b.10): 25 perguntas sobre o vault real, acerto entre as 5 primeiras anotado no `PLANO.md`.
+4. Manual, no app, no B9 do i7: os exemplos acima.
+
+### Decisões do Leonardo (2026-10-21)
+
+As três abaixo, aprovadas como recomendado.
+
+1. Aprovar a regra 1 a 9 e as 4 mudanças no texto da Ficha 1? Recomendação: sim.
+2. Envio das sessões pela Tailscale SSH (sem rota nova no Funnel); o PC do trabalho, sem Tailscale, fica só com a
+   fila local. Recomendação: sim.
+3. Retenção da tabela `sessoes` e da fila local: guardar tudo. Recomendação: sim.
+
+### Aplicado
+
+Passo 1 (2026-10-21): buscar_vault e o primeiro item de ## Vault.

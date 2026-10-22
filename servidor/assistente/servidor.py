@@ -8,6 +8,7 @@ Só este endpoint vai para a internet (via Tailscale Funnel). Paperless e vault 
 """
 
 import logging
+from pathlib import Path
 from urllib.parse import urlparse
 
 from fastmcp import FastMCP
@@ -18,6 +19,7 @@ from .banco import ESCRITAS_BANCO, LEITURAS_BANCO, criar_servidor_banco
 from .config import Config, config
 from .db import Bancos
 from .registro import RegistroChamadas
+from .vault import ESCRITAS_VAULT, LEITURAS_VAULT, criar_servidor_vault
 
 log = logging.getLogger("assistente")
 
@@ -164,6 +166,7 @@ def criar_app(cfg: Config | None = None) -> FastMCP:
         _montar_peca(app, "vault", create_proxy({"mcpServers": {"vault": {
             "command": "mcpvault", "args": [cfg.vault_path],
         }}}))
+        app.mount(criar_servidor_vault(Path(cfg.vault_path)))  # sem namespace: buscar_vault
     else:
         log.info("Vault não configurado; pulando.")
 
@@ -171,7 +174,8 @@ def criar_app(cfg: Config | None = None) -> FastMCP:
     # Vê toda chamada, inclusive das peças e das negadas. Falha fechado: fora das leituras
     # conhecidas e das escritas do banco (que já se auditam), grava `escrever` antes da chamada.
     # Também grava cada chamada (inclusive leitura) em `chamadas`, com a origem (Passo 8b3).
-    app.add_middleware(RegistroChamadas(bancos, leituras=LEITURAS_PECAS | LEITURAS_BANCO, auditadas=ESCRITAS_BANCO))
+    app.add_middleware(RegistroChamadas(bancos, leituras=LEITURAS_PECAS | LEITURAS_BANCO | LEITURAS_VAULT,
+                                      auditadas=ESCRITAS_BANCO, do_vault=LEITURAS_VAULT | ESCRITAS_VAULT))
     return app
 
 

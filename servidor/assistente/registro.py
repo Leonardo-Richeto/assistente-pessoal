@@ -42,7 +42,7 @@ TAMANHO_AUTOR = 80  # = String(80) em Auditoria.autor
 TAMANHO_CAMINHO = 300
 MAX_CAMINHOS = 20
 MAX_IDS = 20
-CHAVES_CAMINHO = {"path": "caminho", "oldPath": "caminho", "newPath": "destino"}
+CHAVES_CAMINHO = {"path": "caminho", "caminho": "caminho", "oldPath": "caminho", "newPath": "destino"}
 # Tamanhos = colunas de Chamada (modelos.py).
 TAMANHO_CLIENTE = 80
 TAMANHO_VERSAO = 40
@@ -142,7 +142,10 @@ def origem(context, argumentos: dict) -> dict:
             "modelo_declarado": modelo}
 
 
-def _peca(nome: str) -> str | None:
+def _peca(nome: str, do_vault: frozenset[str] = frozenset()) -> str | None:
+    """A peça pelo prefixo; `do_vault` são as ferramentas nossas do vault, que não têm o prefixo."""
+    if nome in do_vault:
+        return "vault"
     return next((p for p in PECAS if nome.startswith(f"{p}_")), None)
 
 
@@ -190,8 +193,10 @@ def _dados(peca: str | None, argumentos: dict) -> dict:
 class RegistroChamadas(Middleware):
     """Vê toda chamada `tools/call` do app principal, inclusive das peças montadas e das negadas."""
 
-    def __init__(self, bancos: Bancos, leituras: Iterable[str], auditadas: Iterable[str]):
+    def __init__(self, bancos: Bancos, leituras: Iterable[str], auditadas: Iterable[str],
+                 do_vault: Iterable[str] = ()):
         self._bancos = bancos
+        self._do_vault = frozenset(do_vault)  # ferramentas nossas do vault: tabela `vault` e só o caminho
         self._leituras = frozenset(leituras)  # leituras conhecidas: banco e peças
         self._auditadas = frozenset(auditadas)  # escritas do banco: já gravam a auditoria em _gravar
 
@@ -275,7 +280,7 @@ class RegistroChamadas(Middleware):
                 "auditoria_id": auditoria_id})
 
     async def _chamar(self, context, call_next, nome: str, argumentos: dict, autor: str, chamada: dict):
-        peca = _peca(nome)
+        peca = _peca(nome, self._do_vault)
         dados = _dados(peca, argumentos)
         tabela = peca or "ferramenta"
         escrita = self._e_escrita(nome, argumentos)

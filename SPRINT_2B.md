@@ -68,8 +68,8 @@ tabela; eu confiro testes e diff antes de seguir. Effort max nunca.
 
 | Passo | O que é | Tier | Modelo | Effort | Depende de | Status |
 |---|---|---|---|---|---|---|
-| 0 | Branch `fase-2b`; Ficha 5 aprovada (o texto da Ficha 1 muda em cada passo, junto com a ferramenta); vault sintético em `tests/fixtures/vault/` (~15 notas com acento, links, frontmatter) | B | Sonnet 5.5 | médio | aprovação | Pendente |
-| 1 | 2b.1 `buscar_vault` + CLI; testes de acento, pesos, filtros, query hostil (`"`, `:`, `NEAR`, 10 KiB) | B | Sonnet 5.5 | médio | 0 | Pendente |
+| 0 | Branch `fase-2b`; Ficha 5 aprovada (o texto da Ficha 1 muda em cada passo, junto com a ferramenta); vault sintético em `tests/fixtures/vault/` (~15 notas com acento, links, frontmatter) | B | Sonnet 5.5 | médio | aprovação | Feito 2026-10-21 (Sonnet 5.5) |
+| 1 | 2b.1 `buscar_vault` + CLI; testes de acento, pesos, filtros, query hostil (`"`, `:`, `NEAR`, 10 KiB) | B | Sonnet 5.5 | médio | 0 | Feito 2026-10-21 (Sonnet 5.5) |
 | 2 | 2b.10 medida: executor + 25 perguntas no vault (decisão 4); rodar, ajustar pesos, anotar no `PLANO.md` | B | Sonnet 5.5 | médio | 1 | Pendente |
 | 3 | 2b.5 `notas_recentes` + 2b.7 `ler_nota` com `versao` e relacionadas; função única de caminho seguro | B | Sonnet 5.5 | médio | 0 | Pendente |
 | 4 | ⚑ 2b.2 `escrever_nota` com versão + trava do `vault_write_note`; testes de corrida, caminho hostil, link simbólico | A | Opus 5.5 | alto | 3 | Pendente |
@@ -124,3 +124,13 @@ Um bloco por passo, do mais velho para o mais novo: o que fez, verificado, não 
   código de saída; ignora `.git` e `.stversions`. Teste `scripts/testes/test_lint_conflitos.sh`; frase em `docs/SYNCTHING.md`.
 - Verificado: `test_lint_conflitos.sh` ok (3 casos), `bash -n` ok, `test_retencao.sh` ok (rodado de novo pelo orquestrador).
 - Não verificado: lista com mais de 50 conflitos; o i7 real.
+
+### Passos 0 e 1 — vault sintético e 2b.1 `buscar_vault` (Sonnet 5.5, 2026-10-21)
+
+- Fez: `servidor/tests/fixtures/vault/` (24 arquivos sintéticos, sem dado real); `servidor/assistente/vault_busca.py`
+  (FTS5 em memória, pesos `PESOS = (10, 8, 5, 4, 1)`, consulta com aspas e OR, stopwords, cache por assinatura, CLI);
+  `servidor/assistente/vault.py` (`buscar_vault`, `LEITURAS_VAULT`, `ESCRITAS_VAULT`), montado sem namespace em `criar_app`;
+  `registro.py` com `do_vault` (ferramentas nossas caem na tabela `vault`, só o caminho) e a chave `caminho`;
+  Ficha 1: `buscar_vault` na lista e no primeiro item de "## Vault".
+- Verificado: 299 passam, 1 pulado (rodado de novo pelo orquestrador); CLI no vault real só leitura.
+- Não verificado: Python 3.12 (imagem) até o `docker build` do Passo 6; qualidade do ranking (Passo 2).
