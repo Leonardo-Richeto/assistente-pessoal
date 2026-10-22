@@ -82,6 +82,11 @@ else
   echo "(dry-run: nada será alterado)"
 fi
 GRUPO="$(id -gn "$USUARIO" 2>/dev/null || echo "$USUARIO")"
+# O container do servidor roda com uid 1000 e comita no .git do vault (PLANO 2b.4); o commit diário e o
+# Syncthing rodam com este usuário. Uids diferentes travam um ao outro nas pastas de .git/objects.
+if [ "$DRY" -eq 0 ] && [ "$(id -u "$USUARIO")" != "1000" ]; then
+  echo "AVISO: $USUARIO tem uid $(id -u "$USUARIO"), não 1000; o commit por escrita do vault vai falhar (docs/IMPLANTACAO.md B11)." >&2
+fi
 ARQ="$(dpkg --print-architecture 2>/dev/null || echo amd64)"
 export DEBIAN_FRONTEND=noninteractive
 

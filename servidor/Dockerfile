@@ -7,9 +7,9 @@ ENV PYTHONUNBUFFERED=1 \
     UV_TOOL_DIR=/opt/uv-tools \
     PATH="/app/.venv/bin:$PATH"
 
-# Node só para o MCP do vault (mcpvault é um pacote npm).
+# Node só para o MCP do vault (mcpvault é um pacote npm). git: commit por escrita e histórico do vault (2b.4).
 RUN apt-get update \
- && apt-get install -y --no-install-recommends nodejs npm \
+ && apt-get install -y --no-install-recommends nodejs npm git \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=ghcr.io/astral-sh/uv:0.9 /uv /usr/local/bin/uv

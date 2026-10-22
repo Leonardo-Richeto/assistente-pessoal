@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Teste do aviso de conflito do Syncthing no lint diário, com um lint falso (sem vault real).
+# Teste dos avisos do lint diário (conflito do Syncthing, index.lock esquecido), com um lint falso (sem vault real).
 #   bash scripts/testes/test_lint_conflitos.sh
 set -u
 
@@ -59,6 +59,28 @@ if [ "$codigo" -eq 0 ] && ! grep -q "Conflitos do Syncthing" "$RAIZ/logs-stv/ult
   echo "ok .stversions ignorado"
 else
   echo "FALHOU: arquivo em .stversions/ entrou no aviso"; falhas=$((falhas + 1))
+fi
+
+# (d) .git/index.lock com mais de 10 minutos: AVISO no relatório, código 0.
+v="$(novo_vault lockvelho)"
+mkdir -p "$v/.git"
+touch -t 202001010000 "$v/.git/index.lock"
+codigo="$(rodar lockvelho)"
+if [ "$codigo" -eq 0 ] && grep -qF "AVISO: .git/index.lock existe há mais de 10 minutos" "$RAIZ/logs-lockvelho/ultimo.md"; then
+  echo "ok index.lock velho: aviso e código 0"
+else
+  echo "FALHOU: index.lock velho, código $codigo ou aviso ausente"; falhas=$((falhas + 1))
+fi
+
+# (e) .git/index.lock recente (um commit em andamento): sem aviso.
+v="$(novo_vault locknovo)"
+mkdir -p "$v/.git"
+touch "$v/.git/index.lock"
+codigo="$(rodar locknovo)"
+if [ "$codigo" -eq 0 ] && ! grep -q "index.lock" "$RAIZ/logs-locknovo/ultimo.md"; then
+  echo "ok index.lock recente: sem aviso"
+else
+  echo "FALHOU: index.lock recente gerou aviso (código $codigo)"; falhas=$((falhas + 1))
 fi
 
 [ "$falhas" -eq 0 ] && echo "test_lint_conflitos: ok" || { echo "test_lint_conflitos: $falhas falha(s)"; exit 1; }

@@ -51,7 +51,7 @@ async def test_toda_ferramenta_citada_existe_e_nao_esta_bloqueada(app):  # noqa:
     async with Client(app) as c:
         ferramentas = {t.name: t for t in await c.list_tools()}
     citadas = _citados() - NAO_FERRAMENTA
-    assert len(citadas) >= 35  # 13 do banco, 19 do vault (4 nossas e 15 do mcpvault) e 3 do Paperless
+    assert len(citadas) >= 38  # 14 do banco, 21 do vault (6 nossas e 15 do mcpvault) e 3 do Paperless
     faltando = sorted(citadas - ferramentas.keys())
     assert not faltando, f"O texto do Projeto cita ferramenta que o app não tem: {faltando}"
     assert not citadas & servidor.BLOQUEADAS

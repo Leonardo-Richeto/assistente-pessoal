@@ -6,6 +6,7 @@
 #   VAULT_PATH=/srv/assistente/vault LINT_DIR=/srv/assistente/logs/vault-lint bash deploy/vault/lint-diario.sh
 # O relatório fica FORA do vault, para não virar nota nem entrar no commit diário.
 # Arquivo de conflito do Syncthing (*.sync-conflict-*) vira seção de AVISO no relatório; não muda o código.
+# .git/index.lock com mais de 10 minutos também vira AVISO (o git morreu no meio e travou os commits).
 # As notas marcadas como desatualizadas no banco viram seção de AVISO, lidas de $LINT_DIR/marcas.md, que o
 # vault-marcas.service (marcas-desatualizadas.sh, 03:35) grava. O lint não chama docker: o código dele vem do
 # vault, e o usuário dele não deve estar no grupo docker.
@@ -61,6 +62,15 @@ if [ -f "$MARCAS" ]; then
       cat "$MARCAS"
     } >>"$LINT_DIR/ultimo.md.parcial"
   fi
+fi
+# index.lock esquecido (git morto no meio): o commit por escrita e o commit diário param de comitar. Aviso, não erro.
+LOCK="$VAULT_PATH/.git/index.lock"
+if [ -e "$LOCK" ] && [ -n "$(find "$LOCK" -mmin +10 2>/dev/null)" ]; then
+  {
+    echo ""
+    echo "AVISO: .git/index.lock existe há mais de 10 minutos; nenhum commit do vault sai. Se nenhum git estiver"
+    echo "rodando (pgrep -a git), apague $LOCK."
+  } >>"$LINT_DIR/ultimo.md.parcial"
 fi
 mv "$LINT_DIR/ultimo.md.parcial" "$LINT_DIR/ultimo.md"
 log "$(sed -n 3p "$LINT_DIR/ultimo.md") Relatório: $LINT_DIR/ultimo.md"

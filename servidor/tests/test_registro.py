@@ -499,6 +499,8 @@ CLASSIFICACAO_REVISADA = {
     "buscar_vault": LE,  # nossa (vault.py): índice em memória das notas; só lê
     "ler_nota": LE, "notas_recentes": LE,  # nossas (vault.py): só lêem
     "escrever_nota": ESCREVE,  # nossa (vault.py): troca a nota inteira, só com a versão lida
+    "historico_nota": LE,  # nossa (vault.py): git log da nota; só lê
+    "restaurar_nota": ESCREVE,  # nossa (vault.py): grava o conteúdo de uma versão antiga como versão nova
     "vault_wiki_link": LE,  # lê a nota pelo nome (basename) e devolve o conteúdo; não escreve
     "vault_write_note": ESCREVE, "vault_patch_note": ESCREVE, "vault_update_frontmatter": ESCREVE,
     "vault_manage_tags": ESCREVE,  # operation=list é leitura, conferido em registro.py na hora da chamada
@@ -534,6 +536,7 @@ CLASSIFICACAO_REVISADA = {
     "desfazer_registro": ESCREVE, "vincular_nota": ESCREVE,
     "marcar_desatualizada": ESCREVE,  # grava a marca no banco; não mexe na nota
     "consultar_desatualizadas": LE,
+    "consultar_sessoes": LE,  # lê a tabela sessoes (Passo 11); sem comandos
 }
 
 

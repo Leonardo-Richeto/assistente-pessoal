@@ -19,7 +19,7 @@ from .banco import ESCRITAS_BANCO, LEITURAS_BANCO, criar_servidor_banco
 from .config import Config, config
 from .db import Bancos
 from .registro import RegistroChamadas
-from .vault import ESCRITAS_VAULT, LEITURAS_VAULT, TravaEscritaVault, criar_servidor_vault
+from .vault import ESCRITAS_VAULT, LEITURAS_VAULT, CommitPorEscrita, TravaEscritaVault, criar_servidor_vault
 
 log = logging.getLogger("assistente")
 
@@ -179,6 +179,11 @@ def criar_app(cfg: Config | None = None) -> FastMCP:
     # Depois do registro = mais por dentro (FastMCP 4.1.0 monta a cadeia com o primeiro middleware por fora):
     # vault_write_note sem mode append/prepend é recusada antes da peça, e a auditoria grava `escrever` e `erro`.
     app.add_middleware(TravaEscritaVault())
+    # Mais por dentro ainda: antes de uma escrita do mcpvault, foto da nota se o dono a mudou sem commit (sem a
+    # foto, recusa); depois da escrita sem erro, commit só daquela nota (2b.4). escrever_nota e restaurar_nota
+    # fazem isso dentro da ferramenta. Falha no commit depois da escrita só vai para o log.
+    if cfg.vault_path:
+        app.add_middleware(CommitPorEscrita(Path(cfg.vault_path)))
     return app
 
 

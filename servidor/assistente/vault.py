@@ -1,4 +1,6 @@
-"""Ferramentas nossas sobre o vault (além do mcpvault): busca, leitura com versão e troca da nota inteira com versão.
+"""Ferramentas nossas sobre o vault (além do mcpvault): busca, leitura com versão, troca da nota inteira com versão,
+histórico e restauração pelo git (vault_git.py), e o commit de cada escrita da IA, com uma foto antes de trocar
+uma nota que o dono mudou sem commit.
 
 Só aqui entra lógica do vault; a busca em si fica em vault_busca.py (sem FastMCP).
 Escrita (escrever_nota): temporário na mesma pasta e os.replace, com a versão conferida duas vezes sob uma trava do
@@ -13,19 +15,21 @@ import re
 import secrets
 import stat
 import threading
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated
 from zoneinfo import ZoneInfo
 
+import anyio
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.server.middleware import Middleware
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from . import vault_busca
+from . import vault_busca, vault_git
 from .banco import Modelo, caminho_da_nota
 from .vault_busca import LIMITE_PADRAO, IndiceVault
 
@@ -35,8 +39,8 @@ LEITURA = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
 TROCA = ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False)
 
 # Nomes para o registro (registro.py) e para o teste de classificação. Os próximos passos acrescentam.
-LEITURAS_VAULT = {"buscar_vault", "ler_nota", "notas_recentes"}
-ESCRITAS_VAULT = {"escrever_nota"}
+LEITURAS_VAULT = {"buscar_vault", "ler_nota", "notas_recentes", "historico_nota"}
+ESCRITAS_VAULT = {"escrever_nota", "restaurar_nota"}
 
 # Caracteres: o máximo que ler_nota devolve e que escrever_nota aceita. Um limite só: a nota que ler_nota
 # corta não pode voltar inteira por escrever_nota (perderia o fim).
@@ -61,6 +65,22 @@ RECENTES_PADRAO, RECENTES_MAXIMO = 10, 30
 IGNORADOS_ESCRITA = {".git", ".obsidian", ".stversions", ".trash"}
 FUSO = ZoneInfo("America/Sao_Paulo")
 WIKILINK = re.compile(r"\[\[([^\]|#\n]+)(?:#[^\]|\n]*)?(?:\|[^\]\n]*)?\]\]")
+
+
+class NotaMudou(ToolError):
+    """A versão no disco não é a lida (outro aparelho escreveu no meio)."""
+
+
+class NotaJaExiste(ToolError):
+    """Criar com versao "nova", mas a nota já existe."""
+
+
+class NotaSumiu(ToolError):
+    """Trocar a nota, mas ela não existe (ou foi apagada no meio)."""
+
+
+class NotaNaoTrocavel(ToolError):
+    """A nota no disco está fora de UTF-8 ou passa do limite: só em parte (patch, append) ou no Obsidian."""
 
 
 def versao_de(conteudo: bytes) -> str:
@@ -144,9 +164,9 @@ def _texto_trocavel(dados: bytes) -> None:
     try:
         texto = dados.decode("utf-8")
     except UnicodeDecodeError:
-        raise ToolError(AVISO_NAO_UTF8) from None
+        raise NotaNaoTrocavel(AVISO_NAO_UTF8) from None
     if len(texto) > LIMITE_CONTEUDO:
-        raise ToolError(RECUSA_GRANDE)
+        raise NotaNaoTrocavel(RECUSA_GRANDE)
 
 
 def _criar(raiz_real: Path, real: Path, limpo: str, dados: bytes) -> None:
@@ -154,7 +174,7 @@ def _criar(raiz_real: Path, real: Path, limpo: str, dados: bytes) -> None:
     existe = (f"A nota já existe: {limpo}. Para acrescentar, use vault_write_note com mode append; "
               "não troque a nota inteira sem o dono pedir.")
     if os.path.lexists(real):
-        raise ToolError(existe)
+        raise NotaJaExiste(existe)
     pasta = real.parent
     pasta.mkdir(parents=True, exist_ok=True)
     # A pasta criada continua sendo ela mesma, dentro do vault (link simbólico posto no meio = recusa).
@@ -166,13 +186,13 @@ def _criar(raiz_real: Path, real: Path, limpo: str, dados: bytes) -> None:
         try:
             os.link(tmp, real)
         except FileExistsError:
-            raise ToolError(existe) from None
+            raise NotaJaExiste(existe) from None
         except OSError:
             # Sistema sem link (alguns FUSE e montagens): "x" também falha se o arquivo já existe.
             try:
                 f = open(real, "xb")
             except FileExistsError:
-                raise ToolError(existe) from None
+                raise NotaJaExiste(existe) from None
             try:
                 with f:
                     f.write(dados)
@@ -193,17 +213,26 @@ def _trocar(real: Path, limpo: str, dados: bytes, versao: str) -> None:
     Nota fora de UTF-8 ou maior que o limite não é trocada (ler_nota não devolve a versão dela).
     """
     if not real.is_file():
-        raise ToolError(f"Nota não existe: {limpo}")
-    atual = _ler_bytes(real)
+        raise NotaSumiu(f"Nota não existe: {limpo}")
+    try:
+        atual = real.read_bytes()
+    except FileNotFoundError:
+        raise NotaSumiu(f"Nota não existe: {limpo}") from None
+    except OSError:
+        raise ToolError("Nota não existe ou não pode ser lida") from None
     _texto_trocavel(atual)
     if versao_de(atual) != versao:
-        raise ToolError(NOTA_MUDOU)
+        raise NotaMudou(NOTA_MUDOU)
     modo = stat.S_IMODE(os.stat(real).st_mode)
     tmp = None
     try:
         tmp = _gravar_temporario(real.parent, dados, modo)
-        if versao_de(_ler_bytes(real)) != versao:
-            raise ToolError(NOTA_MUDOU)
+        try:
+            de_novo = real.read_bytes()
+        except FileNotFoundError:
+            raise NotaSumiu(f"Nota não existe: {limpo}") from None
+        if versao_de(de_novo) != versao:
+            raise NotaMudou(NOTA_MUDOU)
         os.replace(tmp, real)
         tmp = None
     finally:
@@ -263,6 +292,163 @@ class TravaEscritaVault(Middleware):
             if not (isinstance(modo, str) and modo in MODOS_ACRESCENTAR):
                 raise ToolError(RECUSA_WRITE_NOTE)
         return await call_next(context)
+
+
+# Escritas do mcpvault que viram commit (2b.4). manage_tags com operation=list só lê. Nome com hash também conta.
+NOMES_COMMIT = re.compile(r"(?:[0-9a-f]{12}_)?(vault_write_note|vault_patch_note|vault_update_frontmatter"
+                          r"|vault_manage_tags)")
+SEM_GIT = "O vault não tem histórico (sem git)."
+RECUSA_FOTO = "Não consegui guardar a versão atual no histórico; nada foi trocado."
+RESTAURAR_MUDOU = ("A nota mudou agora há pouco (outro aparelho). Nada foi trocado. Confira com o dono e tente "
+                   "restaurar de novo.")
+RESTAURAR_NAO_TROCAVEL = ("A nota atual não pode ser trocada pelo assistente (grande demais ou fora de UTF-8). "
+                          "Nada foi trocado; restaure no Obsidian.")
+# Extensões que o mcpvault 0.16.0 escreve (PathFilter.allowedExtensions). Só para o commit: as nossas ferramentas
+# continuam só com .md (caminho_seguro).
+EXTENSOES_COMMIT = (".md", ".markdown", ".txt", ".canvas", ".base")
+
+
+def relativo_no_vault(raiz: Path, caminho: str) -> str:
+    """Caminho do arquivo de verdade, relativo à raiz real (link simbólico dentro do vault: o alvo). ToolError se inválido."""
+    real = caminho_seguro(raiz, caminho)
+    return real.relative_to(Path(os.path.realpath(raiz))).as_posix()
+
+
+def _proibido(partes) -> bool:
+    """Pasta do sistema (.git, .obsidian, .stversions, .trash) em qualquer nível, sem caixa nem ponto/espaço no fim."""
+    return any(p.rstrip(". ").casefold() in IGNORADOS_ESCRITA for p in partes)
+
+
+def relativo_para_commit(raiz: Path, caminho) -> str | None:
+    """Caminho que o mcpvault escreveu, relativo à raiz real, para o commit; None se não é seguro comitar.
+
+    Normaliza como o `normalizePath` do mcpvault 0.16.0: tira espaço das pontas, troca `\\` por `/`, tira o caminho
+    absoluto da raiz do começo (ou uma `/` inicial). Aceita as extensões que o mcpvault escreve. Recusa `..`, pasta do
+    sistema e o que sai da raiz pelo realpath. Se o arquivo não existe com o nome dado, tenta as formas NFC e NFD.
+    """
+    if not isinstance(caminho, str):
+        return None
+    p = caminho.strip()
+    if p == "~" or p.startswith("~/"):
+        p = os.path.expanduser("~") + p[1:]
+    normalizado = p.replace("\\", "/")
+    raiz_real = Path(os.path.realpath(raiz))
+    for prefixo in dict.fromkeys((raiz_real.as_posix(), Path(os.path.abspath(raiz)).as_posix())):
+        if normalizado == prefixo:
+            return None
+        if normalizado.startswith(prefixo + "/"):
+            p = normalizado[len(prefixo) + 1:]
+            break
+    else:
+        if p.startswith("/"):
+            p = p[1:]
+    partes = p.split("/")
+    if not p or not p.isprintable() or ".." in partes or _proibido(partes):
+        return None
+    if not p.lower().endswith(EXTENSOES_COMMIT):
+        return None
+    if not os.path.lexists(raiz_real / p):
+        for forma in ("NFC", "NFD"):
+            outra = unicodedata.normalize(forma, p)
+            if os.path.lexists(raiz_real / outra):
+                p = outra
+                break
+    real = Path(os.path.realpath(raiz_real / p))
+    if not real.is_relative_to(raiz_real) or real == raiz_real:
+        return None
+    rel = real.relative_to(raiz_real)
+    if _proibido(rel.parts) or not rel.name.lower().endswith(EXTENSOES_COMMIT):
+        return None
+    return rel.as_posix()
+
+
+def commitar_escrita(raiz: Path, caminho: str, ferramenta: str) -> bool:
+    """Commit só do arquivo escrito, mensagem `claude-app: <ferramenta> <caminho>`. Nunca levanta exceção."""
+    rel = relativo_para_commit(raiz, caminho)
+    if rel is None:
+        log.warning("Escrita sem commit em %s: caminho que o commit não aceita (o commit diário decide)", ferramenta)
+        return False
+    return vault_git.commitar(raiz, rel, f"claude-app: {ferramenta} {rel}")
+
+
+def foto_ou_recusa(raiz: Path, rel: str, ferramenta: str) -> None:
+    """Guarda no git o que o dono deixou sem commit em `rel` antes de a IA trocar; ToolError se não conseguir."""
+    try:
+        vault_git.foto(raiz, rel, ferramenta)
+    except vault_git.FotoFalhou:
+        raise ToolError(RECUSA_FOTO) from None
+
+
+class CommitPorEscrita(Middleware):
+    """Escritas do mcpvault: foto do estado sem commit antes, commit só da nota do `path` depois (Ficha 5, regra 6).
+
+    Antes de chamar a peça: se a nota tem mudança do dono sem commit, comita uma foto (autor vault); se a foto falha,
+    recusa sem chamar a peça. Depois de uma escrita sem erro: commit da nota; falha no commit só vai para o log.
+    escrever_nota e restaurar_nota fazem isso dentro da própria ferramenta (não passam por aqui).
+    Registrada em criar_app depois da TravaEscritaVault (mais por dentro).
+    """
+
+    def __init__(self, raiz: Path):
+        self._raiz = Path(raiz)
+
+    async def on_call_tool(self, context, call_next):
+        nome = context.message.name
+        m = NOMES_COMMIT.fullmatch(nome) if isinstance(nome, str) else None
+        argumentos = context.message.arguments or {}
+        if m is None or (m[1] == "vault_manage_tags" and argumentos.get("operation") == "list"):
+            return await call_next(context)
+        caminho = argumentos.get("path")
+        rel = relativo_para_commit(self._raiz, caminho)
+        if rel is not None:
+            await anyio.to_thread.run_sync(foto_ou_recusa, self._raiz, rel, m[1])
+        resultado = await call_next(context)
+        if getattr(resultado, "is_error", False) or not isinstance(caminho, str):
+            return resultado
+        with anyio.CancelScope(shield=True):  # a escrita já aconteceu
+            await anyio.to_thread.run_sync(commitar_escrita, self._raiz, caminho, m[1])
+        return resultado
+
+
+def restaurar(raiz: Path, caminho: str, versao_git: str) -> dict:
+    """Grava a nota como estava em `versao_git`, como versão nova, pelas mesmas regras de gravar_nota, e comita.
+
+    Antes de trocar, guarda no git o que o dono deixou sem commit na nota (foto); sem foto, não troca.
+    """
+    rel = relativo_no_vault(raiz, caminho)
+    limpo = caminho_da_nota(caminho)
+    try:
+        antiga = vault_git.conteudo_em(raiz, rel, versao_git)
+    except vault_git.SemGit:
+        raise ToolError(SEM_GIT) from None
+    except vault_git.VersaoInvalida as e:
+        raise ToolError(str(e)) from None
+    except vault_git.ErroGit as e:
+        log.warning("restaurar_nota: git falhou em %s (%s)", rel, e)
+        raise ToolError("Não consegui ler o histórico do vault. Nada foi trocado.") from None
+    try:
+        texto = antiga.dados.decode("utf-8")
+    except UnicodeDecodeError:
+        raise ToolError("Essa versão da nota não está em UTF-8: não dá para restaurar. Nada foi trocado.") from None
+    curta = antiga.versao_git[:vault_git.TAMANHO_ID]
+    real = caminho_seguro(raiz, caminho)
+    saida = {"caminho": limpo, "versao_git_restaurada": curta}
+    try:
+        if real.is_file():
+            atual = _ler_bytes(real)
+            if atual == antiga.dados:
+                return {**saida, "versao": versao_de(atual), "confirmacao": "Nada mudou: a nota já está nessa versão."}
+            _texto_trocavel(atual)
+            foto_ou_recusa(raiz, rel, "restaurar_nota")
+            gravada = gravar_nota(raiz, caminho, texto, versao_de(atual))
+        else:
+            gravada = gravar_nota(raiz, caminho, texto, VERSAO_NOVA)
+    except (NotaMudou, NotaJaExiste, NotaSumiu):
+        raise ToolError(RESTAURAR_MUDOU) from None
+    except NotaNaoTrocavel:
+        raise ToolError(RESTAURAR_NAO_TROCAVEL) from None
+    vault_git.commitar(raiz, rel, f"claude-app: restaurar_nota {rel} ({curta})")
+    return {**saida, "versao": gravada["versao"],
+            "confirmacao": f"Restaurei {limpo} para a versão de {antiga.data}."}
 
 
 @dataclass
@@ -448,6 +634,36 @@ def criar_servidor_vault(raiz: Path) -> FastMCP:
         modelo: Modelo = None,
     ) -> dict:
         """Troca a nota inteira, só se ela ainda tem a versao lida por ler_nota (ou versao "nova" para criar). Para acrescentar, use vault_write_note com mode append."""
-        return gravar_nota(raiz, caminho, conteudo, versao)
+        # Síncrona: o FastMCP roda numa thread (anyio.to_thread), e o git também.
+        if not (isinstance(versao, str) and versao.strip() == VERSAO_NOVA):
+            # Troca: antes, guarda no git o que o dono deixou sem commit na nota; sem a foto, não troca.
+            foto_ou_recusa(raiz, relativo_no_vault(raiz, caminho), "escrever_nota")
+        saida = gravar_nota(raiz, caminho, conteudo, versao)
+        commitar_escrita(raiz, saida["caminho"], "escrever_nota")
+        return saida
+
+    @mcp.tool(annotations=LEITURA)
+    def historico_nota(
+        caminho: Annotated[str, Field(description="Caminho da nota relativo ao vault (ex.: 20-areas/perfil-do-leonardo.md).")],
+        n: Annotated[int, Field(description="Quantas versões (1 a 50), da mais nova para a mais velha.")] = vault_git.HISTORICO_PADRAO,
+    ) -> list[dict]:
+        """Lista as versões antigas de uma nota no git do vault: versao_git (use em restaurar_nota), autor, data, mensagem, o caminho que a nota tinha naquela versão e restauravel (true só quando é o caminho atual; versão de nome antigo não se restaura)."""
+        rel = relativo_no_vault(raiz, caminho)
+        try:
+            return vault_git.historico(raiz, rel, n)
+        except vault_git.SemGit:
+            raise ToolError(SEM_GIT) from None
+        except vault_git.ErroGit as e:
+            log.warning("historico_nota: git falhou em %s (%s)", rel, e)
+            raise ToolError("Não consegui ler o histórico do vault.") from None
+
+    @mcp.tool(annotations=TROCA)
+    def restaurar_nota(
+        caminho: Annotated[str, Field(description="Caminho atual da nota relativo ao vault.")],
+        versao_git: Annotated[str, Field(description="O versao_git devolvido por historico_nota.")],
+        modelo: Modelo = None,
+    ) -> dict:
+        """Volta a nota ao conteúdo de uma versão antiga, gravado como versão nova (nada se perde). Confirme com o dono antes."""
+        return restaurar(raiz, caminho, versao_git)
 
     return mcp

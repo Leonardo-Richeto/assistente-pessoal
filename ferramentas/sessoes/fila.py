@@ -2,7 +2,7 @@
 
 Pasta de estado: `ASSISTENTE_SESSOES_DIR`; senão, no Windows,
 `%LOCALAPPDATA%\\assistente\\sessoes`; senão `~/.local/state/assistente/sessoes`.
-- `pendentes/<projeto>/<sessao>.json`: ainda não enviados ao i7 (Passo 11, `enviar.sh`).
+- `pendentes/<projeto>/<sessao>.json`: ainda não enviados ao i7 (`enviar.py`).
 - `enviadas/<projeto>/<sessao>.json`: já enviados. Nada é apagado (retenção: guardar tudo).
 - `hooks.log`: erros e avisos dos hooks (cortado em ~1 MB, mantendo o fim).
 

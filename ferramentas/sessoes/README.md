@@ -142,9 +142,56 @@ No Windows: `Get-Content $env:LOCALAPPDATA\assistente\sessoes\hooks.log -Tail 20
 
 ## Envio para o i7
 
-Ainda não existe. O Passo 11 da Sprint 2b cria `enviar.sh`, que manda `pendentes/` para a tabela
-`sessoes` do i7 pela Tailscale (SSH) e move cada arquivo enviado para `enviadas/` com
-`fila.marcar_enviada(sessao)`. O PC do trabalho, sem Tailscale, fica só com a fila local.
+`enviar.py` manda as pendentes para a tabela `sessoes` do i7 pela Tailscale (SSH), sem rota nova na
+internet. O PC do trabalho, sem Tailscale, fica só com a fila local. O envio não roda no fim da
+sessão (o `SessionEnd` tem 1,5 s): rode à mão ou por timer.
+
+O que ele faz:
+
+1. Junta as pendentes de todas as subpastas, as mais antigas primeiro, até 500 e 2 MB por vez.
+2. Manda uma linha JSON por sessão para `python -m assistente.sessoes importar` no container
+   `servidor` do i7, que valida cada resumo e grava (ver `servidor/assistente/sessoes.py`).
+3. Move para `enviadas/` as aceitas e as que o banco já tinha (repetidas). As recusadas ficam em
+   `pendentes/`, com o motivo no `hooks.log`. Nada é apagado.
+4. Se o SSH ou o importador falha, ou passa de 120 s, nada se move: o próximo envio tenta de novo.
+
+Sessão retomada chega de novo com outro `fim` e vira linha nova; o app mostra a mais nova
+(`consultar_sessoes`).
+
+Pré-requisitos no Mac (ou em outra máquina com Tailscale):
+
+- SSH sem senha para o i7: Tailscale SSH ligado no i7 (`tailscale up --ssh`) ou chave SSH em
+  `~/.ssh/authorized_keys` do i7. Com `BatchMode=yes`, o SSH nunca pede senha: sem acesso, falha.
+- O usuário do i7 no grupo `docker` (o comando roda `docker compose exec` sem `sudo`).
+- `ASSISTENTE_SSH` no ambiente, no formato `usuario@maquina` (ex.: `leo@i7`, o nome da Tailscale).
+
+Comando:
+
+```bash
+ASSISTENTE_SSH=usuario@i7 /usr/bin/python3 ferramentas/sessoes/enviar.py
+```
+
+No i7 ele roda:
+
+```bash
+docker compose --project-directory /srv/assistente/app exec -T servidor python -m assistente.sessoes importar
+```
+
+Sem `ASSISTENTE_SSH`, sai com 1 e não toca na fila. `--comando "..."` troca o comando inteiro
+(os testes usam para rodar o importador local). Código 0 se enviou ou não havia o que enviar.
+
+Agendar no Mac (launchd, a cada hora):
+
+1. Copie o exemplo e troque `USUARIO` e `usuario@i7`:
+   `cp ferramentas/sessoes/exemplos/local.assistente.sessoes-enviar.plist ~/Library/LaunchAgents/`
+2. Confira o arquivo: `plutil -lint ~/Library/LaunchAgents/local.assistente.sessoes-enviar.plist`.
+3. Ligue: `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/local.assistente.sessoes-enviar.plist`.
+4. Rode uma vez para testar: `launchctl kickstart gui/$(id -u)/local.assistente.sessoes-enviar`.
+5. Desligue: `launchctl bootout gui/$(id -u)/local.assistente.sessoes-enviar`.
+
+O launchd roda sem o agente SSH do terminal: a chave precisa estar sem senha ou no Keychain
+(`ssh-add --apple-use-keychain`), ou use Tailscale SSH. A saída fica em `enviar-launchd.log`, na
+pasta de estado.
 
 ## Testes
 

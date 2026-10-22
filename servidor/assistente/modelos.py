@@ -82,6 +82,46 @@ class NotaDesatualizada(Base):
     desfeito: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
 
+class Sessao(Base):
+    """Resumo de uma sessão do Claude Code, feito por regra no hook da máquina (ficha 5, regra 9; Passo 11).
+
+    Só INSERT e SELECT (migração 0006): nada se apaga nem se altera. A sessão retomada chega de novo com outro
+    `fim` e vira linha nova; a consulta pega a mais nova de cada `sessao`. O mesmo (`sessao`, `fim`) não entra
+    duas vezes (índice único; `python -m assistente.sessoes importar` conta a repetida e segue).
+    Os textos vêm de fora (transcript): são dado, nunca instrução. Datas gravadas em UTC.
+    """
+
+    __tablename__ = "sessoes"
+    # O índice único começa por `sessao`: serve também de índice da busca por sessão.
+    __table_args__ = (
+        Index("ix_sessoes_sessao_fim", "sessao", "fim", unique=True),
+        Index("ix_sessoes_fim", "fim"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    recebido_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Id da sessão do Claude Code (^[A-Za-z0-9-]{8,80}$, conferido na importação).
+    sessao: Mapped[str] = mapped_column(String(80))
+    projeto: Mapped[str] = mapped_column(String(120))
+    raiz: Mapped[str] = mapped_column(String(300))
+    maquina: Mapped[str] = mapped_column(String(60))
+    inicio: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    fim: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    duracao_min: Mapped[int] = mapped_column(Integer)
+    # Primeira mensagem digitada pelo dono (o hook corta em 120).
+    titulo: Mapped[str] = mapped_column(String(200))
+    # Listas: caminhos (até 50), comandos sem conteúdo (até 30), commits {id, mensagem} (até 20).
+    arquivos: Mapped[list] = mapped_column(JSON)
+    comandos: Mapped[list] = mapped_column(JSON)
+    commits: Mapped[list] = mapped_column(JSON)
+    passagem: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # `reason` do SessionEnd do Claude Code (clear, logout, prompt_input_exit, other...).
+    motivo_fim: Mapped[str] = mapped_column(String(40))
+    # O hook leu só parte do transcript (sessão muito grande).
+    parcial: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    versao_resumo: Mapped[int] = mapped_column(Integer)
+
+
 class Auditoria(Base):
     """Toda escrita feita por ferramenta passa por aqui, e toda tentativa negada (registro.py)."""
 
@@ -91,7 +131,8 @@ class Auditoria(Base):
     momento: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     # Nome da ferramenta; `<nome invalido>` se o nome pedido não for só letras, números e `_`.
     ferramenta: Mapped[str] = mapped_column(String(60))
-    # Banco: gastos | ponto | atividades | notas_desatualizadas. Peças: vault | paperless. Outro nome: ferramenta.
+    # Banco: gastos | ponto | atividades | notas_desatualizadas | sessoes (uma linha por importação, Passo 11).
+    # Peças: vault | paperless. Outro nome: ferramenta.
     tabela: Mapped[str] = mapped_column(String(60))
     # Banco: id do gasto, ponto, atividade ou marca. Linha ok | erro | cancelado | negado depois de uma
     # `escrever`: o id dessa linha `escrever` (auditoria.id). Vazio na `escrever` e na negada sem ela.

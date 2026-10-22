@@ -210,6 +210,13 @@ cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor   # depois: powersave
       versionamento Staggered com as versões em `/srv/assistente/data/vault-versoes`, `.gitignore` do vault, timer do
       commit às 03:30, `VAULT_PATH=/vault` no `.env`). **Não verificado:** se o Synctrain aceita padrões de ignorar, e se o
       Obsidian do iPhone abre a pasta do Synctrain.
+      **Aviso (2b.4):** o servidor comita cada escrita da IA no `.git` do vault com o uid 1000 do container. Confira o
+      dono antes de subir: `stat -c %u /srv/assistente/vault/.git /srv/assistente/vault/.git/objects` tem de dar `1000`.
+      Se der outro uid sem escrita para o 1000, o commit por escrita falha (só WARNING em `docker compose logs servidor`; a escrita vale e o
+      commit das 03:30 leva a mudança), e a escrita da IA numa nota que o dono mudou sem commit é recusada (a foto do
+      estado anterior não sai). Avise antes de mudar `chown`.
+      O usuário do commit diário e do Syncthing (`<usuario>`) precisa ter uid 1000, o mesmo do container:
+      `id -u <usuario>` deve dar 1000. Conferir: `find /srv/assistente/vault/.git ! -uid 1000 | head` não mostra nada.
 - [ ] B12. Backup diário (2026-10-19, portabilidade; substitui o adiamento de 2026-10-18): o `preparar_host.sh` já
       instalou o `assistente-backup.timer`. Confira `systemctl list-timers assistente-backup.timer`, rode uma vez à mão
       (`sudo systemctl start assistente-backup.service`, `journalctl -u assistente-backup -n 30`) e faça um ensaio de

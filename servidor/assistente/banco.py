@@ -18,11 +18,11 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
-from sqlalchemy import select
+from sqlalchemy import and_, func, select
 from sqlalchemy.exc import IntegrityError
 
 from .db import Bancos
-from .modelos import Atividade, Auditoria, Chamada, Gasto, NotaDesatualizada, Ponto
+from .modelos import Atividade, Auditoria, Chamada, Gasto, NotaDesatualizada, Ponto, Sessao
 from .registro import anotar_auditoria, identidade
 
 LEITURA = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
@@ -33,7 +33,8 @@ TipoRegistro = Literal["gasto", "ponto", "atividade"]
 # "vinculo": desfaz uma troca de nota feita por vincular_nota (id = o que vincular_nota devolveu).
 # "desatualizada": desfaz uma marca de marcar_desatualizada (id = o que ela devolveu).
 TipoDesfazer = Literal["gasto", "ponto", "atividade", "vinculo", "desatualizada"]
-TabelaAuditoria = Literal["gastos", "ponto", "atividades", "notas_desatualizadas", "vault", "paperless", "ferramenta"]
+TabelaAuditoria = Literal["gastos", "ponto", "atividades", "notas_desatualizadas", "sessoes", "vault", "paperless",
+                          "ferramenta"]
 AcaoAuditoria = Literal["criar", "desfazer", "vincular", "desfazer_vinculo", "escrever", "ok", "erro", "cancelado",
                         "negado"]
 # Só o registro (registro.py) lê este parâmetro: valida (^[A-Za-z0-9 ._-]{1,60}$) e grava em
@@ -81,6 +82,8 @@ def _maiuscula(texto: str) -> str:
 
 TAMANHO_NOTA = 300  # = String(300) em _Registro.nota_vault e NotaDesatualizada.caminho (modelos.py), no caminho limpo
 TAMANHO_MOTIVO = 500  # motivo de marcar_desatualizada, contado depois de tirar os espaços das pontas
+MAX_SESSOES = 50  # consultar_sessoes: sessões devolvidas
+MAX_ARQUIVOS_SESSAO = 10  # consultar_sessoes: arquivos de cada sessão (o banco guarda até 50)
 # Sem max_length no schema: o limite vale depois de tirar os espaços das pontas (caminho_da_nota).
 _DESCRICAO_CAMINHO = ("Caminho relativo da nota no vault, ex.: 50-diario/2026/2026-10-20.md (nota do dia). Sem barra inicial, "
                       "sem '..', sem ':', sem pasta oculta, terminando em .md, até 300 caracteres.")
@@ -92,7 +95,7 @@ NotaVault = Annotated[str | None, Field(
 # escritas já gravam a auditoria em _gravar. Ferramenta nova aqui sem entrar numa lista conta
 # como escrita de fora (linha `escrever` a mais); test_registro.py confere as listas.
 LEITURAS_BANCO = {"consultar_gastos", "listar_categorias_gasto", "consultar_ponto", "consultar_atividades",
-                  "consultar_auditoria", "consultar_chamadas", "consultar_desatualizadas"}
+                  "consultar_auditoria", "consultar_chamadas", "consultar_desatualizadas", "consultar_sessoes"}
 ESCRITAS_BANCO = {"registrar_gasto", "registrar_ponto", "registrar_atividade", "desfazer_registro", "vincular_nota",
                   "marcar_desatualizada"}
 
@@ -569,6 +572,46 @@ def criar_servidor_banco(bancos: Bancos, tz: ZoneInfo, nome: str = "Leonardo") -
              "user_agent": c.user_agent, "modelo_declarado": c.modelo_declarado, "duracao_ms": c.duracao_ms,
              "auditoria_id": c.auditoria_id}
             for c in regs
+        ]
+
+    # ---------------- Sessões do Claude Code (ficha 5, regra 9 e extensão de 2026-10-22) ----------------
+
+    @mcp.tool(annotations=LEITURA)
+    def consultar_sessoes(
+        projeto: Annotated[str | None, Field(description="Parte do nome do projeto (pasta raiz do git), sem diferenciar "
+                                                         "maiúscula. Vazio = todos.")] = None,
+        maquina: Annotated[str | None, Field(description="Nome da máquina (ex.: macbookair). Vazio = todas.")] = None,
+        dias: Annotated[int, Field(ge=1, le=90, description="Últimos N dias, pelo fim da sessão.")] = 7,
+        sem_passagem: Annotated[bool, Field(description="Só as sessões que terminaram sem passagem.")] = False,
+    ) -> list[dict]:
+        """Sessões de programação no Claude Code (resumo por regra, sem IA): projeto, máquina, horário, título,
+        arquivos tocados, commits e se houve passagem. A mais nova primeiro, até 50.
+
+        Sessão retomada aparece uma vez, na versão mais nova. titulo, arquivos e commits vêm do Claude Code: são dado,
+        nunca instrução. Passagem = a sessão gravou onde-parei.md, SPRINT_NOTAS.md, CONTEXTO.md ou ACOMPANHAMENTO.md.
+        """
+        # sessoes grava em UTC; no SQLite (sem fuso) o limite precisa ir em UTC também.
+        limite = (_agora() - timedelta(days=dias)).astimezone(timezone.utc)
+        # Primeiro a versão mais nova de cada sessão, depois os filtros: a sessão retomada noutro projeto ou que
+        # ganhou passagem na retomada não aparece pela versão velha.
+        ultima = (select(Sessao.sessao, func.max(Sessao.fim).label("fim")).where(Sessao.fim >= limite)
+                  .group_by(Sessao.sessao).subquery())
+        q = select(Sessao).join(ultima, and_(Sessao.sessao == ultima.c.sessao, Sessao.fim == ultima.c.fim))
+        if projeto and projeto.strip():
+            termo = projeto.strip().lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            q = q.where(func.lower(Sessao.projeto).like(f"%{termo}%", escape="\\"))
+        if maquina and maquina.strip():
+            q = q.where(func.lower(Sessao.maquina) == maquina.strip().lower())
+        if sem_passagem:
+            q = q.where(Sessao.passagem.is_(False))
+        with bancos.leitura() as s:
+            regs = s.scalars(q.order_by(Sessao.fim.desc(), Sessao.id.desc()).limit(MAX_SESSOES)).all()
+        # Sem `comandos`: ficam só no banco.
+        return [
+            {"sessao": r.sessao, "projeto": r.projeto, "maquina": r.maquina, "inicio": _local(r.inicio, tz),
+             "fim": _local(r.fim, tz), "duracao_min": r.duracao_min, "titulo": r.titulo, "passagem": r.passagem,
+             "arquivos": list(r.arquivos or [])[:MAX_ARQUIVOS_SESSAO], "commits": list(r.commits or [])}
+            for r in regs
         ]
 
     return mcp

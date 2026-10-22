@@ -74,12 +74,12 @@ tabela; eu confiro testes e diff antes de seguir. Effort max nunca.
 | 3 | 2b.5 `notas_recentes` + 2b.7 `ler_nota` com `versao` e relacionadas; função única de caminho seguro | B | Sonnet 5.5 | médio | 0 | Feito 2026-10-21 (Sonnet 5.5) |
 | 4 | ⚑ 2b.2 `escrever_nota` com versão + trava do `vault_write_note`; testes de corrida, caminho hostil, link simbólico | A | Opus 5.5 | alto | 3 | Feito 2026-10-21 (Opus 5.5); revisor rodou, correções feitas |
 | 5 | 2b.3 barreira de segredo no middleware + gitleaks no `commit-diario.sh` | A | Opus 5.5 | alto | 4 | Pendente |
-| 6 | 2b.4 commit por escrita, `historico_nota`, `restaurar_nota`; `git` na imagem; `docker build` local | A | Opus 5.5 | alto | 4 | Pendente |
+| 6 | 2b.4 commit por escrita, `historico_nota`, `restaurar_nota`; `git` na imagem; `docker build` local | A | Opus 5.5 | alto | 4 | Feito 2026-10-22 (Opus 5.5); revisor rodou, correções feitas |
 | 7 | 2b.6 `contexto_inicial` com limite | B | Sonnet 5.5 | médio | 3 | Pendente |
 | 8 | 2b.8 migração 0005, `marcar_desatualizada`, `consultar_desatualizadas`, desfazer, lista no lint; teste no Postgres de rascunho | A | Opus 5.5 | alto | 0 | Feito 2026-10-21 (Opus 5.5); revisor rodou, correções feitas |
 | 9 | 2b.11 `sync-conflict` no `lint-diario.sh` + teste em `scripts/testes/` | C | Haiku 5.5 | baixo | 0 | Feito 2026-10-21 (Haiku 5.5) |
 | 10 | ⚑ 2b.9a hooks `SessionEnd`/`SessionStart`, resumo por regra, fila local, aviso; testes com transcript sintético | A | Opus 5.5 | alto | 5 | Feito 2026-10-22 (Opus 5.5); revisor rodou, correções feitas |
-| 11 | ⚑ 2b.9b migração 0006 `sessoes`, `assistente-sessoes importar`, `enviar.sh` por SSH; teste com Postgres de rascunho | A | Opus 5.5 | alto | 8, 10 | Pendente |
+| 11 | ⚑ 2b.9b migração 0006 `sessoes`, `assistente-sessoes importar`, `enviar.sh` por SSH; teste com Postgres de rascunho | A | Opus 5.5 | alto | 8, 10 | Feito 2026-10-22 (Opus 5.5); revisor pendente |
 | 12 | Fechamento: revisor final na branch, `docker build` arm64, docs (`PLANO.md` [x], `CONTEXTO.md`, `README.md`, `docs/IMPLANTACAO.md` com os passos do i7), hooks no Mac (decisão 6), vault (`onde-parei`, nota do plano) | A | Opus 5.5 | alto | todos | Pendente |
 
 Ordem de execução: 0, 1, 3, 9, 8, 2, 4, 5, 6, 7, 10, 11, 12 (o que não depende do anterior vem antes).
@@ -205,3 +205,29 @@ Um bloco por passo, do mais velho para o mais novo: o que fez, verificado, não 
 - Não verificado: Windows/PowerShell; hooks num Claude Code de verdade (fica para o Passo 12).
 - Ficou de fora (decisão do orquestrador, reversível): frase em prosa ("minha senha é X"), `sudo -S`, `gh secret --body`
   e valores com menos de 8 caracteres não são pegos: o risco de falso positivo no vault é maior.
+
+### Passo 6 — 2b.4 commit por escrita, `historico_nota`, `restaurar_nota` (Opus 5.5, 2026-10-21/22)
+
+- Fez: `servidor/assistente/vault_git.py` (git por lista de argumentos, `--literal-pathspecs`, config que executa comando
+  desligada, sem `GIT_*` herdado, `Popen` com SIGTERM antes de SIGKILL, trava com prazo de 30 s); `CommitPorEscrita`
+  (commit só do arquivo, autor `claude-app`, depois das escritas do mcpvault); `escrever_nota` e `restaurar_nota`
+  comitam dentro da ferramenta; foto (autor `vault`) da edição do dono ainda sem commit ANTES de trocar, ou recusa;
+  `historico_nota` com o caminho de cada versão e `restauravel`; `git` na imagem (2.47.3, build arm64 ok);
+  `commit-diario.sh` com as mesmas travas e espera do `index.lock`; lint avisa `index.lock` com mais de 10 min;
+  aviso de uid 1000 em `docs/IMPLANTACAO.md` e no `preparar_host.sh` (aviso, não para).
+- Revisor independente (Opus 5.5): 9 achados, todos corrigidos (restaurar apagava edição do dono do git; timeout
+  deixava `index.lock`; mensagens do restaurar; config do repositório executava comando; uid; caminhos do mcpvault
+  sem commit; histórico × nome antigo; trava sem prazo; texto da Ficha 1 sobre "único desfazer").
+- Verificado: suíte do servidor e testes de shell (`test_commit_diario.sh` novo); os testes novos falham no código antigo.
+- Não verificado: Debian do i7 (SIGTERM, uid, NFD no ext4).
+
+### Passo 11 — 2b.9b tabela `sessoes`, importador, envio e `consultar_sessoes` (Opus 5.5, 2026-10-22)
+
+- Fez: migração `0006` (`sessoes`, só INSERT/SELECT, índice único (sessao, fim)), `python -m assistente.sessoes importar`
+  (JSONL da entrada, validação estrita, 1 linha de auditoria por execução), `ferramentas/sessoes/enviar.py` (SSH +
+  `docker compose exec`, move para `enviadas/` só o aceito ou repetido), exemplo de launchd (não instalado),
+  `consultar_sessoes` no app (extensão da Ficha 5 pelo orquestrador, sem `comandos`).
+- Verificado: 568 passam, 10 pulados sem Postgres; 578 passam com o Postgres de rascunho (GRANT: escrita só INSERT/SELECT,
+  leitura só SELECT; UPDATE/DELETE/TRUNCATE recusados); `ferramentas/sessoes/tests` 264 passam; envio ponta a ponta
+  com o importador real contra SQLite.
+- Não verificado: SSH real e `docker compose exec` no i7; launchd; Windows.
