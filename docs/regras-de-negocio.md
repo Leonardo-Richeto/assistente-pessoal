@@ -353,7 +353,7 @@ O texto do Projeto não roda em `pytest`. O que o teste cobre é o contrato dele
 - **Contexto:** `chamadas` (migração `0003`) recebe uma linha por chamada de ferramenta, inclusive
   leitura. Ela tem só INSERT e SELECT. Não guarda argumento nem conteúdo, só quem chamou, quando,
   com que resultado e quanto demorou.
-- **Conflito com uma regra fixa:** `CLAUDE.md` diz "Nada é apagado". Qualquer prazo que apague o
+- **Conflito com uma regra fixa:** `AGENTS.md` diz "Nada é apagado". Qualquer prazo que apague o
   detalhe abre uma exceção a essa regra. Só o Leonardo decide.
 
 ### Quanto cresce

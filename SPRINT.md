@@ -22,7 +22,7 @@ passar para o i7 dedicado.
 2. `README.md`: arquitetura e princípios.
 3. `PLANO.md`: fases e tarefas do produto.
 4. `docs/IMPLANTACAO.md`: Etapa A (MacBook) e Etapa B (i7), com `[x]`.
-5. `CLAUDE.md`: regras de código que não se negociam.
+5. `AGENTS.md`: regras de código que não se negociam.
 
 Se este arquivo divergir de uma fonte acima, vale a fonte. Corrija este arquivo.
 
@@ -115,7 +115,7 @@ Code, na pasta do projeto, com o modelo e o effort da tabela. Troque só o núme
 do passo. O detalhe do passo vem de `SPRINT_NOTAS.md` § Prompt do próximo passo.
 
 ```
-Leia SPRINT.md e SPRINT_NOTAS.md na raiz, depois CONTEXTO.md, CLAUDE.md e
+Leia SPRINT.md e SPRINT_NOTAS.md na raiz, depois CONTEXTO.md, AGENTS.md e
 docs/IMPLANTACAO.md. Execute só o Passo N da Sprint 1.
 Confira se você está no tier do passo; se estiver abaixo, pare e avise.
 Anote em SPRINT_NOTAS.md durante a sessão. Ao terminar: testes passando,

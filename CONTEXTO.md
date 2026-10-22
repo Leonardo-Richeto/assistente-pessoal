@@ -5,7 +5,7 @@ sessão) **lê este arquivo primeiro** e, ao terminar, **atualiza** as seções 
 prompt para a próxima etapa. Ver "Regra de passagem" no fim.
 
 Leitura complementar: `README.md` (arquitetura e princípios), `PLANO.md` (fases e tarefas),
-`docs/IMPLANTACAO.md` (teste no MacBook → produção no i7), `CLAUDE.md` (regras de código).
+`docs/IMPLANTACAO.md` (teste no MacBook → produção no i7), `AGENTS.md` (regras de código).
 
 ---
 
@@ -196,7 +196,7 @@ Enquanto houver sprint aberta, o prompt de abertura e o passo atual ficam em `SP
 sintéticos.** Modelo: Opus 5.5, effort alto (toca schema e dado). Prompt:
 
 ```
-Leia CONTEXTO.md (entrada de 2026-10-19), CLAUDE.md, README.md, docs/MIGRACAO.md e PLANO.md.
+Leia CONTEXTO.md (entrada de 2026-10-19), AGENTS.md, README.md, docs/MIGRACAO.md e PLANO.md.
 Máquina: PC Windows do trabalho (domínio corporativo), Docker Desktop + Git Bash. Regras desta máquina:
 só dados sintéticos; nenhuma credencial real (Google, Pluggy, Tailscale); nada de Tailscale/Funnel nem
 porta exposta além de 127.0.0.1; ASSISTENTE_HOME numa pasta de teste fora do repositório.

@@ -4,7 +4,7 @@ Cada tarefa é pequena e tem critério de pronto, para ser executada uma por vez
 Claude Code com **Sonnet**. Use **Opus** só nas tarefas marcadas ⚑ (decisão de arquitetura)
 ou quando o Sonnet travar. Ao terminar uma tarefa: testes passando, commit, marque `[x]`.
 
-Convenções do código estão em `CLAUDE.md`. Estado e histórico do processo em `CONTEXTO.md`.
+Convenções do código estão em `AGENTS.md`. Estado e histórico do processo em `CONTEXTO.md`.
 A sequência de **teste no MacBook → produção no i7** está em `docs/IMPLANTACAO.md`.
 
 ---
@@ -53,6 +53,53 @@ cifrado e migração pelo mesmo pacote (Fase 7, `docs/MIGRACAO.md`).
 - [ ] 2.2b Levar para o vault a "Regra de passagem" (`CONTEXTO.md`) e a nota de inventário das máquinas
 - [ ] 2.3 Job diário de commit do vault (`git add -A && git commit`) para ter histórico de tudo que a IA escrever
 - [ ] ⚑ 2.4 Definir o envio de arquivos para o servidor (pasta "consumir" do Paperless sincronizada pelo Syncthing é o caminho mais simples)
+
+## Fase 2b — Vault inteligente (ideias do ai-memory, Leonardo, 2026-10-21)
+Vieram do estudo do vault com o [ai-memory](https://github.com/akitaonrails/ai-memory) em 2026-10-21; o porquê
+está em `60-planos/metas/memoria-automatica-e-busca-no-vault.md` do vault. **Fronteira** (D5 de `decisoes-do-vault`):
+o vault guarda o curado; sessões, chamadas e capturas automáticas ficam no banco e nunca viram nota sozinhas.
+O código que lê o vault mora neste repo, nunca no vault: o servidor não executa arquivo que a IA ou o Syncthing
+podem escrever. Itens que mudam o que o Claude do app faz (2b.2, 2b.6, 2b.7, 2b.8, 2b.9) precisam de ficha
+"proposta" antes do código. 2b.1 e 2b.10 podem começar no Mac, antes do i7.
+
+**Prioridade 1: alto valor, baixo custo**
+- [ ] 2b.1 `buscar_vault(texto, tipo?, status?)`: busca full-text (SQLite FTS5 em memória ou Postgres) com peso no
+  título, nome do arquivo, tags e resumo `>`, sem acento obrigatório; devolve caminho, título e resumo das 5 melhores.
+  Complementa `vault_search_notes`, que só acha a palavra exata. Prova de 2026-10-21: 123 notas em 48 ms
+  - Pronto quando: o conjunto do 2b.10 roda e o resultado está anotado aqui
+- [ ] ⚑ 2b.2 Escrita com conferência de versão: escrever no vault exige o hash do conteúdo lido e recusa se a nota
+  mudou desde a leitura (edição pelo Syncthing no meio); `vault_write_note` sem `mode` deixa de aparecer
+- [ ] 2b.3 Barreira de segredo: antes de gravar no vault ou no banco, padrões do gitleaks recusam token, chave e
+  senha; a referência `{{segredo:NOME}}` passa. O valor fica no Vaultwarden, fora do vault, e o servidor nunca o
+  resolve (resolvido, iria para o contexto do modelo). O `commit-diario.sh` roda o gitleaks antes do commit
+- [ ] ⚑ 2b.3a Vaultwarden no i7 (Leonardo, 2026-10-21), em Docker Compose próprio, guarda os valores do 2b.3.
+  Proposta: acesso só pela Tailscale, sem Funnel. Os dados dele entram no backup cifrado da Fase 7 (`exportar.sh`)
+  - Pronto quando: o backup da Fase 7 leva o volume do Vaultwarden para fora do SSD do i7 e a restauração foi testada, antes do primeiro segredo
+- [ ] 2b.4 Commit por escrita: depois de cada escrita da IA, commit só do arquivo escrito, autor `claude-app`; o
+  commit diário (2.3) fica para as edições do Leonardo. Ferramentas `historico_nota(caminho)` e
+  `restaurar_nota(caminho, versao)`; depois, rever o bloqueio de `vault_move_note` e `vault_move_file`
+- [ ] 2b.5 `notas_recentes(n)`, pelo campo `atualizado`
+
+**Prioridade 2: depende do i7 no ar**
+- [ ] 2b.6 `contexto_inicial()`: resumo do perfil, `onde-parei.md`, nota do dia e pendências numa chamada só, com
+  limite de caracteres (hoje são 4 a 6 chamadas no começo da conversa)
+- [ ] 2b.7 `ler_nota(caminho, relacionadas=true)`: devolve também links e backlinks a um salto, só com o resumo
+- [ ] 2b.8 `marcar_desatualizada(caminho, motivo)`: grava no banco; o lint diário (M3) lista as notas marcadas
+- [ ] ⚑ 2b.9 Captura das sessões do Claude Code: hook `SessionEnd` resume o transcript por regra (título, arquivos,
+  comandos, commits, duração), fila local por máquina com chave contra duplicata, envio pela Tailscale com token de
+  máquina para uma tabela de sessões; hook `SessionStart` avisa quando a sessão anterior do projeto terminou sem
+  passagem. Ficha: o que a tabela guarda e por quanto tempo
+- [ ] 2b.10 Teste da busca: 20 a 30 perguntas, cada uma com a nota esperada; mede quantas vezes ela vem entre as 5
+  primeiras; roda a cada mudança no ranking
+- [ ] 2b.11 O lint avisa quando aparece arquivo `*.sync-conflict-*` no vault
+
+**Prioridade 3: só se a necessidade aparecer**
+- 2b.12 Busca por significado (pgvector com modelo local multilíngue), quando a busca por palavra errar com frequência
+- 2b.13 Reordenar resultados com o Jev como juiz (o ai-memory tem adaptador: `docs/jev-reranker-adapter.md`)
+- 2b.14 Fila de propostas de mudança em nota de regra ou decisão, aprovadas pelo Leonardo; a mesma fila da Fase 6b
+
+Fora, decidido no estudo: decaimento, compactação e deduplicação de nota; consolidação por LLM; handoff entre
+agentes e multiusuário; relações tipadas; consulta por data (o git já responde).
 
 ## Fase 3 — Workers (ingestão)
 - [ ] 3.1 Pacote `servidor/assistente/workers/` + serviço `workers` no compose rodando APScheduler; worker usa a conexão de **escrita** e grava auditoria com `autor="worker:<nome>"`
@@ -104,7 +151,7 @@ no i7 (B11 da Sprint 2 e 6.1). Antes de implementar: ficha "proposta" em `docs/r
   `aprovado`, `recusado`, `no_ar`)
 - [ ] ⚑ 6b.3 Construtor no i7: Claude Code headless pega o pedido e escreve ficha proposta, código e testes num
   branch próprio, num container sem o `.env` de produção e sem rede além do necessário
-- [ ] ⚑ 6b.4 Revisor independente automático no branch (regras do `CLAUDE.md`: sem SQL livre, escrita auditada,
+- [ ] ⚑ 6b.4 Revisor independente automático no branch (regras do `AGENTS.md`: sem SQL livre, escrita auditada,
   classificação leitura/escrita, `PERMITIDAS`) e testes passando; reprovado volta ao construtor ou vira `recusado`
 - [ ] ⚑ 6b.5 Aprovação do Leonardo: resumo com a ficha, o diff e o parecer do revisor (pelo app; depois da Fase 6,
   pelo WhatsApp); só o sim dele libera
