@@ -4,9 +4,11 @@ Antes de uma escrita no vault ou no banco, percorre os argumentos (textos, chave
 listas) com `segredos.achar_segredo`. Achou: recusa a chamada inteira, sem chamar a ferramenta e sem redigir
 (redigir mudaria o texto do dono sem ele ver). `{{segredo:NOME}}` passa; o servidor nunca a resolve.
 
+Falha fechado: vigia toda ferramenta que NÃO é leitura conhecida (nome novo de uma peça, escrita nova do banco),
+menos as do Paperless (`paperless_*`): a Ficha 5 fala de vault e banco, e o Paperless guarda documento (o OCR de um
+extrato tem número de conta e o upload é binário).
+
 Nunca põe o valor achado na mensagem, no log nem no banco: só o tipo (`aws`, `bearer`...).
-Paperless fica de fora: a Ficha 5 fala de vault e banco, e o Paperless guarda documento (o OCR de um extrato tem
-número de conta e o upload é binário).
 """
 
 import logging
@@ -24,7 +26,7 @@ log = logging.getLogger(__name__)
 # Limites da conferência: passou, recusa (falha fechado), porque o que não foi conferido pode ter segredo.
 PROFUNDIDADE_MAXIMA = 20
 ITENS_MAXIMOS = 10_000
-CARACTERES_MAXIMOS = 1_000_000  # 5 vezes o limite de escrever_nota; ~3 s no pior texto hostil
+CARACTERES_MAXIMOS = 400_000  # 2 vezes o limite de escrever_nota; cada padrão é linear (test_cada_padrao_e_linear)
 # Nome com hash que o FastMCP 4.1.0 dá às ferramentas de peça (`<hash12>_vault_write_note`) também conta.
 _PREFIXO_HASH = re.compile(r"[0-9a-f]{12}_")
 
@@ -41,8 +43,16 @@ class GrandeDemais(Exception):
     """Os argumentos passam dos limites da conferência."""
 
 
-def _textos(valor, profundidade: int = 0, conta: list[int] | None = None):
-    """Cada texto a conferir: strings soltas, e `chave: valor` de cada par de dict (como fica no frontmatter)."""
+def _escalar(item) -> bool:
+    return isinstance(item, (str, int, float)) and not isinstance(item, bool)
+
+
+def _textos(valor, profundidade: int = 0, conta: list[int] | None = None, pai: str | None = None):
+    """Cada texto a conferir: strings soltas, e `chave: valor` de cada par de dict (como fica no frontmatter).
+
+    Item de lista e valor de dict aninhado levam a chave do pai na frente (`password: [X]` vira `password: X`;
+    `api_key: {v: X}` vira `v: X` e `api_key: X`): sem a chave, `X` sozinho não tem cara de segredo.
+    """
     conta = conta if conta is not None else [0, 0]  # [itens, caracteres]
     if profundidade > PROFUNDIDADE_MAXIMA:
         raise GrandeDemais
@@ -54,19 +64,24 @@ def _textos(valor, profundidade: int = 0, conta: list[int] | None = None):
             raise GrandeDemais
         return texto
 
-    if isinstance(valor, str):
-        yield _contar(valor)
+    if _escalar(valor):
+        if pai is not None:
+            yield _contar(f"{pai}: {valor}")
+        elif isinstance(valor, str):
+            yield _contar(valor)
     elif isinstance(valor, dict):
         for chave, item in valor.items():
-            if isinstance(item, (str, int, float)) and not isinstance(item, bool):
+            if _escalar(item):
                 # Como fica no frontmatter: `password: Abc123...` só tem cara de segredo com a chave junto.
                 yield _contar(f"{chave}: {item}")
+                if pai is not None:
+                    yield _contar(f"{pai}: {item}")
             else:
                 yield _contar(str(chave))
-                yield from _textos(item, profundidade + 1, conta)
+                yield from _textos(item, profundidade + 1, conta, str(chave))
     elif isinstance(valor, (list, tuple)):
         for item in valor:
-            yield from _textos(item, profundidade + 1, conta)
+            yield from _textos(item, profundidade + 1, conta, pai)
 
 
 def segredo_nos_argumentos(argumentos) -> str | None:
@@ -82,16 +97,20 @@ class BarreiraSegredo(Middleware):
 
     Registrada em criar_app logo depois do RegistroChamadas: a recusa aparece em `chamadas` como `erro` e, nas
     escritas do vault, também em `auditoria` (`escrever` e `erro`, só com o caminho).
+    `leituras`: as leituras conhecidas (não vigiadas). Todo o resto é vigiado, menos `paperless_*`.
     """
 
-    def __init__(self, escritas: Iterable[str]):
-        self._escritas = frozenset(escritas)
+    def __init__(self, leituras: Iterable[str]):
+        self._leituras = frozenset(leituras)
 
     def _vigia(self, nome) -> bool:
         if not isinstance(nome, str):
+            return True  # falha fechado
+        base = nome[13:] if _PREFIXO_HASH.match(nome) is not None else nome
+        if nome in self._leituras or base in self._leituras:
             return False
-        return nome in self._escritas or (
-            _PREFIXO_HASH.match(nome) is not None and nome[13:] in self._escritas)
+        # Paperless fica de fora por decisão (Ficha 5 fala de vault e banco; documento tem número de conta).
+        return not (nome.startswith("paperless_") or base.startswith("paperless_"))
 
     async def on_call_tool(self, context, call_next):
         nome = context.message.name

@@ -7,6 +7,7 @@
 # O relatório fica FORA do vault, para não virar nota nem entrar no commit diário.
 # Arquivo de conflito do Syncthing (*.sync-conflict-*) vira seção de AVISO no relatório; não muda o código.
 # .git/index.lock com mais de 10 minutos também vira AVISO (o git morreu no meio e travou os commits).
+# Último commit diário (autor "Vault (commit diário)") com mais de 2 dias também vira AVISO.
 # As notas marcadas como desatualizadas no banco viram seção de AVISO, lidas de $LINT_DIR/marcas.md, que o
 # vault-marcas.service (marcas-desatualizadas.sh, 03:35) grava. O lint não chama docker: o código dele vem do
 # vault, e o usuário dele não deve estar no grupo docker.
@@ -71,6 +72,21 @@ if [ -e "$LOCK" ] && [ -n "$(find "$LOCK" -mmin +10 2>/dev/null)" ]; then
     echo "AVISO: .git/index.lock existe há mais de 10 minutos; nenhum commit do vault sai. Se nenhum git estiver"
     echo "rodando (pgrep -a git), apague $LOCK."
   } >>"$LINT_DIR/ultimo.md.parcial"
+fi
+# Commit diário parado (gitleaks achando segredo, docker fora, timer desligado): aviso, não erro. Sem repositório git
+# ou sem nenhum commit diário ainda, não diz nada. Nenhuma config do repositório roda comando aqui.
+AUTOR_DIARIO="Vault (commit diário)"  # o mesmo do commit-diario.sh
+ULTIMO_DIARIO="$(GIT_CONFIG_NOSYSTEM=1 git -C "$VAULT_PATH" -c safe.directory="$VAULT_PATH" -c core.hooksPath=/dev/null \
+  -c core.fsmonitor=false -c log.showSignature=false --no-pager log -1 -F --author="$AUTOR_DIARIO" --format=%ct HEAD \
+  2>/dev/null)"
+if [ -n "$ULTIMO_DIARIO" ] && [ "$ULTIMO_DIARIO" -eq "$ULTIMO_DIARIO" ] 2>/dev/null; then
+  DIAS=$(( ($(date +%s) - ULTIMO_DIARIO) / 86400 ))
+  if [ $(( $(date +%s) - ULTIMO_DIARIO )) -gt $((2 * 86400)) ]; then
+    {
+      echo ""
+      echo "AVISO: último commit diário há $DIAS dias. Veja journalctl -u vault-commit.service (gitleaks, docker, timer)."
+    } >>"$LINT_DIR/ultimo.md.parcial"
+  fi
 fi
 mv "$LINT_DIR/ultimo.md.parcial" "$LINT_DIR/ultimo.md"
 log "$(sed -n 3p "$LINT_DIR/ultimo.md") Relatório: $LINT_DIR/ultimo.md"

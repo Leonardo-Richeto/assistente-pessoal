@@ -1,0 +1,8 @@
+# Config do gitleaks do commit diário do vault (deploy/vault/commit-diario.sh).
+# Vem do repositório do app e entra no container só leitura com `--config`: um `.gitleaks.toml` na raiz do vault
+# (que o Syncthing traz de qualquer aparelho) não vale, e o script recusa o commit se ele existir.
+# Só as regras padrão da versão fixada da imagem; nenhuma exceção (allowlist) aqui.
+title = "assistente-pessoal: vault"
+
+[extend]
+useDefault = true

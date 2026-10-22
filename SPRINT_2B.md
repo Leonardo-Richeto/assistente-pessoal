@@ -73,7 +73,7 @@ tabela; eu confiro testes e diff antes de seguir. Effort max nunca.
 | 2 | 2b.10 medida: executor + 25 perguntas no vault (decisão 4); rodar, ajustar pesos, anotar no `PLANO.md` | B | Sonnet 5.5 | médio | 1 | Feito 2026-10-21 (Sonnet 5.5) |
 | 3 | 2b.5 `notas_recentes` + 2b.7 `ler_nota` com `versao` e relacionadas; função única de caminho seguro | B | Sonnet 5.5 | médio | 0 | Feito 2026-10-21 (Sonnet 5.5) |
 | 4 | ⚑ 2b.2 `escrever_nota` com versão + trava do `vault_write_note`; testes de corrida, caminho hostil, link simbólico | A | Opus 5.5 | alto | 3 | Feito 2026-10-21 (Opus 5.5); revisor rodou, correções feitas |
-| 5 | 2b.3 barreira de segredo no middleware + gitleaks no `commit-diario.sh` | A | Opus 5.5 | alto | 4 | Feito 2026-10-22 (Opus 5.5); revisor pendente |
+| 5 | 2b.3 barreira de segredo no middleware + gitleaks no `commit-diario.sh` | A | Opus 5.5 | alto | 4 | Feito 2026-10-22 (Opus 5.5); revisor rodou, correções feitas |
 | 6 | 2b.4 commit por escrita, `historico_nota`, `restaurar_nota`; `git` na imagem; `docker build` local | A | Opus 5.5 | alto | 4 | Feito 2026-10-22 (Opus 5.5); revisor rodou, correções feitas |
 | 7 | 2b.6 `contexto_inicial` com limite | B | Sonnet 5.5 | médio | 3 | Feito 2026-10-22 (Sonnet 5.5) |
 | 8 | 2b.8 migração 0005, `marcar_desatualizada`, `consultar_desatualizadas`, desfazer, lista no lint; teste no Postgres de rascunho | A | Opus 5.5 | alto | 0 | Feito 2026-10-21 (Opus 5.5); revisor rodou, correções feitas |
@@ -260,4 +260,23 @@ Um bloco por passo, do mais velho para o mais novo: o que fez, verificado, não 
   Ficha 1 e PLANO (2b.5, 2b.6, 2b.7 `[x]`).
 - Verificado: 636 passam, 10 pulados; no vault real (só leitura), 3.268 caracteres, só o "trabalho em andamento" cortado.
 
-### Revisor do Passo 5 (Opus 5.5, 2026-10-22): 11 achados, correção em andamento
+### Revisor do Passo 5 (Opus 5.5, 2026-10-22): 11 achados, todos corrigidos
+
+- gitleaks não desliga mais por link simbólico (`--config` do repositório); os commits por escrita e fotos são varridos
+  desde a última varredura limpa e o push só sai se ela estiver limpa; senha em texto comum ("A senha do banco é X",
+  negrito, tabela, frontmatter aninhado) é pega; padrões lineares (1 milhão de caracteres hostis: pior 0,14 s, antes
+  5,98 s); config do repositório não roda comando no commit diário (`.gitattributes` com filter/diff/binary recusa o dia);
+  `timeout` no gitleaks e `TimeoutStartSec=30min`; achado tira só o arquivo do stage; lint avisa commit diário parado há
+  2+ dias; falsos positivos corrigidos; barreira vigia tudo que não é leitura conhecida (menos `paperless_*`); caminho
+  com segredo na auditoria vira só `[segredo:<tipo>]`; relatório do gitleaks só com arquivo, regra, linha e commit.
+- Decidido pelo orquestrador: push do vault só por SSH (deploy key, como `docs/SYNCTHING.md` já manda).
+- Verificado: 680 passam, 10 pulados; `ferramentas/sessoes/tests` 406; testes de shell ok (com a imagem real do
+  gitleaks também); varredura do vault real: 133 arquivos, 0 achados.
+- Pendência no i7: `.obsidian/plugins/*/data.json` no `.gitignore` do vault e a unit `vault-commit.service` nova.
+
+### Extra — verificação de saúde cobre a Fase 2b (Sonnet 5.5, 2026-10-22)
+
+- Ideia do `doctor` do ai-memory: `python -m assistente.verificacao` confere a migração do banco contra a cabeça do
+  código, a leitura de `notas_desatualizadas` e `sessoes`, e o vault (notas indexadas e tempo, `.git` gravável,
+  `index.lock` velho, `.gitattributes` com filtro); `--sem-banco` roda só a parte do vault.
+- Verificado: 25 testes; no vault real (só leitura): "114 notas indexadas em 37 ms", ".git gravável".

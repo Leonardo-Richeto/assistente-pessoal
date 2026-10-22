@@ -12,4 +12,6 @@ User=<usuario>
 EnvironmentFile=-/etc/default/vault-commit
 Environment=VAULT_PATH=/srv/assistente/vault
 ExecStart=/bin/bash /srv/assistente/app/deploy/vault/commit-diario.sh
-# Push precisa de credencial do usuario (chave SSH ou token) no git do proprio usuario.
+# Duas varreduras do gitleaks de ate 15 min cada (GITLEAKS_TIMEOUT); depois disso o systemd para o servico.
+TimeoutStartSec=30min
+# Push precisa da chave SSH de deploy do usuario (o script so aceita ssh no push; https e pasta local nao).

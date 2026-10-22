@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Teste dos avisos do lint diário (conflito do Syncthing, index.lock esquecido), com um lint falso (sem vault real).
+# Teste dos avisos do lint diário (conflito do Syncthing, index.lock esquecido, commit diário parado), com um lint
+# falso (sem vault real).
 #   bash scripts/testes/test_lint_conflitos.sh
 set -u
 
@@ -81,6 +82,37 @@ if [ "$codigo" -eq 0 ] && ! grep -q "index.lock" "$RAIZ/logs-locknovo/ultimo.md"
   echo "ok index.lock recente: sem aviso"
 else
   echo "FALHOU: index.lock recente gerou aviso (código $codigo)"; falhas=$((falhas + 1))
+fi
+
+# (f) último commit diário (autor "Vault (commit diário)") há 5 dias: AVISO com os dias, código 0.
+# (g) commit diário de hoje, ou repositório sem commit diário: sem aviso.
+commit_diario() {  # <vault> <data ISO>
+  git -C "$1" -c init.defaultBranch=main init -q 2>/dev/null
+  echo "$2" >>"$1/00-inbox/dia.md"
+  git -C "$1" add -A
+  GIT_AUTHOR_DATE="$2" GIT_COMMITTER_DATE="$2" GIT_CONFIG_GLOBAL=/dev/null git -C "$1" -c user.name="Vault (commit diário)" \
+    -c user.email=vault@localhost -c commit.gpgsign=false commit -q -m "vault: $2"
+}
+v="$(novo_vault diario-velho)"
+commit_diario "$v" "$(python3 -c 'import datetime as d; print((d.datetime.now() - d.timedelta(days=5, hours=1)).isoformat(timespec="seconds"))')"
+codigo="$(rodar diario-velho)"
+if [ "$codigo" -eq 0 ] && grep -qF "AVISO: último commit diário há 5 dias." "$RAIZ/logs-diario-velho/ultimo.md"; then
+  echo "ok commit diário velho: aviso com os dias e código 0"
+else
+  echo "FALHOU: commit diário velho, código $codigo ou aviso ausente"; falhas=$((falhas + 1))
+fi
+v="$(novo_vault diario-novo)"
+commit_diario "$v" "$(python3 -c 'import datetime as d; print(d.datetime.now().isoformat(timespec="seconds"))')"
+GIT_CONFIG_GLOBAL=/dev/null git -C "$v" -c user.name=claude-app -c user.email=c@l -c commit.gpgsign=false \
+  commit -q --allow-empty -m "escrita da IA"
+codigo="$(rodar diario-novo)"
+v="$(novo_vault sem-git)"
+codigo2="$(rodar sem-git)"
+if [ "$codigo" -eq 0 ] && ! grep -q "commit diário" "$RAIZ/logs-diario-novo/ultimo.md" \
+  && [ "$codigo2" -eq 0 ] && ! grep -q "commit diário" "$RAIZ/logs-sem-git/ultimo.md"; then
+  echo "ok commit diário recente ou sem git: sem aviso"
+else
+  echo "FALHOU: aviso de commit diário indevido (códigos $codigo e $codigo2)"; falhas=$((falhas + 1))
 fi
 
 [ "$falhas" -eq 0 ] && echo "test_lint_conflitos: ok" || { echo "test_lint_conflitos: $falhas falha(s)"; exit 1; }

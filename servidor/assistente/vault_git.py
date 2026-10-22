@@ -5,7 +5,9 @@ Só chama o `git` do sistema por subprocess, com lista de argumentos (nunca shel
 (`*` e `[` no nome não viram padrão). Nenhuma config do repositório, do usuário ou do sistema pode rodar comando:
 sem ganchos, sem fsmonitor, sem diff externo nem textconv, sem ssh, config global e de sistema desligadas, e caminho
 com `filter` no .gitattributes não é comitado. Nada daqui grava conteúdo de nota em log ou mensagem.
-Arquivo com cara de segredo (segredos.achar_segredo) não é comitado nem vira foto (Ficha 5, regra 5).
+Arquivo com cara de segredo (segredos.achar_segredo) não é comitado nem vira foto (Ficha 5, regra 5). Arquivo com mais
+de LIMITE_CONFERIR bytes não é conferido (travaria a thread): fica sem commit (o commit diário e o gitleaks levam) e não
+vira foto (a escrita da IA é recusada).
 O repositório só conta se o `.git` está na raiz do vault: um vault dentro de outro repositório não é comitado.
 Funções síncronas: quem chama do servidor roda numa thread (anyio.to_thread ou ferramenta síncrona do FastMCP).
 """
@@ -44,6 +46,9 @@ TAMANHO_ID = 12
 FUSO = ZoneInfo("America/Sao_Paulo")
 # Bytes de uma versão antiga lidos no máximo (o limite de escrita é em caracteres; UTF-8 tem até 4 bytes cada).
 LIMITE_BYTES = 4 * 200_000
+# Bytes conferidos antes de comitar ou fotografar; maior que isso, não conferimos (nem comitamos).
+LIMITE_CONFERIR = 1_000_000
+GRANDE_DEMAIS = "grande_demais"  # situação de _commitar: o arquivo passa de LIMITE_CONFERIR
 _SEPARA_CAMPO, _SEPARA_LINHA = "\x1f", "\x1e"
 # Config que, vinda do repositório, rodaria comando ou abriria rede. `-c` na linha de comando vence a do repositório.
 CONFIG_SEGURA = (
@@ -207,26 +212,38 @@ def _tentar_commit(raiz_real: Path, caminho: str, mensagem: str,
     return "ok", r
 
 
+class GrandeDemais(Exception):
+    """O arquivo passa de LIMITE_CONFERIR bytes: não dá para conferir se tem segredo."""
+
+
 def _segredo_no_arquivo(raiz_real: Path, caminho: str) -> str | None:
     """Tipo do segredo no arquivo do disco (os bytes que o `git add` levaria), ou None. Arquivo que sumiu: None.
 
-    Lê o arquivo de verdade (link simbólico: o alvo, que é o que o Obsidian mostra). ErroGit se não dá para ler.
+    Lê o arquivo de verdade (link simbólico: o alvo, que é o que o Obsidian mostra), no máximo LIMITE_CONFERIR bytes:
+    passou, GrandeDemais. ErroGit se não dá para ler.
     """
     try:
-        dados = (raiz_real / caminho).read_bytes()
+        with open(raiz_real / caminho, "rb") as f:
+            dados = f.read(LIMITE_CONFERIR + 1)
     except FileNotFoundError:
         return None
     except OSError as e:
         raise ErroGit(f"não consegui ler o arquivo para conferir segredo ({type(e).__name__})") from None
+    if len(dados) > LIMITE_CONFERIR:
+        raise GrandeDemais
     return achar_segredo(dados.decode("utf-8", errors="replace"))
 
 
 def _commitar(raiz_real: Path, caminho: str, mensagem: str, autor: tuple[str, str]) -> tuple[str, str]:
     """Commit só de `caminho`, com as esperas do index.lock. Chame com a trava.
 
-    ('ok'|'nada'|'filtro'|'segredo'|'falhou', motivo). Com 'segredo', o motivo é o tipo, nunca o valor.
+    ('ok'|'nada'|'filtro'|'segredo'|GRANDE_DEMAIS|'falhou', motivo). Com 'segredo', o motivo é o tipo, nunca o valor.
     """
-    if (tipo := _segredo_no_arquivo(raiz_real, caminho)) is not None:
+    try:
+        tipo = _segredo_no_arquivo(raiz_real, caminho)
+    except GrandeDemais:
+        return GRANDE_DEMAIS, f"o arquivo passa de {LIMITE_CONFERIR} bytes e não dá para conferir segredo"
+    if tipo is not None:
         return "segredo", tipo
     if _filtro(raiz_real, caminho) is not None:
         return "filtro", "o .gitattributes põe filter neste caminho e o filtro rodaria comando"
@@ -245,7 +262,8 @@ def commitar(raiz: Path | str, caminho_relativo: str, mensagem: str) -> bool:
     """Comita só `caminho_relativo` (relativo à raiz do vault), autor claude-app. True se criou commit.
 
     Nunca levanta exceção: a escrita já valeu. Sem `.git` na raiz: DEBUG. Nada a comitar: não é erro.
-    Arquivo com cara de segredo: não comita (WARNING sem o valor); o commit diário e o gitleaks decidem depois.
+    Arquivo com cara de segredo, ou maior que LIMITE_CONFERIR: não comita (WARNING sem o valor); o commit diário e o
+    gitleaks decidem depois.
     Falha (git ausente, timeout, index.lock ocupado depois das esperas, trava ocupada, filtro, dono do repositório):
     WARNING sem conteúdo; o commit diário leva a mudança.
     """
@@ -268,6 +286,10 @@ def commitar(raiz: Path | str, caminho_relativo: str, mensagem: str) -> bool:
         return False
     if situacao == "segredo":
         log.warning("Escrita de %s ficou sem commit: o arquivo tem algo com cara de segredo.", caminho_relativo)
+        return False
+    if situacao == GRANDE_DEMAIS:
+        log.warning("Escrita de %s ficou sem commit: o arquivo passa de %d bytes e não dá para conferir segredo.",
+                    caminho_relativo, LIMITE_CONFERIR)
         return False
     log.warning("Commit do vault falhou em %s (%s); a escrita vale", caminho_relativo, motivo)
     return False
@@ -325,6 +347,7 @@ def foto(raiz: Path | str, caminho_relativo: str, ferramenta: str) -> bool:
     True se criou o commit da foto. Sem `.git` na raiz, ou nada a guardar: False.
     FotoFalhou se o vault tem `.git` e a foto não sai (git falhou, trava ocupada, filtro, index.lock preso);
     FotoComSegredo (uma FotoFalhou) se a nota tem algo com cara de segredo: não guarda isso no histórico.
+    Nota maior que LIMITE_CONFERIR: FotoFalhou (não dá para conferir; a escrita da IA não segue).
     """
     mensagem = f"vault: estado antes de {ferramenta} {caminho_relativo}"
     try:

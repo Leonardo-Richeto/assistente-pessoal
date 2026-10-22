@@ -45,7 +45,7 @@ def test_arquivos_relativos_sem_repetir_e_sem_leitura(transcript, projeto, estad
 def test_comandos_com_segredo_tirado(transcript, projeto, estado):
     comandos = _resumir(transcript, projeto)["comandos"]
     texto = "\n".join(comandos)
-    for vazado in ("AKIAIOSFODNN7EXAMPLE", "senha@", "abc123456789"):
+    for vazado in ("AKIAIOSFODNN7EXAMPLE", "S3nhaF0rte", "abc123456789"):
         assert vazado not in texto
     assert "[segredo:aws]" in comandos[0]
     assert "[segredo:url_com_senha]" in comandos[1]

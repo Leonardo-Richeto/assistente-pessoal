@@ -182,9 +182,10 @@ def criar_app(cfg: Config | None = None) -> FastMCP:
     #   RegistroChamadas → BarreiraSegredo → TravaEscritaVault → CommitPorEscrita → ferramenta.
     # Toda recusa de dentro aparece no registro (`chamadas` com `erro`; nas escritas do vault, também `escrever` e
     # `erro` em `auditoria`), e nada é escrito antes da barreira e da trava (nem a foto do CommitPorEscrita).
-    # Barreira de segredo (Ficha 5, regra 5): escritas do banco, as nossas do vault e as do mcpvault. Paperless fica
-    # de fora (a regra fala de vault e banco; documento tem número de conta e upload é binário).
-    app.add_middleware(BarreiraSegredo(ESCRITAS_BANCO | ESCRITAS_VAULT | ESCRITAS_PECAS_VAULT))
+    # Barreira de segredo (Ficha 5, regra 5): falha fechado, vigia tudo que não está nas leituras conhecidas (escritas
+    # do banco, as nossas do vault, as do mcpvault e qualquer nome novo). Paperless (`paperless_*`) fica de fora (a
+    # regra fala de vault e banco; documento tem número de conta e upload é binário).
+    app.add_middleware(BarreiraSegredo(LEITURAS_PECAS | LEITURAS_BANCO | LEITURAS_VAULT))
     # vault_write_note sem mode append/prepend é recusada antes da peça.
     app.add_middleware(TravaEscritaVault())
     # Mais por dentro ainda: antes de uma escrita do mcpvault, foto da nota se o dono a mudou sem commit (sem a

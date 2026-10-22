@@ -741,3 +741,4 @@ Correções do revisor do Passo 6 (2026-10-21): foto antes de trocar, git sem co
 restaurar, histórico com o caminho de cada versão.
 Correções do revisor do Passo 11 (2026-10-22): chave SSH restrita, texto_de_fora, recusadas/, envio sem corrida, limites
 da consulta, enviadas/ sem sobrescrever, maquina validada.
+Correções do revisor do Passo 5 (2026-10-22): gitleaks sem desligar por link e varrendo os commits por escrita antes do push, senha em texto comum, sem travar o servidor, menos falso positivo, barreira falha fechado.

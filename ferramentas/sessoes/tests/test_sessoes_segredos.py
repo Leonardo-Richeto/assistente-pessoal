@@ -28,7 +28,7 @@ POSITIVOS = [
     ("xapp-1-A0123456789-abcdef", "slack"),
     ("eyJhbGciOiJIUzI1NiJ9xx.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c", "jwt"),
     ("-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXk\n-----END OPENSSH PRIVATE KEY-----", "chave_privada"),
-    ("postgres://u:senha@h/banco", "url_com_senha"),
+    ("postgres://u:S3nhaF0rte@h/banco", "url_com_senha"),
     ("export DB_PASSWORD=hunter2222", "variavel_segredo"),
     ("TOKEN=abc123456789", "variavel_segredo"),
     ("PGPASSWORD=segredo1 psql", "variavel_segredo"),
@@ -75,6 +75,54 @@ POSITIVOS = [
     ("curl -H 'Authorization: Basic dXNlcjpwYXNzd29yZA==' https://x", "cabecalho_auth"),
     ("--password 'minha senha com espaco'", "senha_cli"),
     ('export ANTHROPIC_API_KEY="sk-ant-api03-AbCdEfGhIjKlMnOp"', "chave_api"),
+    # Achado 3 do revisor (Passo 5): senha em texto comum.
+    ("A senha do banco é Tr0ca-Est@Senha99", "senha"),
+    ("Senha do banco: Tr0ca-Est@Senha99", "senha"),
+    ("**Senha:** Tr0ca-Est@Senha99", "senha"),
+    ("**Senha**: Tr0ca-Est@Senha99", "senha"),
+    ("senha: `Tr0ca-Est@Senha99`", "senha"),
+    ("| senha | Tr0ca-Est@Senha99 |", "senha"),
+    ("|Senha|Tr0ca-Est@Senha99|", "senha"),
+    ("pwd: Tr0ca-Est@Senha99", "senha"),
+    ("pass: Tr0ca-Est@Senha99", "senha"),
+    ("senha: 12345678", "senha"),
+    ("PIN do cartão: 98213377", "senha"),
+    ("my password is Tr0ca-Est@Senha99", "senha"),
+    ("Senha:: Tr0ca-Est@Senha99", "senha"),
+    ("minha senha do wifi eh CasaDoLeo2024", "senha"),
+    # O resto do valor depois da referência conta.
+    ("password: {{segredo:a}}Tr0ca-Est@Senha99", "cabecalho_auth"),
+    ("senha do banco: {{segredo:a}}Tr0ca-Est@Senha99", "senha"),
+    ("postgres://u:{{segredo:a}}S3nhaF0rte@h/banco", "url_com_senha"),
+]
+
+# Achado 2 do revisor (Passo 5): prefixos de fornecedor, no formato real (montados em partes).
+FORNECEDORES = [
+    ("SG." + "Ab1" * 7 + "x" + "." + "Cd2" * 14 + "y", "sendgrid"),
+    ("npm_" + "Ab1" * 12, "npm"),
+    ("pypi-AgEIcHlwaS5vcmc" + "Ab1-" * 15, "pypi"),
+    ("dop_v1_" + "a1" * 32, "digitalocean"),
+    ("AGE-SECRET-KEY-1" + "QPZRY9X8GF" * 5 + "2TVDW0S3", "age"),
+    ("glsa_" + "Ab1" * 10 + "Cd" + "_" + "0a1b2c3d", "grafana"),
+    ("shpat_" + "0a1b" * 8, "shopify"),
+    ("shpss_" + "0a1b" * 8, "shopify"),
+    ("ntn_" + "1" * 11 + "Ab1" * 11 + "Cd", "notion"),
+    ("lin_api_" + "Ab1x" * 10, "linear"),
+]
+# Parecidos com os prefixos, sem o formato: não casam.
+FORNECEDORES_FALSOS = [
+    "SG." + "Ab1" * 7 + "x",              # sem a segunda parte
+    "SG.foo.bar",
+    "npm_install_script e npm_" + "Ab1" * 11,  # 33 caracteres
+    "pypi-upload pypi-AgEIcHlwaS5vcmc",
+    "dop_v1_" + "a1" * 31,                # 62
+    "dop_v1_" + "g" * 64,                 # fora do hexadecimal
+    "AGE-SECRET-KEY-1 no manual do age",
+    "AGE-SECRET-KEY-1" + "b" * 58,        # fora do alfabeto bech32 (maiúsculo)
+    "glsa_token_do_grafana",
+    "shpat_" + "0a1b" * 7,                # 28
+    "ntn_12345 e ntn_" + "1" * 10 + "Ab1" * 11 + "Cd",
+    "lin_api_key e lin_api_" + "Ab1x" * 9,
 ]
 
 NEGATIVOS = [
@@ -138,6 +186,38 @@ NEGATIVOS = [
     "export SENHA={{segredo:ROTEADOR}}",
     "curl -u admin:{{segredo:ADMIN}} https://x",
     "--password '{{segredo:BANCO}}'",
+    # Achado 3 do revisor (Passo 5): texto comum sobre senha não é senha.
+    "a senha é forte",
+    "a senha do wifi está no cofre",
+    "senha: {{segredo:wifi}}",
+    "Senha do banco: {{segredo:banco}}",
+    "password: obrigatório",
+    "Senha: ver no Vaultwarden",
+    "pin: 1234",
+    "senha do cartão: 4821",
+    "PASS: todos os testes passaram (609 passed)",
+    "Passo 5: senha_padrao: definida no primeiro acesso",
+    "password is required",
+    "A senha: precisa ter 12 caracteres e um símbolo.",
+    "senha: AniversarioDaMae",
+    "Senha expira em: 2026-11-01",
+    "| Senha | Onde |",
+    "password = getpass.getpass('Senha: ')",
+    # Achado 8 do revisor (Passo 5): falsos positivos que travavam o uso normal.
+    "postgresql+psycopg://app:${DB_PASS}@db:5432/app",
+    "postgres://u:senha@h/banco",
+    "credentials: ~/.config/gcloud/application_default_credentials.json",
+    "credentials: /srv/assistente/secrets/google.json",
+    "secret_key = config.secret_key_base64",
+    "client_secret: settings.google_client_secret",
+    "Authorization: Basic usuario:senha em base64",
+    "REDIS_PASSWORD=\nAPI_TOKEN=${API_TOKEN}",
+    "https://meet.google.com/abc-defg-hij?authuser=0&key=chave",
+    "Prefixo sk-learn-model-selection-guide em URL",
+    "scikit-learn (sk-learn) usa sk-learn-pipeline-estimators",
+    "JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:?obrigatorio}",
+    "token: 2026-10-22T10:30:00",
+    "EAAAAAAAAAAAAAAAAAAAAAAAAAAAH grito",
 ]
 
 
@@ -146,6 +226,31 @@ def test_acha_e_tira(texto, tipo):
     assert segredos.achar_segredo(texto) == tipo
     saida = segredos.tirar_segredos(texto)
     assert "[segredo:" in saida
+
+
+@pytest.mark.parametrize("texto,tipo", FORNECEDORES)
+def test_fornecedor_no_formato_real_casa(texto, tipo):
+    assert segredos.achar_segredo(f"chave {texto} aqui") == tipo
+    assert segredos.tirar_segredos(f"chave {texto} aqui") == f"chave [segredo:{tipo}] aqui"
+
+
+@pytest.mark.parametrize("texto", FORNECEDORES_FALSOS)
+def test_fornecedor_fora_do_formato_nao_casa(texto):
+    assert segredos.achar_segredo(texto) is None
+
+
+def test_atribuicao_nao_atravessa_linha():
+    """`REDIS_PASSWORD=` vazio não pega a linha de baixo como valor (com `\\s*` pegava)."""
+    assert segredos.achar_segredo("REDIS_PASSWORD=\nAbc123def456ghi") is None
+    assert segredos.achar_segredo("password:\n  Tr0ca-Est@Senha99") is None
+    assert segredos.achar_segredo("REDIS_PASSWORD=Abc123def456ghi") == "variavel_segredo"
+
+
+def test_troca_so_a_senha_do_texto():
+    assert segredos.tirar_segredos("A senha do banco é Tr0ca-Est@Senha99, ok?") == (
+        "A senha do banco é [segredo:senha], ok?")
+    assert segredos.tirar_segredos("postgres://u:S3nhaF0rte@h/banco") == "postgres://u:[segredo:url_com_senha]@h/banco"
+    assert segredos.tirar_segredos("usa sk-proj-abcDEF123456789xyzABC") == "usa [segredo:chave_api]"
 
 
 @pytest.mark.parametrize("texto", NEGATIVOS)
@@ -197,6 +302,16 @@ def test_pem_sem_fim_vai_ate_o_fim_do_texto():
     ("xxxxxxxxxxxx", False),
     ("'{{segredo:X}}'", False),
     ("[segredo:aws]", False),
+    ("~/.config/gcloud/application_default_credentials.json", False),  # caminho
+    ("/run/secrets/paperless", False),
+    ("secrets/google.json", False),
+    ("config.secret_key_base64", False),  # atributo de código
+    ("process.env.OPENAI_API_KEY", False),
+    ("2026-10-22T10:30:00-03:00", False),  # data
+    ("?obrigatorio", False),  # ${X:?obrigatorio}
+    ("wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", True),  # base64 com / não é caminho
+    ("Tr0ca.Est@99", True),
+    ("{{segredo:a}}Tr0ca-Est@Senha99", True),  # o resto, sem a referência
 ])
 def test_parece_segredo(valor, esperado):
     assert segredos.parece_segredo(valor) is esperado
@@ -229,6 +344,27 @@ def test_copia_do_servidor_igual():
     spec.loader.exec_module(modulo)
     assert list(modulo.PADROES) == list(segredos.PADROES)
     assert getattr(modulo, "REFERENCIA", segredos.REFERENCIA) == segredos.REFERENCIA
+
+
+# Achado 4 do revisor (Passo 5): cada padrão com 1 milhão de caracteres hostis. Medido no Mac (2026-10-22): o pior
+# padrão leva ~0,14 s; o limite de 2 s dá folga para CI e para o i7.
+HOSTIS = ["-", "_", "a", " ", "=", ":", "a-_ =:", "aA1-", "x-api-", "curl ", "mysql ", "sshpass ", "docker login ",
+          "pin ", "senha ", "a://a:", "{{segredo:a}}", "basic "]
+
+
+@pytest.mark.parametrize("unidade", HOSTIS)
+def test_cada_padrao_e_linear(unidade):
+    import time
+
+    texto = (unidade * (1_000_000 // len(unidade) + 1))[:1_000_000] + "!"
+    lentos = []
+    for (regex, tipo), (padrao, _) in zip(segredos._COMPILADOS, segredos.PADROES):
+        inicio = time.perf_counter()
+        for _ in regex.finditer(texto):
+            pass
+        if (gasto := time.perf_counter() - inicio) > 2.0:
+            lentos.append((tipo, round(gasto, 2), padrao[:40]))
+    assert lentos == []
 
 
 @pytest.mark.parametrize("unidade", [

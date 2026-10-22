@@ -83,7 +83,8 @@ nesta ordem.
    git -C /srv/assistente/vault log -1 --oneline    # tem de ser o mesmo hash do Mac
    ```
    Se o clone recusar por pasta não vazia, não apague nada: pare e confira o que há nela.
-4. `.gitignore` do vault (defesa para o commit diário não levar `.stversions`, `.stfolder` e temporários).
+4. `.gitignore` do vault (defesa para o commit diário não levar `.stversions`, `.stfolder`, temporários e o
+   `.obsidian/plugins/*/data.json`, onde plugins guardam chave de API).
    O comando acrescenta ao arquivo que já existir, sem sobrescrever:
    ```bash
    cat /srv/assistente/app/deploy/vault/gitignore-do-vault >> /srv/assistente/vault/.gitignore
@@ -172,7 +173,12 @@ No Mac/Windows/iPhone, cole o conteúdo na aba "Ignorar padrões" da pasta (mesm
 
 Roda às 03:30, só comita se houver mudança, com mensagem datada. Não apaga nada.
 
-Antes do commit, o script roda o gitleaks (imagem Docker com versão e digest fixos, sem rede, vault só leitura) no que está no stage; se ele achar segredo, falhar ou o docker não existir, nada é comitado, o stage é desfeito (o disco não muda), o journal diz "ERRO: gitleaks achou segredo em: <arquivos>; nada foi comitado hoje." e o relatório sem o valor fica em `/srv/assistente/logs/vault-commit/gitleaks.json`. Tire o segredo da nota (o valor vai para o cofre; na nota fica `{{segredo:NOME}}`) e rode de novo. Por isso o usuário do `vault-commit.service` precisa estar no grupo `docker` (o `scripts/preparar_host.sh` já põe o `$USER`), e um `.gitleaks.toml` ou `.gitleaksignore` na raiz do vault faz o script recusar (desligariam regras).
+Antes do commit, o script roda o gitleaks (imagem Docker com versão e digest fixos, sem rede, vault só leitura, config `deploy/vault/gitleaks.toml` do repositório do app, até 15 min por varredura; o `vault-commit.service` para tudo em 30 min) duas vezes:
+
+1. **No que está no stage.** Se ele achar segredo, só os arquivos achados saem do stage (o disco não muda) e o resto é comitado; o journal diz "ERRO: gitleaks achou segredo em: <arquivos>; esses arquivos ficaram fora do commit de hoje". Se o gitleaks falhar, passar do tempo ou o docker não existir, nada é comitado e o stage é desfeito.
+2. **Nos commits desde a última varredura limpa** (commits por escrita do servidor, fotos e o commit do dia). O id do último commit varrido fica em `/srv/assistente/logs/vault-commit/ultimo-varrido`, fora do vault; na primeira vez, o histórico inteiro é varrido. **O push só acontece depois desta varredura sair limpa.** Se ela achar segredo, o journal diz "ERRO: gitleaks achou segredo em commits já feitos, nos arquivos: <arquivos>; sem push." Nada é apagado: tire o segredo do histórico (`git filter-repo`, decisão sua) ou, se aceita o risco, grave o id do HEAD naquele arquivo (`git -C /srv/assistente/vault rev-parse HEAD > /srv/assistente/logs/vault-commit/ultimo-varrido`).
+
+Os relatórios (`gitleaks.json` e `gitleaks-commits.json`, em `/srv/assistente/logs/vault-commit/`, modo 600) trazem só arquivo, regra, linha e commit, nunca o valor nem o trecho. Tire o segredo da nota (o valor vai para o cofre; na nota fica `{{segredo:NOME}}`) e rode de novo. Por isso o usuário do `vault-commit.service` precisa estar no grupo `docker` (o `scripts/preparar_host.sh` já põe o `$USER`). O script recusa o dia inteiro se o vault tiver `.gitleaks.toml` ou `.gitleaksignore` na raiz (mesmo como link simbólico), ou um `.gitattributes` (em qualquer pasta) ou `.git/info/attributes` com `filter`, `diff` ou `binary` (rodariam comando ou esconderiam conteúdo do gitleaks). O push só usa ssh (a chave de deploy). O lint diário avisa "último commit diário há N dias" quando passam 2 dias sem commit diário.
 
 ```bash
 sudo install -d -o "$USER" -g "$USER" /srv/assistente/logs/vault-commit

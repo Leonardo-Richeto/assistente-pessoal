@@ -13,7 +13,7 @@ import shutil
 from pathlib import Path
 
 import pytest
-from fastmcp import Client
+from fastmcp import Client, FastMCP
 from fastmcp.exceptions import ToolError
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
@@ -85,6 +85,20 @@ def test_mensagem_de_recusa():
     ({"tags": ["ok", ["fundo", GITHUB]]}, "github"),
     ({"frontmatter": {AWS: 1}}, "aws"),  # chave do dict também conta
     ({"x": [{"y": [f"Authorization: Bearer {GITHUB[4:]}"]}]}, "bearer"),
+    # Achado 3 do revisor (Passo 5): a chave do pai vale para item de lista e dict aninhado; senha em texto comum.
+    ({"frontmatter": {"password": [SENHA]}}, "cabecalho_auth"),
+    ({"frontmatter": {"api_key": {"v": SENHA}}}, "cabecalho_auth"),
+    ({"frontmatter": {"senha": [{"banco": SENHA}]}}, "cabecalho_auth"),
+    ({"frontmatter": {"senha": 98213377}}, "senha"),
+    ({"conteudo": f"A senha do banco é {SENHA}"}, "senha"),
+    ({"conteudo": f"Senha do banco: {SENHA}"}, "senha"),
+    ({"conteudo": f"**Senha:** {SENHA}"}, "senha"),
+    ({"conteudo": f"senha: `{SENHA}`"}, "senha"),
+    ({"conteudo": f"| conta | senha |\n|---|---|\n| banco | senha | {SENHA} |"}, "senha"),
+    ({"conteudo": f"pwd: {SENHA}"}, "senha"),
+    ({"conteudo": f"pass: {SENHA}"}, "senha"),
+    ({"conteudo": "senha: 12345678"}, "senha"),
+    ({"conteudo": "password: {{segredo:a}}" + SENHA}, "cabecalho_auth"),
 ])
 def test_acha_segredo_em_texto_dict_e_lista(argumentos, tipo):
     assert segredos_mcp.segredo_nos_argumentos(argumentos) == tipo
@@ -95,6 +109,11 @@ def test_acha_segredo_em_texto_dict_e_lista(argumentos, tipo):
     {"frontmatter": {"password": "{{segredo:wifi}}", "tags": ["projeto", "senha"]}},
     {"frontmatter": {"senha": "trocar-amanha", "token": "obrigatorio"}},
     {"valor": 42.9, "id": 3, "ok": True, "nada": None},
+    {"conteudo": "a senha é forte; a senha do wifi está no cofre"},
+    {"conteudo": "senha: {{segredo:wifi}}\npassword: obrigatório\nSenha: ver no Vaultwarden\npin: 1234"},
+    {"frontmatter": {"password": ["{{segredo:wifi}}"], "tags": ["senha", "token"], "pin": 1234}},
+    {"frontmatter": {"credentials": "~/.config/gcloud/application_default_credentials.json"}},
+    {"conteudo": "DATABASE_URL: postgresql+psycopg://app:${DB_PASS}@db:5432/app"},
 ])
 def test_referencia_e_texto_comum_passam(argumentos):
     assert segredos_mcp.segredo_nos_argumentos(argumentos) is None
@@ -112,19 +131,54 @@ def test_argumentos_grandes_ou_fundos_demais_sao_recusados():
         segredos_mcp.segredo_nos_argumentos({"conteudo": "a" * (segredos_mcp.CARACTERES_MAXIMOS + 1)})
 
 
+def test_limite_de_caracteres():
+    assert segredos_mcp.CARACTERES_MAXIMOS == 400_000
+
+
+def test_conferencia_no_limite_e_rapida():
+    """Achado 4 do revisor (Passo 5): 400.000 caracteres hostis não seguram a thread (antes, 1 MB de '-' levava ~6 s)."""
+    import time
+
+    for unidade in ("-", "a-_ =:", "senha ", "curl "):
+        texto = (unidade * (segredos_mcp.CARACTERES_MAXIMOS // len(unidade)))[:segredos_mcp.CARACTERES_MAXIMOS - 20]
+        inicio = time.perf_counter()
+        assert segredos_mcp.segredo_nos_argumentos({"c": texto}) is None
+        assert time.perf_counter() - inicio < 2.0
+
+
 def test_quem_passa_pela_barreira():
-    b = segredos_mcp.BarreiraSegredo({"escrever_nota", "vault_write_note"})
+    """Falha fechado (achado 9 do revisor, Passo 5): vigia tudo que não é leitura conhecida, menos `paperless_*`."""
+    b = segredos_mcp.BarreiraSegredo({"ler_nota", "vault_read_note"})
     assert b._vigia("escrever_nota") and b._vigia("vault_write_note") and b._vigia("0123456789ab_vault_write_note")
-    assert not b._vigia("ler_nota") and not b._vigia("0123456789ab_ler_nota") and not b._vigia(None)
-    vigiadas = servidor.ESCRITAS_PECAS_VAULT
-    assert vigiadas == {"vault_write_note", "vault_patch_note", "vault_update_frontmatter", "vault_manage_tags"}
-    assert not {n for n in vigiadas if n.startswith("paperless_")}  # Paperless fica de fora (Ficha 5 fala de vault e banco)
+    assert b._vigia("ferramenta_nova") and b._vigia("vault_nova") and b._vigia(None)
+    assert not b._vigia("ler_nota") and not b._vigia("0123456789ab_ler_nota") and not b._vigia("vault_read_note")
+    # Paperless fica de fora por decisão (Ficha 5 fala de vault e banco).
+    assert not b._vigia("paperless_update_document") and not b._vigia("0123456789ab_paperless_create_tag")
+    app_b = segredos_mcp.BarreiraSegredo(servidor.LEITURAS_PECAS | servidor.LEITURAS_BANCO | vault.LEITURAS_VAULT)
+    for nome in servidor.ESCRITAS_PECAS_VAULT | servidor.ESCRITAS_BANCO | vault.ESCRITAS_VAULT:
+        assert app_b._vigia(nome), nome
 
 
 def test_registro_redige_caminho_e_descarta_modelo_com_cara_de_segredo():
-    assert registro.caminhos_do_vault({"path": f"00-inbox/{AWS}.md"}) == {"caminho": "00-inbox/[segredo:aws].md"}
+    assert registro.caminhos_do_vault({"path": f"00-inbox/{AWS}.md"}) == {"caminho": "[segredo:aws]"}
+    assert registro.caminhos_do_vault({"path": "00-inbox/nota.md"}) == {"caminho": "00-inbox/nota.md"}
     assert registro.modelo_declarado(AWS) is None
     assert registro.modelo_declarado("claude-opus-5-5") == "claude-opus-5-5"
+
+
+def test_registro_nao_grava_pedaco_de_segredo_que_o_corte_esconderia():
+    """Achado 10 do revisor (Passo 5): o segredo só é reconhecido com o fim (aspa que fecha depois do corte).
+
+    Antes, `tirar_segredos` olhava os 600 primeiros caracteres, não reconhecia, e os 300 primeiros iam para a
+    auditoria com o começo do segredo.
+    """
+    pedaco = "Tr0caEst@99 "
+    caminho = 'n/TOKEN="' + pedaco * 60 + '".md'
+    assert segredos.achar_segredo(caminho) == "variavel_segredo"
+    dados = registro.caminhos_do_vault({"path": caminho, "paths": [caminho, "ok.md"]})
+    assert dados == {"caminho": "[segredo:variavel_segredo]", "caminhos": ["[segredo:variavel_segredo]", "ok.md"]}
+    assert registro.caminhos_do_vault({"path": "a" * 20_000}) == {"caminho": registro.CAMINHO_LONGO}
+    assert registro.caminhos_do_vault({"path": "a" * 400}) == {"caminho": "a" * registro.TAMANHO_CAMINHO}
 
 
 # ---------------- barreira no app: banco ----------------
@@ -168,8 +222,7 @@ async def test_escrita_do_banco_com_referencia_passa(app, url):  # noqa: F811
 ESCRITAS_VAULT = [
     ("escrever_nota", {"caminho": "00-inbox/nova.md", "conteudo": f"# Nova\n\nchave {AWS}\n", "versao": "nova"},
      "aws", "00-inbox/nova.md"),
-    ("restaurar_nota", {"caminho": f"00-inbox/{AWS}.md", "versao_git": "abcdef1"}, "aws",
-     "00-inbox/[segredo:aws].md"),
+    ("restaurar_nota", {"caminho": f"00-inbox/{AWS}.md", "versao_git": "abcdef1"}, "aws", "[segredo:aws]"),
     ("vault_write_note", {"path": HORTA, "mode": "append", "content": "linha comum\n",
                           "frontmatter": {"password": SENHA}}, "cabecalho_auth", HORTA),
     ("vault_write_note", {"path": HORTA, "mode": "append", "content": "linha comum\n",
@@ -212,6 +265,27 @@ async def test_nome_com_hash_tambem_passa_pela_barreira(app, raiz, url):  # noqa
             await c.call_tool("0123456789ab_vault_write_note", {"path": HORTA, "mode": "append", "content": AWS})
     assert str(erro.value) == _msg("aws")  # a barreira recusa antes de o FastMCP procurar o nome
     assert CHAMADAS_PECA == []
+
+
+async def test_escrita_nova_fora_das_listas_passa_pela_barreira(app, raiz, url):  # noqa: F811
+    """Achado 9 do revisor (Passo 5): ferramenta montada sem entrar em lista nenhuma é vigiada (falha fechado)."""
+    chamadas: list[str] = []
+    nova = FastMCP("nova")
+
+    @nova.tool
+    def anotar_coisa(texto: str) -> str:
+        chamadas.append(texto)
+        return "ok"
+
+    app.mount(nova)
+    async with Client(app) as c:
+        with pytest.raises(ToolError) as erro:
+            await c.call_tool("anotar_coisa", {"texto": f"chave {AWS}"})
+        assert str(erro.value) == _msg("aws")
+        assert chamadas == []
+        assert (await c.call_tool("anotar_coisa", {"texto": "texto comum"})).data == "ok"
+    assert chamadas == ["texto comum"]
+    _sem_valor(url, str(erro.value))
 
 
 async def test_argumentos_fundos_demais_sao_recusados_no_app(app, raiz):  # noqa: F811
@@ -309,6 +383,29 @@ async def test_restaurar_versao_com_segredo_e_recusado(app, raiz, url, caplog): 
     assert _disco(raiz) == antes and _commits(raiz) == commits
     assert [a.acao for a in _auditoria(url)] == ["escrever", "erro"]
     _sem_valor(url, str(erro.value), caplog.text)
+
+
+def test_arquivo_grande_demais_fica_sem_commit_e_sem_foto(raiz, caplog, monkeypatch):  # noqa: F811
+    """Achado 4 do revisor (Passo 5): acima de 1 MB, não confere (travaria a thread): sem commit, e a foto recusa."""
+    monkeypatch.setattr(vault_git, "LIMITE_CONFERIR", 1_000)
+    (raiz / "00-inbox/grande.md").write_text("texto comum\n" * 200, encoding="utf-8")
+    commits = _commits(raiz)
+    with caplog.at_level(logging.DEBUG, logger="assistente"):
+        assert vault_git.commitar(raiz, "00-inbox/grande.md", "claude-app: teste") is False
+    assert _commits(raiz) == commits
+    assert ("Escrita de 00-inbox/grande.md ficou sem commit: o arquivo passa de 1000 bytes e não dá para conferir "
+            "segredo.") in [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    alvo = raiz / HORTA
+    alvo.write_text(alvo.read_text(encoding="utf-8") + "linha comum\n" * 200, encoding="utf-8")
+    with pytest.raises(vault_git.FotoFalhou) as erro:
+        vault_git.foto(raiz, HORTA, "vault_write_note")
+    assert not isinstance(erro.value, vault_git.FotoComSegredo)  # a mensagem é a da foto que falhou (RECUSA_FOTO)
+    assert _commits(raiz) == commits
+    assert vault_git.LIMITE_CONFERIR == 1_000 and vault_git.GRANDE_DEMAIS == "grande_demais"
+
+
+def test_limite_de_conferencia_do_arquivo_e_1_mb():
+    assert vault_git.LIMITE_CONFERIR == 1_000_000
 
 
 # ---------------- importador de sessões ----------------

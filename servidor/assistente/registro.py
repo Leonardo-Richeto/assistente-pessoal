@@ -12,7 +12,7 @@ Classificação falha fechado: só é leitura o que está numa lista explícita 
   Falha aberto: se não grava, só log ERROR (a escrita já tem o rastro em `auditoria`).
 
 Nunca grava o conteúdo dos argumentos. Do vault, só o caminho da nota (`path`, `paths`,
-`oldPath`, `newPath`), com o que tiver cara de segredo trocado por `[segredo:<tipo>]`.
+`oldPath`, `newPath`); caminho com cara de segredo vira só `[segredo:<tipo>]`, sem pedaço nenhum.
 Do Paperless, só ids inteiros. Do resto, só o `modelo` declarado, validado.
 As tabelas `auditoria` e `chamadas` são só INSERT.
 """
@@ -31,7 +31,7 @@ from fastmcp.server.middleware import Middleware
 
 from .db import Bancos
 from .modelos import Auditoria, Chamada
-from .segredos import achar_segredo, tirar_segredos
+from .segredos import achar_segredo
 
 log = logging.getLogger(__name__)
 
@@ -42,6 +42,8 @@ NOME_VALIDO = re.compile(r"[A-Za-z0-9_]{1,60}")  # 60 = String(60) em Auditoria.
 NOME_INVALIDO = "<nome invalido>"
 TAMANHO_AUTOR = 80  # = String(80) em Auditoria.autor
 TAMANHO_CAMINHO = 300
+CONFERIR_CAMINHO = 10_000  # caracteres conferidos inteiros; caminho maior não vai para a auditoria
+CAMINHO_LONGO = "[caminho longo demais]"
 MAX_CAMINHOS = 20
 MAX_IDS = 20
 CHAVES_CAMINHO = {"path": "caminho", "caminho": "caminho", "oldPath": "caminho", "newPath": "destino"}
@@ -154,8 +156,18 @@ def _peca(nome: str, do_vault: frozenset[str] = frozenset()) -> str | None:
 
 
 def _cortar(v) -> str | None:
-    # Caminho com cara de segredo (a barreira recusa a escrita, mas a linha `escrever` vem antes): só o tipo.
-    return tirar_segredos(v[:TAMANHO_CAMINHO * 2])[:TAMANHO_CAMINHO] if isinstance(v, str) else None
+    """O caminho cortado em TAMANHO_CAMINHO, conferido INTEIRO antes do corte.
+
+    Com cara de segredo (a barreira recusa a escrita, mas a linha `escrever` vem antes): só `[segredo:<tipo>]`.
+    Conferir só um pedaço deixaria passar o começo de um segredo que o corte não deixa reconhecer.
+    """
+    if not isinstance(v, str):
+        return None
+    if len(v) > CONFERIR_CAMINHO:
+        return CAMINHO_LONGO
+    if (tipo := achar_segredo(v)) is not None:
+        return f"[segredo:{tipo}]"
+    return v[:TAMANHO_CAMINHO]
 
 
 def caminhos_do_vault(argumentos: dict) -> dict:

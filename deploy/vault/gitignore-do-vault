@@ -16,6 +16,8 @@
 # Obsidian: estado de cada aparelho
 .obsidian/workspace*.json
 .obsidian/cache
+# Plugins guardam chave de API e token na config deles (data.json): fora do git e do GitHub.
+.obsidian/plugins/*/data.json
 .trash/
 
 # macOS e Windows
