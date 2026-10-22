@@ -34,7 +34,7 @@ alimenta a migração. Plano original: "Plano de Portabilidade do Servidor" (Leo
 | `scripts/preparar_host.sh` | Debian 12 ou 13: Docker, git, age, Tailscale do host (só SSH), Syncthing, árvore de `<home>`, link `app/.env`, timer do backup |
 | `scripts/exportar.sh` | Para quem grava (o Postgres fica), gera dump, contagens, vault, sessões, Tailscale, `.env`, `manifesto.json` e `SHA256SUMS`, e cifra tudo em `assistente-AAAAMMDD-HHMM.tar.age` (+ `.sha256`). Religa os serviços no fim, menos com `--congelar` |
 | `scripts/importar.sh` | Na máquina nova: confere o hash, decifra, confere cada arquivo, põe o `.env` (com o `ASSISTENTE_HOME` novo), sobe só o Postgres, restaura, confere as contagens, `alembic upgrade head`, vault e sessões no lugar, sobe tudo e roda o `verificar.sh` |
-| `scripts/verificar.sh` | Serviços saudáveis, migração com código 0, schema, contagens (se receber o arquivo), consulta de leitura pelas ferramentas MCP, `/mcp` sem token = 401 e, com o perfil `tailscale`, o Funnel respondendo 401 |
+| `scripts/verificar.sh` | Serviços saudáveis, migração com código 0, schema, contagens (se receber o arquivo), consulta de leitura pelas ferramentas MCP, migração do banco na cabeça, tabelas novas legíveis, vault (pasta, notas indexadas, `.git` gravável, `index.lock`, `filter=`; `AVISO` não reprova; `python -m assistente.verificacao --sem-banco --sem-http` roda só o vault), `/mcp` sem token = 401 e, com o perfil `tailscale`, o Funnel respondendo 401 |
 
 Os scripts rodam em Linux, macOS e Windows (Git Bash). Sem `age` no host, usam a imagem
 `deploy/ferramentas` (Alpine + age, versões fixas). Recusam: `.env` sem alguma variável do
