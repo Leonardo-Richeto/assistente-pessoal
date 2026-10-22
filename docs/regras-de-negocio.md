@@ -59,7 +59,7 @@ Você usa o conector "Assistente". Ele tem três áreas:
   registrar_ponto, consultar_ponto, registrar_atividade, consultar_atividades, vincular_nota,
   marcar_desatualizada, consultar_desatualizadas, desfazer_registro, consultar_auditoria,
   consultar_chamadas, consultar_sessoes.
-- Vault (notas): buscar_vault, ler_nota, notas_recentes, escrever_nota, historico_nota, restaurar_nota,
+- Vault (notas): buscar_vault, ler_nota, notas_recentes, contexto_inicial, escrever_nota, historico_nota, restaurar_nota,
   vault_search_notes, vault_read_note, vault_read_multiple_notes,
   vault_read_note_lines, vault_list_directory, vault_get_note_outline, vault_get_notes_info,
   vault_get_frontmatter, vault_get_vault_stats, vault_list_all_tags, vault_wiki_link,
@@ -148,7 +148,9 @@ Pergunta que cruza áreas ("quanto gastei com o que está na nota fiscal X?") us
   arquivo que começa com _), lendo só as 12 primeiras linhas (vault_read_note_lines).
   Use vault_search_notes para achar a palavra exata.
 - Para ver o que mudou por último no vault, use notas_recentes.
-- Pergunta sobre a vida do dono: leia antes a nota de perfil dele em 20-areas/.
+- No começo de uma conversa sobre a vida ou o trabalho do dono, chame contexto_inicial uma vez.
+  Em registro rápido (gasto, ponto), não chame.
+- Pergunta sobre a vida do dono: o perfil vem em contexto_inicial; a nota inteira está em 20-areas/.
 - Antes de mudar uma nota existente, leia-a com ler_nota. Para acrescentar, use vault_write_note com
   mode append ou vault_patch_note. Para trocar a nota inteira, use escrever_nota com a versao
   que ler_nota devolveu; se ela recusar porque a nota mudou, leia de novo e refaça. Nunca
@@ -733,6 +735,7 @@ Passo 6 (2026-10-21): commit por escrita, historico_nota e restaurar_nota.
 Correções do revisor dos Passos 4 e 8 (2026-10-21): nota cortada ou fora de UTF-8 vem sem versao e não se troca;
 conteúdo vazio recusado; "Reescrevi"/"Criei"; frase de escrever_nota sem "Desfazer?" em "Como confirmar".
 Passo 11 (2026-10-22): tabela sessoes (0006), importador, enviar.py e consultar_sessoes.
+Passo 7 (2026-10-22): contexto_inicial.
 Passo 5 (2026-10-22): barreira de segredo nas escritas, no commit por escrita, na foto e no commit diário (gitleaks).
 Correções do revisor do Passo 6 (2026-10-21): foto antes de trocar, git sem config que executa comando, mensagens do
 restaurar, histórico com o caminho de cada versão.

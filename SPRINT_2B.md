@@ -75,7 +75,7 @@ tabela; eu confiro testes e diff antes de seguir. Effort max nunca.
 | 4 | ⚑ 2b.2 `escrever_nota` com versão + trava do `vault_write_note`; testes de corrida, caminho hostil, link simbólico | A | Opus 5.5 | alto | 3 | Feito 2026-10-21 (Opus 5.5); revisor rodou, correções feitas |
 | 5 | 2b.3 barreira de segredo no middleware + gitleaks no `commit-diario.sh` | A | Opus 5.5 | alto | 4 | Feito 2026-10-22 (Opus 5.5); revisor pendente |
 | 6 | 2b.4 commit por escrita, `historico_nota`, `restaurar_nota`; `git` na imagem; `docker build` local | A | Opus 5.5 | alto | 4 | Feito 2026-10-22 (Opus 5.5); revisor rodou, correções feitas |
-| 7 | 2b.6 `contexto_inicial` com limite | B | Sonnet 5.5 | médio | 3 | Pendente |
+| 7 | 2b.6 `contexto_inicial` com limite | B | Sonnet 5.5 | médio | 3 | Feito 2026-10-22 (Sonnet 5.5) |
 | 8 | 2b.8 migração 0005, `marcar_desatualizada`, `consultar_desatualizadas`, desfazer, lista no lint; teste no Postgres de rascunho | A | Opus 5.5 | alto | 0 | Feito 2026-10-21 (Opus 5.5); revisor rodou, correções feitas |
 | 9 | 2b.11 `sync-conflict` no `lint-diario.sh` + teste em `scripts/testes/` | C | Haiku 5.5 | baixo | 0 | Feito 2026-10-21 (Haiku 5.5) |
 | 10 | ⚑ 2b.9a hooks `SessionEnd`/`SessionStart`, resumo por regra, fila local, aviso; testes com transcript sintético | A | Opus 5.5 | alto | 5 | Feito 2026-10-22 (Opus 5.5); revisor rodou, correções feitas |
@@ -252,3 +252,12 @@ Um bloco por passo, do mais velho para o mais novo: o que fez, verificado, não 
   10 arquivos e ~40.000 caracteres (`{"sessoes", "cortado"}`); `enviadas/` guarda cada versão; `maquina` validada.
 - Verificado: 621 passam, 10 pulados; `ferramentas/sessoes/tests` 307 passam; testes `_pg` (10) no Postgres de rascunho.
 - Não verificado: SSH real com `command=` no i7.
+
+### Passo 7 — 2b.6 `contexto_inicial` (Sonnet 5.5, 2026-10-22)
+
+- Fez: `contexto_inicial()` em `vault.py` (perfil sem frontmatter, 12 linhas; "Trabalho em andamento" do `onde-parei.md`;
+  nota do dia; contagem de marcas em vigor pela conexão de leitura; teto de 6.000 caracteres medido no JSON);
+  Ficha 1 e PLANO (2b.5, 2b.6, 2b.7 `[x]`).
+- Verificado: 636 passam, 10 pulados; no vault real (só leitura), 3.268 caracteres, só o "trabalho em andamento" cortado.
+
+### Revisor do Passo 5 (Opus 5.5, 2026-10-22): 11 achados, correção em andamento

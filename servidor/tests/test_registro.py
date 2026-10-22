@@ -497,7 +497,7 @@ CLASSIFICACAO_REVISADA = {
     "vault_list_directory": LE, "vault_get_note_outline": LE, "vault_get_notes_info": LE,
     "vault_get_frontmatter": LE, "vault_get_vault_stats": LE, "vault_list_all_tags": LE,
     "buscar_vault": LE,  # nossa (vault.py): índice em memória das notas; só lê
-    "ler_nota": LE, "notas_recentes": LE,  # nossas (vault.py): só lêem
+    "ler_nota": LE, "notas_recentes": LE, "contexto_inicial": LE,  # nossas (vault.py): só lêem
     "escrever_nota": ESCREVE,  # nossa (vault.py): troca a nota inteira, só com a versão lida
     "historico_nota": LE,  # nossa (vault.py): git log da nota; só lê
     "restaurar_nota": ESCREVE,  # nossa (vault.py): grava o conteúdo de uma versão antiga como versão nova

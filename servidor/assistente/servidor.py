@@ -168,7 +168,7 @@ def criar_app(cfg: Config | None = None) -> FastMCP:
         _montar_peca(app, "vault", create_proxy({"mcpServers": {"vault": {
             "command": "mcpvault", "args": [cfg.vault_path],
         }}}))
-        app.mount(criar_servidor_vault(Path(cfg.vault_path)))  # sem namespace: buscar_vault
+        app.mount(criar_servidor_vault(Path(cfg.vault_path), bancos))  # sem namespace: buscar_vault
     else:
         log.info("Vault não configurado; pulando.")
 

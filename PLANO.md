@@ -81,12 +81,12 @@ podem escrever. Itens que mudam o que o Claude do app faz (2b.2, 2b.6, 2b.7, 2b.
 - [ ] 2b.4 Commit por escrita: depois de cada escrita da IA, commit só do arquivo escrito, autor `claude-app`; o
   commit diário (2.3) fica para as edições do Leonardo. Ferramentas `historico_nota(caminho)` e
   `restaurar_nota(caminho, versao)`; depois, rever o bloqueio de `vault_move_note` e `vault_move_file`
-- [ ] 2b.5 `notas_recentes(n)`, pelo campo `atualizado`
+- [x] 2b.5 `notas_recentes(n)`, pelo campo `atualizado` (Passo 3, 2026-10-21)
 
 **Prioridade 2: depende do i7 no ar**
-- [ ] 2b.6 `contexto_inicial()`: resumo do perfil, `onde-parei.md`, nota do dia e pendências numa chamada só, com
+- [x] 2b.6 (Passo 7, 2026-10-22) `contexto_inicial()`: resumo do perfil, `onde-parei.md`, nota do dia e pendências numa chamada só, com
   limite de caracteres (hoje são 4 a 6 chamadas no começo da conversa)
-- [ ] 2b.7 `ler_nota(caminho, relacionadas=true)`: devolve também links e backlinks a um salto, só com o resumo
+- [x] 2b.7 (Passo 3, 2026-10-21) `ler_nota(caminho, relacionadas=true)`: devolve também links e backlinks a um salto, só com o resumo
 - [ ] 2b.8 `marcar_desatualizada(caminho, motivo)`: grava no banco; o lint diário (M3) lista as notas marcadas
 - [ ] ⚑ 2b.9 Captura das sessões do Claude Code: hook `SessionEnd` resume o transcript por regra (título, arquivos,
   comandos, commits, duração), fila local por máquina com chave contra duplicata, envio pela Tailscale com token de
