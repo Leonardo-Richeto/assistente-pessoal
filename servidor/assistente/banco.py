@@ -19,9 +19,10 @@ from fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from .db import Bancos
-from .modelos import Atividade, Auditoria, Chamada, Gasto, Ponto
+from .modelos import Atividade, Auditoria, Chamada, Gasto, NotaDesatualizada, Ponto
 from .registro import anotar_auditoria, identidade
 
 LEITURA = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
@@ -30,44 +31,56 @@ ESCRITA = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentH
 TipoPonto = Literal["entrada", "saida", "pausa_inicio", "pausa_fim"]
 TipoRegistro = Literal["gasto", "ponto", "atividade"]
 # "vinculo": desfaz uma troca de nota feita por vincular_nota (id = o que vincular_nota devolveu).
-TipoDesfazer = Literal["gasto", "ponto", "atividade", "vinculo"]
-TabelaAuditoria = Literal["gastos", "ponto", "atividades", "vault", "paperless", "ferramenta"]
+# "desatualizada": desfaz uma marca de marcar_desatualizada (id = o que ela devolveu).
+TipoDesfazer = Literal["gasto", "ponto", "atividade", "vinculo", "desatualizada"]
+TabelaAuditoria = Literal["gastos", "ponto", "atividades", "notas_desatualizadas", "vault", "paperless", "ferramenta"]
 AcaoAuditoria = Literal["criar", "desfazer", "vincular", "desfazer_vinculo", "escrever", "ok", "erro", "cancelado",
                         "negado"]
 # Só o registro (registro.py) lê este parâmetro: valida (^[A-Za-z0-9 ._-]{1,60}$) e grava em
 # `chamadas.modelo_declarado`; inválido é descartado sem falhar a chamada. A ferramenta não usa.
 Modelo = Annotated[str | None, Field(description="Nome do modelo em uso (ex.: claude-opus-5-5). Fica registrado como declarado.")]
+# Registros com nota_vault (vincular_nota). As marcas de nota desatualizada não entram: não têm nota_vault.
 _MODELOS = {"gasto": Gasto, "ponto": Ponto, "atividade": Atividade}
 _TIPOS = {classe.__tablename__: tipo for tipo, classe in _MODELOS.items()}
-# Artigo, contrações com "a" e "de" e terminação do adjetivo de cada tipo: "o gasto", "ao gasto",
-# "do gasto", "desfeito"; "a atividade", "à atividade", "da atividade", "desfeita".
-_GENERO = {"gasto": ("o", "ao", "do", "o"), "ponto": ("o", "ao", "do", "o"), "atividade": ("a", "à", "da", "a")}
+# O que desfazer_registro marca como desfeito (o "vinculo" é outro caminho: _desfazer_vinculo).
+_DESFAZIVEIS = {**_MODELOS, "desatualizada": NotaDesatualizada}
+# Palavra exibida, artigo, contrações com "a" e "de" e terminação do adjetivo de cada tipo: "o gasto",
+# "ao gasto", "do gasto", "desfeito"; "a atividade", "à atividade", "da atividade", "desfeita"; o tipo
+# desatualizada aparece como "a marca".
+_GENERO = {"gasto": ("gasto", "o", "ao", "do", "o"), "ponto": ("ponto", "o", "ao", "do", "o"),
+           "atividade": ("atividade", "a", "à", "da", "a"), "desatualizada": ("marca", "a", "à", "da", "a")}
+
+
+def _palavra(tipo: str) -> str:
+    """'gasto', 'atividade' ou 'marca' (tipo desatualizada)."""
+    return _GENERO[tipo][0]
 
 
 def _o(tipo: str, id: int) -> str:
-    """'o gasto 12' ou 'a atividade 3'."""
-    return f"{_GENERO[tipo][0]} {tipo} {id}"
+    """'o gasto 12', 'a atividade 3' ou 'a marca 5'."""
+    return f"{_GENERO[tipo][1]} {_palavra(tipo)} {id}"
 
 
 def _ao(tipo: str, id: int) -> str:
     """'ao gasto 12' ou 'à atividade 3'."""
-    return f"{_GENERO[tipo][1]} {tipo} {id}"
+    return f"{_GENERO[tipo][2]} {_palavra(tipo)} {id}"
 
 
 def _do(tipo: str, id: int) -> str:
     """'do gasto 12' ou 'da atividade 3'."""
-    return f"{_GENERO[tipo][2]} {tipo} {id}"
+    return f"{_GENERO[tipo][3]} {_palavra(tipo)} {id}"
 
 
 def _desfeito(tipo: str) -> str:
-    return "desfeit" + _GENERO[tipo][3]
+    return "desfeit" + _GENERO[tipo][4]
 
 
 def _maiuscula(texto: str) -> str:
     return texto[:1].upper() + texto[1:]
 
 
-TAMANHO_NOTA = 300  # = String(300) em _Registro.nota_vault (modelos.py), contado no caminho já limpo
+TAMANHO_NOTA = 300  # = String(300) em _Registro.nota_vault e NotaDesatualizada.caminho (modelos.py), no caminho limpo
+TAMANHO_MOTIVO = 500  # motivo de marcar_desatualizada, contado depois de tirar os espaços das pontas
 # Sem max_length no schema: o limite vale depois de tirar os espaços das pontas (caminho_da_nota).
 _DESCRICAO_CAMINHO = ("Caminho relativo da nota no vault, ex.: 50-diario/2026/2026-10-20.md (nota do dia). Sem barra inicial, "
                       "sem '..', sem ':', sem pasta oculta, terminando em .md, até 300 caracteres.")
@@ -79,8 +92,9 @@ NotaVault = Annotated[str | None, Field(
 # escritas já gravam a auditoria em _gravar. Ferramenta nova aqui sem entrar numa lista conta
 # como escrita de fora (linha `escrever` a mais); test_registro.py confere as listas.
 LEITURAS_BANCO = {"consultar_gastos", "listar_categorias_gasto", "consultar_ponto", "consultar_atividades",
-                  "consultar_auditoria", "consultar_chamadas"}
-ESCRITAS_BANCO = {"registrar_gasto", "registrar_ponto", "registrar_atividade", "desfazer_registro", "vincular_nota"}
+                  "consultar_auditoria", "consultar_chamadas", "consultar_desatualizadas"}
+ESCRITAS_BANCO = {"registrar_gasto", "registrar_ponto", "registrar_atividade", "desfazer_registro", "vincular_nota",
+                  "marcar_desatualizada"}
 
 
 def _autor() -> str | None:
@@ -362,7 +376,7 @@ def criar_servidor_banco(bancos: Bancos, tz: ZoneInfo, nome: str = "Leonardo") -
             anterior = reg.nota_vault
             if anterior == novo:
                 return {"vinculo": None, "desfazer": None,
-                        "confirmacao": f"Nada mudou: {_o(tipo, id)} já está ligad{_GENERO[tipo][3]} a {novo}. "
+                        "confirmacao": f"Nada mudou: {_o(tipo, id)} já está ligad{_GENERO[tipo][4]} a {novo}. "
                                        "Nada a desfazer."}
             reg.nota_vault = novo
             dados = {"caminho": novo} if anterior is None else {"caminho": novo, "anterior": anterior}
@@ -418,31 +432,89 @@ def criar_servidor_banco(bancos: Bancos, tz: ZoneInfo, nome: str = "Leonardo") -
         volta = f"voltou para {anterior}" if anterior else "ficou sem nota"
         return f"Desfeito: vínculo {id}. {_maiuscula(_o(tipo, reg.id))} {volta}."
 
+    # ---------------- Notas desatualizadas (ficha 5, regra 8) ----------------
+
+    @mcp.tool(annotations=ESCRITA)
+    def marcar_desatualizada(
+        caminho: Annotated[str, Field(description=_DESCRICAO_CAMINHO)],
+        motivo: Annotated[str, Field(description="Por que a nota parece velha ou errada, em uma frase "
+                                                 f"(até {TAMANHO_MOTIVO} caracteres).")],
+        modelo: Modelo = None,
+    ) -> dict:
+        """Marca uma nota do vault como desatualizada (parece velha ou errada). Não mexe na nota.
+
+        Diga ao dono e não corrija a nota sozinho. Para desfazer, chame desfazer_registro com tipo desatualizada e o
+        id devolvido. O servidor não confere se a nota existe.
+        """
+        nota = caminho_da_nota(caminho)
+        if nota is None:
+            raise ToolError("Informe o caminho da nota, ex.: 50-diario/2026/2026-10-20.md.")
+        motivo = motivo.strip()
+        if not motivo:
+            raise ToolError("Diga em uma frase por que a nota parece desatualizada.")
+        if len(motivo) > TAMANHO_MOTIVO:
+            raise ToolError(f"O motivo tem {len(motivo)} caracteres; resuma em até {TAMANHO_MOTIVO}.")
+
+        def _ja_marcada() -> ToolError | None:
+            with bancos.leitura() as s:
+                mid = s.scalar(select(NotaDesatualizada.id).where(
+                    NotaDesatualizada.caminho == nota, NotaDesatualizada.desfeito.is_(False)))
+            return None if mid is None else ToolError(f"{nota} já está marcada (marca {mid}).")
+
+        if erro := _ja_marcada():
+            raise erro
+        try:
+            # Banco: os dados gravados (como a descrição do gasto). O motivo cabe inteiro (até 500).
+            mid = _gravar(NotaDesatualizada(caminho=nota, motivo=motivo, autor=_autor()), "marcar_desatualizada",
+                          NotaDesatualizada.__tablename__, {"caminho": nota, "motivo": motivo})
+        except IntegrityError:
+            # Outra chamada marcou a mesma nota entre a conferência e a gravação (índice único das em vigor).
+            raise _ja_marcada() or ToolError(f"Não consegui marcar {nota}; tente de novo.") from None
+        return {"id": mid, "confirmacao": f"Marquei {nota} como desatualizada (marca {mid}). Desfazer?"}
+
+    @mcp.tool(annotations=LEITURA)
+    def consultar_desatualizadas(
+        caminho: Annotated[str | None, Field(description="Só a marca desta nota. Vazio = todas.")] = None,
+    ) -> list[dict]:
+        """Notas do vault marcadas como desatualizadas e ainda não desfeitas, a mais nova primeiro."""
+        nota = caminho_da_nota(caminho)
+        q = select(NotaDesatualizada).where(NotaDesatualizada.desfeito.is_(False))
+        if nota is not None:
+            q = q.where(NotaDesatualizada.caminho == nota)
+        with bancos.leitura() as s:
+            marcas = s.scalars(q.order_by(NotaDesatualizada.id.desc())).all()
+        return [{"id": m.id, "caminho": m.caminho, "motivo": m.motivo, "momento": _local(m.criado_em, tz),
+                 "autor": m.autor} for m in marcas]
+
     # ---------------- Desfazer e auditoria ----------------
 
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False))
     def desfazer_registro(tipo: TipoDesfazer, id: int, modelo: Modelo = None) -> str:
-        """Desfaz um registro (gasto, ponto ou atividade). O dado fica no banco marcado como desfeito.
+        """Desfaz um registro (gasto, ponto ou atividade) ou uma marca de nota desatualizada. O dado fica no banco
+        marcado como desfeito.
 
         Com tipo vinculo e o id do campo `desfazer` de vincular_nota, desfaz só a troca de nota: o registro volta à
-        nota anterior (ou fica sem nota) e continua valendo.
+        nota anterior (ou fica sem nota) e continua valendo. Com tipo desatualizada e o id de marcar_desatualizada,
+        tira a marca da nota.
         """
         if tipo == "vinculo":
             return _desfazer_vinculo(id)
-        classe = _MODELOS[tipo]
+        classe = _DESFAZIVEIS[tipo]
         with bancos.escrita.begin() as s:
-            reg = s.get(classe, id)
+            # FOR UPDATE: dois desfazer ao mesmo tempo não gravam duas linhas na auditoria (o segundo espera e lê
+            # desfeito = true). O SQLite ignora; o teste de verdade é o test_concorrencia_pg.py.
+            reg = s.get(classe, id, with_for_update=True)
             if reg is None:
-                raise ToolError(f"Não achei {tipo} com id {id}.")
+                raise ToolError(f"Não achei {_palavra(tipo)} com id {id}.")
             if reg.desfeito:
                 return f"{_maiuscula(_o(tipo, id))} já estava {_desfeito(tipo)}."
-            reg.desfeito = True
+            reg.desfeito = True  # UPDATE só de `desfeito`: o único GRANT de UPDATE em notas_desatualizadas (0005)
             auditoria = Auditoria(ferramenta="desfazer_registro", tabela=classe.__tablename__, registro_id=id,
                                   acao="desfazer", dados={}, autor=_autor())
             s.add(auditoria)
             s.flush()
         anotar_auditoria(auditoria.id)
-        return f"Desfeito: {tipo} {id}."
+        return f"Desfeito: {_palavra(tipo)} {id}."
 
     @mcp.tool(annotations=LEITURA)
     def consultar_auditoria(

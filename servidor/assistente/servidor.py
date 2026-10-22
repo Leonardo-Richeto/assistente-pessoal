@@ -19,7 +19,7 @@ from .banco import ESCRITAS_BANCO, LEITURAS_BANCO, criar_servidor_banco
 from .config import Config, config
 from .db import Bancos
 from .registro import RegistroChamadas
-from .vault import ESCRITAS_VAULT, LEITURAS_VAULT, criar_servidor_vault
+from .vault import ESCRITAS_VAULT, LEITURAS_VAULT, TravaEscritaVault, criar_servidor_vault
 
 log = logging.getLogger("assistente")
 
@@ -176,6 +176,9 @@ def criar_app(cfg: Config | None = None) -> FastMCP:
     # Também grava cada chamada (inclusive leitura) em `chamadas`, com a origem (Passo 8b3).
     app.add_middleware(RegistroChamadas(bancos, leituras=LEITURAS_PECAS | LEITURAS_BANCO | LEITURAS_VAULT,
                                       auditadas=ESCRITAS_BANCO, do_vault=LEITURAS_VAULT | ESCRITAS_VAULT))
+    # Depois do registro = mais por dentro (FastMCP 4.1.0 monta a cadeia com o primeiro middleware por fora):
+    # vault_write_note sem mode append/prepend é recusada antes da peça, e a auditoria grava `escrever` e `erro`.
+    app.add_middleware(TravaEscritaVault())
     return app
 
 

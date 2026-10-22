@@ -126,7 +126,7 @@ def _ligadas(linhas: list[Auditoria]) -> list[tuple]:
 async def test_escrita_no_vault_grava_caminho_sem_conteudo(app, url, recebidas, caplog):
     with caplog.at_level(logging.DEBUG, logger="assistente"):
         async with Client(app) as c:
-            await c.call_tool("vault_write_note", {"path": "00-inbox/teste.md", "content": SEGREDO,
+            await c.call_tool("vault_write_note", {"path": "00-inbox/teste.md", "mode": "append", "content": SEGREDO,
                                                    "frontmatter": {"titulo": SEGREDO}})
     assert recebidas == [("write_note", "00-inbox/teste.md", SEGREDO)]
     linhas = _linhas(url)
@@ -195,7 +195,7 @@ async def test_leitura_so_vai_para_o_log(app, url, caplog):
 async def test_escrita_continua_em_info(app, caplog):
     with caplog.at_level(logging.INFO, logger="assistente.registro"):
         async with Client(app) as c:
-            await c.call_tool("vault_write_note", {"path": "a.md", "content": SEGREDO})
+            await c.call_tool("vault_write_note", {"path": "a.md", "mode": "append", "content": SEGREDO})
             await c.call_tool("registrar_gasto", {"valor": 10, "descricao": "pão", "categoria": "mercado"})
     for nome in ("vault_write_note", "registrar_gasto"):
         regs = [r for r in caplog.records if r.getMessage().startswith(f"Chamada {nome}:")]
@@ -367,7 +367,7 @@ async def test_cancelamento_no_meio_da_escrita_grava_cancelado(url):
 
     with anyio.CancelScope() as escopo:
         async with anyio.create_task_group() as tg:
-            tg.start_soon(mw.on_call_tool, _contexto("vault_write_note", {"path": "a.md", "content": SEGREDO}),
+            tg.start_soon(mw.on_call_tool, _contexto("vault_write_note", {"path": "a.md", "mode": "append", "content": SEGREDO}),
                           _escreve_e_trava)
             await entrou.wait()
             escopo.cancel()
@@ -398,7 +398,7 @@ async def test_cancelamento_pelo_cliente_grava_cancelado(app, url, recebidas):
 async def test_identidade_do_token_vai_para_a_auditoria(app, url, monkeypatch, claims, autor):
     monkeypatch.setattr(registro, "get_access_token", _token(claims))
     async with Client(app) as c:
-        await c.call_tool("vault_write_note", {"path": "a.md", "content": "x"})
+        await c.call_tool("vault_write_note", {"path": "a.md", "mode": "append", "content": "x"})
         with pytest.raises(ToolError):
             await c.call_tool("vault_delete_note", {"path": "a.md", "confirmPath": "a.md"})
         await c.call_tool("registrar_gasto", {"valor": 1, "descricao": "x", "categoria": "y"})
@@ -409,7 +409,7 @@ async def test_identidade_do_token_vai_para_a_auditoria(app, url, monkeypatch, c
 async def test_token_sem_identidade_conferida_e_anonimo(app, url, monkeypatch):
     monkeypatch.setattr(registro, "get_access_token", _token({"email": "x@gmail.com", "login": "x"}))
     async with Client(app) as c:
-        await c.call_tool("vault_write_note", {"path": "a.md", "content": "x"})
+        await c.call_tool("vault_write_note", {"path": "a.md", "mode": "append", "content": "x"})
         await c.call_tool("registrar_gasto", {"valor": 1, "descricao": "x", "categoria": "y"})
     assert [(a.acao, a.autor) for a in _linhas(url)] == [("escrever", "anonimo"), ("ok", "anonimo"), ("criar", None)]
 
@@ -449,7 +449,7 @@ async def test_falha_ao_gravar_auditoria_recusa_a_escrita(app, url, recebidas, m
     monkeypatch.setattr(registro.RegistroChamadas, "_inserir", _quebrado)
     async with Client(app) as c:
         with pytest.raises(ToolError, match="Escrita recusada"):
-            await c.call_tool("vault_write_note", {"path": "a.md", "content": SEGREDO})
+            await c.call_tool("vault_write_note", {"path": "a.md", "mode": "append", "content": SEGREDO})
         with pytest.raises(ToolError, match="Escrita recusada"):
             await c.call_tool("paperless_update_document", {"document_id": 1})
         # Fora das leituras conhecidas também é recusado (falha fechado); leitura não depende do banco.
@@ -464,7 +464,7 @@ async def test_falha_ao_gravar_auditoria_recusa_a_escrita(app, url, recebidas, m
 async def test_consultar_auditoria_mostra_as_linhas_novas(app, url):
     async with Client(app) as c:
         await c.call_tool("registrar_gasto", {"valor": 1, "descricao": "x", "categoria": "y"})
-        await c.call_tool("vault_write_note", {"path": "a.md", "content": SEGREDO})
+        await c.call_tool("vault_write_note", {"path": "a.md", "mode": "append", "content": SEGREDO})
         with pytest.raises(ToolError):
             await c.call_tool("vault_delete_note", {"path": "a.md", "confirmPath": "a.md"})
         aud = (await c.call_tool("consultar_auditoria", {})).data
@@ -498,6 +498,7 @@ CLASSIFICACAO_REVISADA = {
     "vault_get_frontmatter": LE, "vault_get_vault_stats": LE, "vault_list_all_tags": LE,
     "buscar_vault": LE,  # nossa (vault.py): índice em memória das notas; só lê
     "ler_nota": LE, "notas_recentes": LE,  # nossas (vault.py): só lêem
+    "escrever_nota": ESCREVE,  # nossa (vault.py): troca a nota inteira, só com a versão lida
     "vault_wiki_link": LE,  # lê a nota pelo nome (basename) e devolve o conteúdo; não escreve
     "vault_write_note": ESCREVE, "vault_patch_note": ESCREVE, "vault_update_frontmatter": ESCREVE,
     "vault_manage_tags": ESCREVE,  # operation=list é leitura, conferido em registro.py na hora da chamada
@@ -531,6 +532,8 @@ CLASSIFICACAO_REVISADA = {
     "consultar_auditoria": LE, "consultar_chamadas": LE,
     "registrar_gasto": ESCREVE, "registrar_ponto": ESCREVE, "registrar_atividade": ESCREVE,
     "desfazer_registro": ESCREVE, "vincular_nota": ESCREVE,
+    "marcar_desatualizada": ESCREVE,  # grava a marca no banco; não mexe na nota
+    "consultar_desatualizadas": LE,
 }
 
 
@@ -638,7 +641,7 @@ async def test_identidade_pelo_http_com_token_do_provedor(tmp_path, url, recebid
     base = {"google": GoogleProvider, "github": GitHubProvider}[provedor]
     app = servidor.criar_app(cfg).http_app()
     cab = {"accept": "application/json, text/event-stream", "authorization": "Bearer qualquer"}
-    chamadas = [("vault_write_note", {"path": "a.md", "content": SEGREDO}),
+    chamadas = [("vault_write_note", {"path": "a.md", "mode": "append", "content": SEGREDO}),
                 ("vault_delete_note", {"path": "a.md", "confirmPath": "a.md"}),
                 ("registrar_gasto", {"valor": 1, "descricao": "x", "categoria": "y"})]
     with patch.object(base, "load_access_token", return_value=token):

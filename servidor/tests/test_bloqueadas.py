@@ -114,9 +114,9 @@ async def test_so_permitidas_aparecem_nas_pecas(app):
     assert das_pecas == servidor.PERMITIDAS
     # As do banco e a busca nossa do vault (sem namespace) continuam todas.
     assert visiveis - das_pecas == {
-        "buscar_vault", "ler_nota", "notas_recentes",
+        "buscar_vault", "ler_nota", "notas_recentes", "escrever_nota",
         "consultar_atividades", "consultar_auditoria", "consultar_chamadas", "consultar_gastos", "consultar_ponto",
-        "desfazer_registro",
+        "desfazer_registro", "marcar_desatualizada", "consultar_desatualizadas",
         "listar_categorias_gasto", "registrar_atividade", "registrar_gasto", "registrar_ponto", "vincular_nota",
     }
 

@@ -199,15 +199,20 @@ Sem esse arquivo (ou sem o `1`), o serviço só comita localmente. Teste outra v
 `systemctl start` e confira no journal a linha "push feito".
 
 **Lint diário** (`PLANO.md` M3). Roda às 03:40, depois do commit, o `90-meta/lint-do-vault.py` do próprio
-vault. Só lê. O relatório também lista os arquivos de conflito do Syncthing (`*.sync-conflict-*`) como aviso, sem mudar o código de saída. O relatório fica em `/srv/assistente/logs/vault-lint/ultimo.md`, fora do vault, para não entrar no commit:
+vault. Só lê. O relatório também lista os arquivos de conflito do Syncthing (`*.sync-conflict-*`) como aviso, sem mudar o código de saída. O relatório fica em `/srv/assistente/logs/vault-lint/ultimo.md`, fora do vault, para não entrar no commit.
+
+As notas marcadas como desatualizadas no banco (`marcar_desatualizada`) entram no relatório como aviso. Quem consulta o banco é o `vault-marcas.service`, às 03:35: ele roda `deploy/vault/marcas-desatualizadas.sh` (`docker compose exec` no container `servidor`) e grava `/srv/assistente/logs/vault-lint/marcas.md`. O lint só lê esse arquivo e nunca chama `docker`: o código do lint vem do vault, pelo Syncthing, e o usuário dele não deve estar no grupo `docker` (docker = root). Falha na consulta vira uma linha de aviso; arquivo com mais de 24 h vira "AVISO: lista de marcas com mais de 24 h."; sem o arquivo, o lint pula a lista. O usuário do `vault-marcas.service` precisa estar no grupo `docker` (o mesmo do backup). Os comandos abaixo ainda põem o mesmo `$USER` nos dois serviços, e o `scripts/preparar_host.sh` põe esse usuário no grupo `docker`: um usuário próprio para o lint, fora do grupo, está pendente (decidir no i7).
 
 ```bash
 sudo install -d -o "$USER" -g "$USER" /srv/assistente/logs/vault-lint
-sudo cp /srv/assistente/app/deploy/vault/vault-lint.service /etc/systemd/system/
-sudo cp /srv/assistente/app/deploy/vault/vault-lint.timer   /etc/systemd/system/
-sudo sed -i "s/<usuario>/$USER/" /etc/systemd/system/vault-lint.service
-sudo systemctl daemon-reload && sudo systemctl enable --now vault-lint.timer
-sudo systemctl start vault-lint.service; cat /srv/assistente/logs/vault-lint/ultimo.md | head -20
+sudo cp /srv/assistente/app/deploy/vault/vault-lint.service   /etc/systemd/system/
+sudo cp /srv/assistente/app/deploy/vault/vault-lint.timer     /etc/systemd/system/
+sudo cp /srv/assistente/app/deploy/vault/vault-marcas.service /etc/systemd/system/
+sudo cp /srv/assistente/app/deploy/vault/vault-marcas.timer   /etc/systemd/system/
+sudo sed -i "s/<usuario>/$USER/" /etc/systemd/system/vault-lint.service /etc/systemd/system/vault-marcas.service
+sudo systemctl daemon-reload && sudo systemctl enable --now vault-marcas.timer vault-lint.timer
+sudo systemctl start vault-marcas.service; sudo systemctl start vault-lint.service  # nesta ordem
+cat /srv/assistente/logs/vault-lint/ultimo.md | head -20
 ```
 
 Com ERRO no vault, o serviço fica como falho (`systemctl --failed` mostra). Corrija a nota e rode de novo.

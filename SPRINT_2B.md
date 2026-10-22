@@ -72,11 +72,11 @@ tabela; eu confiro testes e diff antes de seguir. Effort max nunca.
 | 1 | 2b.1 `buscar_vault` + CLI; testes de acento, pesos, filtros, query hostil (`"`, `:`, `NEAR`, 10 KiB) | B | Sonnet 5.5 | médio | 0 | Feito 2026-10-21 (Sonnet 5.5) |
 | 2 | 2b.10 medida: executor + 25 perguntas no vault (decisão 4); rodar, ajustar pesos, anotar no `PLANO.md` | B | Sonnet 5.5 | médio | 1 | Feito 2026-10-21 (Sonnet 5.5) |
 | 3 | 2b.5 `notas_recentes` + 2b.7 `ler_nota` com `versao` e relacionadas; função única de caminho seguro | B | Sonnet 5.5 | médio | 0 | Feito 2026-10-21 (Sonnet 5.5) |
-| 4 | ⚑ 2b.2 `escrever_nota` com versão + trava do `vault_write_note`; testes de corrida, caminho hostil, link simbólico | A | Opus 5.5 | alto | 3 | Pendente |
+| 4 | ⚑ 2b.2 `escrever_nota` com versão + trava do `vault_write_note`; testes de corrida, caminho hostil, link simbólico | A | Opus 5.5 | alto | 3 | Feito 2026-10-21 (Opus 5.5); revisor rodou, correções feitas |
 | 5 | 2b.3 barreira de segredo no middleware + gitleaks no `commit-diario.sh` | A | Opus 5.5 | alto | 4 | Pendente |
 | 6 | 2b.4 commit por escrita, `historico_nota`, `restaurar_nota`; `git` na imagem; `docker build` local | A | Opus 5.5 | alto | 4 | Pendente |
 | 7 | 2b.6 `contexto_inicial` com limite | B | Sonnet 5.5 | médio | 3 | Pendente |
-| 8 | 2b.8 migração 0005, `marcar_desatualizada`, `consultar_desatualizadas`, desfazer, lista no lint; teste no Postgres de rascunho | A | Opus 5.5 | alto | 0 | Pendente |
+| 8 | 2b.8 migração 0005, `marcar_desatualizada`, `consultar_desatualizadas`, desfazer, lista no lint; teste no Postgres de rascunho | A | Opus 5.5 | alto | 0 | Feito 2026-10-21 (Opus 5.5); revisor rodou, correções feitas |
 | 9 | 2b.11 `sync-conflict` no `lint-diario.sh` + teste em `scripts/testes/` | C | Haiku 5.5 | baixo | 0 | Feito 2026-10-21 (Haiku 5.5) |
 | 10 | ⚑ 2b.9a hooks `SessionEnd`/`SessionStart`, resumo por regra, fila local, aviso; testes com transcript sintético | A | Opus 5.5 | alto | 5 | Pendente |
 | 11 | ⚑ 2b.9b migração 0006 `sessoes`, `assistente-sessoes importar`, `enviar.sh` por SSH; teste com Postgres de rascunho | A | Opus 5.5 | alto | 8, 10 | Pendente |
@@ -153,3 +153,24 @@ Um bloco por passo, do mais velho para o mais novo: o que fez, verificado, não 
 - Verificado: 337 passam, 1 pulado; medida igual (24/25, MRR 0.847).
 - Não verificado: nome de arquivo em NFD vindo do Mac pelo Syncthing para o Linux do i7. O índice e o grafo leem o
   vault duas vezes por mudança (custo pequeno com ~125 notas; juntar no fechamento se valer).
+
+### Passos 4 e 8 — 2b.2 `escrever_nota` e 2b.8 notas desatualizadas (Opus 5.5, 2026-10-21, em paralelo)
+
+- Passo 4: `escrever_nota(caminho, conteudo, versao)` em `vault.py` (criar com `os.link` sem sobrescrever; trocar com
+  versão conferida duas vezes, temporário `.escrever-nota-*.tmp` + `os.replace`, trava por processo, permissões
+  mantidas); `TravaEscritaVault` recusa `vault_write_note` sem `mode` append/prepend (registro grava `escrever` e `erro`);
+  Ficha 1 sem instrução que use `vault_write_note` para criar ou trocar nota.
+- Passo 8: migração `0005` (`notas_desatualizadas`, índice único parcial do caminho em vigor, GRANT `UPDATE (desfeito)`
+  só), `marcar_desatualizada`, `consultar_desatualizadas`, `desfazer_registro` tipo `desatualizada` ("a marca N"), CLI
+  `python -m assistente.desatualizadas`.
+- Revisor independente (Opus 5.5): 8 achados. Corrigidos: nota cortada (>200.000) e fora de UTF-8 perdiam dado ao serem
+  regravadas (agora vêm sem `versao` e não se trocam); "já existe" empurrava para troca inteira; conteúdo vazio;
+  confirmação "Reescrevi"; dois `desfazer` simultâneos (agora `with_for_update`, teste no Postgres); lint com código do
+  vault no mesmo usuário do docker (consulta das marcas separada em `vault-marcas.service` 03:35 → `marcas.md`).
+- Revisor apontou e não corrigi: (a) deploy antes de colar o texto novo da Ficha 1 faz `vault_write_note` sem `mode`
+  ser recusada (anotar no B8: subir o servidor e colar a Ficha 1 juntos); (b) no i7, o lint ainda roda com o usuário do
+  Syncthing, que está no grupo docker: criar usuário próprio do lint fora do docker (decisão para a implantação,
+  anotada em `docs/SYNCTHING.md`).
+- Verificado: 428 passam, 6 pulados sem Postgres; com o Postgres de rascunho, 6 testes de Postgres passam (GRANT de
+  coluna, concorrência do desfazer); `test_lint_desatualizadas.sh` 11 ok; `test_lint_conflitos.sh` ok.
+- Não verificado: units no systemd do i7; mcpvault real com `mode` append numa nota que não existe.

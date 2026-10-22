@@ -1,4 +1,4 @@
-"""vincular_nota sob concorrência no Postgres de verdade (Passo 8e; pendência do revisor do 8c).
+"""vincular_nota e desfazer_registro sob concorrência no Postgres de verdade (Passo 8e; achado do revisor da 2b).
 
 Só roda com ASSISTENTE_PG_RASCUNHO = URL de um banco de RASCUNHO já migrado (alembic upgrade head), com nome
 começando por `teste_`. Sem a variável, o teste é pulado. O SQLite dos outros testes não tem `FOR UPDATE`.
@@ -28,7 +28,7 @@ from sqlalchemy.orm import Session
 
 from assistente.banco import criar_servidor_banco
 from assistente.db import Bancos
-from assistente.modelos import Auditoria, Gasto
+from assistente.modelos import Auditoria, Gasto, NotaDesatualizada
 
 URL = os.environ.get("ASSISTENTE_PG_RASCUNHO", "")
 PREFIXO_RASCUNHO = "teste_"
@@ -123,3 +123,53 @@ def _trocas_simultaneas(engine, registrar_gasto, vincular_nota):
     assert {primeira.dados["caminho"], segunda.dados["caminho"]} == {"00-inbox/a1.md", "00-inbox/a2.md"}
     assert final == segunda.dados["caminho"]
     assert sorted(r["vinculo"] for r in resultados.values()) == [primeira.id, segunda.id]
+
+
+@pytest.mark.parametrize("tipo", ["gasto", "desatualizada"])
+def test_dois_desfazer_simultaneos_gravam_uma_linha(url, tipo):
+    """Dois desfazer do mesmo registro ao mesmo tempo: um desfaz, o outro diz "já estava" (FOR UPDATE no SELECT).
+
+    Sem a trava, os dois liam desfeito = false e gravavam duas linhas `desfazer` na auditoria.
+    """
+    bancos = Bancos.de_urls(url, url)
+    mcp = criar_servidor_banco(bancos, TZ)
+    desfazer = anyio.run(mcp.get_tool, "desfazer_registro").fn
+    engine = create_engine(url)
+    try:
+        if tipo == "gasto":
+            classe, tabela = Gasto, "gastos"
+            rid = anyio.run(mcp.get_tool, "registrar_gasto").fn(
+                valor=Decimal("1.00"), descricao="teste desfazer", categoria="teste")["id"]
+        else:
+            classe, tabela = NotaDesatualizada, "notas_desatualizadas"
+            rid = anyio.run(mcp.get_tool, "marcar_desatualizada").fn(
+                caminho=f"00-inbox/desfazer-{time.time_ns()}.md", motivo="teste")["id"]
+        resultados, erros = [], []
+
+        def chamar():
+            try:
+                resultados.append(desfazer(tipo=tipo, id=rid))
+            except Exception as e:  # noqa: BLE001 (o teste mostra o erro)
+                erros.append(e)
+
+        # Uma terceira conexão segura a linha: os dois desfazer param juntos e disputam a linha ao soltar.
+        with Session(engine) as trava, trava.begin():
+            trava.execute(select(classe).where(classe.id == rid).with_for_update())
+            threads = [threading.Thread(target=chamar) for _ in range(2)]
+            for t in threads:
+                t.start()
+            paradas = _esperando_trava(engine, 2)
+        for t in threads:
+            t.join(timeout=10)
+
+        assert not erros, erros
+        assert paradas == 2, "os dois desfazer deveriam esperar a trava ao mesmo tempo"
+        assert sorted(r.startswith("Desfeito:") for r in resultados) == [False, True], resultados
+        with Session(engine) as s:
+            linhas = s.scalars(select(Auditoria.acao).where(Auditoria.tabela == tabela, Auditoria.registro_id == rid,
+                                                            Auditoria.acao == "desfazer")).all()
+        assert len(linhas) == 1
+    finally:
+        engine.dispose()
+        bancos.leitura.kw["bind"].dispose()
+        bancos.escrita.kw["bind"].dispose()

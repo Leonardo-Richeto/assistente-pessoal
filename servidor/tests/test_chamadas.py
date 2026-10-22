@@ -61,7 +61,7 @@ def _sem_segredo(linhas) -> None:
 async def test_toda_chamada_vira_linha_com_a_origem(app, url, http_simulado):
     async with Client(app, client_info=CLIENTE) as c:
         await c.call_tool("vault_read_note", {"path": "a.md"})
-        await c.call_tool("vault_write_note", {"path": "a.md", "content": SEGREDO})
+        await c.call_tool("vault_write_note", {"path": "a.md", "mode": "append", "content": SEGREDO})
         r = (await c.call_tool("registrar_gasto", {"valor": 1, "descricao": SEGREDO, "categoria": "y",
                                                    "modelo": "claude-opus-5-5"})).data
         await c.call_tool("desfazer_registro", {"tipo": "gasto", "id": r["id"], "modelo": "Claude Opus 5.5"})
@@ -126,8 +126,8 @@ def test_modelo_declarado_valida_o_formato():
 async def test_modelo_pelo_meta_vale_para_as_pecas(app, url, recebidas):
     # Peça pronta não muda de schema: o modelo só entra se o cliente mandar `_meta._modelo`.
     async with Client(app) as c:
-        await c.call_tool("vault_write_note", {"path": "a.md", "content": "x"}, meta={"_modelo": "claude-teste"})
-        await c.call_tool("vault_write_note", {"path": "b.md", "content": "x"}, meta={"_modelo": "x\ny"})
+        await c.call_tool("vault_write_note", {"path": "a.md", "mode": "append", "content": "x"}, meta={"_modelo": "claude-teste"})
+        await c.call_tool("vault_write_note", {"path": "b.md", "mode": "append", "content": "x"}, meta={"_modelo": "x\ny"})
     assert [c.modelo_declarado for c in _chamadas(url)] == ["claude-teste", None]
     assert [r[1] for r in recebidas] == ["a.md", "b.md"]
 
@@ -151,7 +151,7 @@ async def test_falha_ao_gravar_chamada_nao_derruba_nada(app, url, recebidas, mon
     with caplog.at_level(logging.ERROR, logger="assistente.registro"):
         async with Client(app) as c:
             assert (await c.call_tool("vault_read_note", {"path": "a.md"})).data == SEGREDO
-            await c.call_tool("vault_write_note", {"path": "a.md", "content": "x"})
+            await c.call_tool("vault_write_note", {"path": "a.md", "mode": "append", "content": "x"})
             await c.call_tool("registrar_gasto", {"valor": 1, "descricao": "x", "categoria": "y"})
     assert _chamadas(url) == []
     assert [a.acao for a in _auditoria(url)] == ["escrever", "ok", "criar"]  # a auditoria segue igual
@@ -161,7 +161,7 @@ async def test_falha_ao_gravar_chamada_nao_derruba_nada(app, url, recebidas, mon
 async def test_consultar_auditoria_filtra_por_tabela_e_acao(app, url):
     async with Client(app) as c:
         await c.call_tool("registrar_gasto", {"valor": 1, "descricao": "x", "categoria": "y"})
-        await c.call_tool("vault_write_note", {"path": "a.md", "content": "x"})
+        await c.call_tool("vault_write_note", {"path": "a.md", "mode": "append", "content": "x"})
         with pytest.raises(ToolError):
             await c.call_tool("vault_delete_note", {"path": "a.md", "confirmPath": "a.md"})
         todas = (await c.call_tool("consultar_auditoria", {})).data
@@ -226,7 +226,7 @@ async def test_pelo_http_grava_cliente_sessao_e_user_agent(tmp_path, url, recebi
                 cab["mcp-session-id"] = sessao
                 await c.post("/mcp", headers=cab, json={"jsonrpc": "2.0", "method": "notifications/initialized"})
                 r = await c.post("/mcp", headers=cab, json={"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {
-                    "name": "vault_write_note", "arguments": {"path": "a.md", "content": SEGREDO}}})
+                    "name": "vault_write_note", "arguments": {"path": "a.md", "mode": "append", "content": SEGREDO}}})
                 assert r.status_code == 200, r.text
     (linha,) = _chamadas(url)
     assert (linha.ferramenta, linha.resultado, linha.cliente, linha.versao_cliente, linha.sessao, linha.user_agent) == (

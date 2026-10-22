@@ -176,7 +176,8 @@ async def test_conteudo_grande_e_cortado(raiz, tmp_path, monkeypatch):
     async with Client(app) as c:
         r = (await c.call_tool("ler_nota", {"caminho": "grande.md"})).data
     assert r["cortado"] is True and len(r["conteudo"]) == 200_000
-    assert r["versao"] == vault.versao_de((raiz / "grande.md").read_bytes())
+    # Sem versão: trocar a nota inteira com o texto cortado apagaria o fim.
+    assert r["versao"] is None and r["aviso"].startswith("Nota maior que o limite: lida só em parte.")
 
 
 # ---------------- notas_recentes ----------------

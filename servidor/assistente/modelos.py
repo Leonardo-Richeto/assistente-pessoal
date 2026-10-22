@@ -8,7 +8,7 @@ Para um dado novo, crie o modelo aqui e gere a migração com
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import JSON, Boolean, Date, DateTime, Integer, Numeric, String, Text, func
+from sqlalchemy import JSON, Boolean, Date, DateTime, Index, Integer, Numeric, String, Text, func, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -57,6 +57,31 @@ class Atividade(_Registro, Base):
     tags: Mapped[str | None] = mapped_column(String(200))
 
 
+class NotaDesatualizada(Base):
+    """Marca de nota do vault que parece velha ou errada (Passo 8, 2b.8; ficha 5, regra 8). Não mexe na nota.
+
+    Só INSERT e UPDATE da coluna `desfeito` (migração 0005). Desfazer = `desfeito = true`, como `_Registro`.
+    """
+
+    __tablename__ = "notas_desatualizadas"
+    # Uma marca em vigor por nota: o índice único parcial (só das não desfeitas) segura duas marcas
+    # simultâneas da mesma nota e serve de índice do caminho nas consultas das marcas em vigor.
+    __table_args__ = (
+        Index("ix_notas_desatualizadas_caminho_em_vigor", "caminho", unique=True,
+              postgresql_where=text("NOT desfeito"), sqlite_where=text("NOT desfeito")),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Caminho relativo da nota (formato conferido por `caminho_da_nota`; o servidor não confere se existe).
+    caminho: Mapped[str] = mapped_column(String(300))
+    # Por que a nota parece velha ou errada, nas palavras do modelo (até 500 caracteres, conferido na ferramenta).
+    motivo: Mapped[str] = mapped_column(Text)
+    # Conta conferida na lista (como `Auditoria.autor`); vazio sem token.
+    autor: Mapped[str | None] = mapped_column(String(80))
+    desfeito: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+
+
 class Auditoria(Base):
     """Toda escrita feita por ferramenta passa por aqui, e toda tentativa negada (registro.py)."""
 
@@ -66,9 +91,9 @@ class Auditoria(Base):
     momento: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     # Nome da ferramenta; `<nome invalido>` se o nome pedido não for só letras, números e `_`.
     ferramenta: Mapped[str] = mapped_column(String(60))
-    # Banco: gastos | ponto | atividades. Peças: vault | paperless. Outro nome: ferramenta.
+    # Banco: gastos | ponto | atividades | notas_desatualizadas. Peças: vault | paperless. Outro nome: ferramenta.
     tabela: Mapped[str] = mapped_column(String(60))
-    # Banco: id do gasto, ponto ou atividade. Linha ok | erro | cancelado | negado depois de uma
+    # Banco: id do gasto, ponto, atividade ou marca. Linha ok | erro | cancelado | negado depois de uma
     # `escrever`: o id dessa linha `escrever` (auditoria.id). Vazio na `escrever` e na negada sem ela.
     registro_id: Mapped[int | None]
     # Banco: criar | desfazer; vincular | desfazer_vinculo (caminho da nota, Passo 8c).

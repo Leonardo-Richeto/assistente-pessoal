@@ -6,6 +6,9 @@
 #   VAULT_PATH=/srv/assistente/vault LINT_DIR=/srv/assistente/logs/vault-lint bash deploy/vault/lint-diario.sh
 # O relatório fica FORA do vault, para não virar nota nem entrar no commit diário.
 # Arquivo de conflito do Syncthing (*.sync-conflict-*) vira seção de AVISO no relatório; não muda o código.
+# As notas marcadas como desatualizadas no banco viram seção de AVISO, lidas de $LINT_DIR/marcas.md, que o
+# vault-marcas.service (marcas-desatualizadas.sh, 03:35) grava. O lint não chama docker: o código dele vem do
+# vault, e o usuário dele não deve estar no grupo docker.
 set -u
 
 VAULT_PATH="${VAULT_PATH:-/srv/assistente/vault}"
@@ -39,6 +42,25 @@ if [ -n "$CONFLITOS" ]; then
     printf '%s\n' "$CONFLITOS" | head -n 50 | while IFS= read -r f; do echo "- ${f#"$VAULT_PATH"/}"; done
     [ "$N" -gt 50 ] && echo "- ... e mais $((N - 50))"
   } >>"$LINT_DIR/ultimo.md.parcial"
+fi
+
+# Notas marcadas como desatualizadas (marcar_desatualizada, tabela do banco): aviso, não erro.
+# Sem marcas.md (vault-marcas.service não instalado), pula em silêncio. Com mais de 24 h, só avisa.
+MARCAS="$LINT_DIR/marcas.md"
+if [ -f "$MARCAS" ]; then
+  if [ -z "$(find "$MARCAS" -mmin -1440 2>/dev/null)" ]; then
+    { echo ""; echo "AVISO: lista de marcas com mais de 24 h."; } >>"$LINT_DIR/ultimo.md.parcial"
+  elif head -n 1 "$MARCAS" | grep -q '^AVISO:'; then  # a consulta falhou: a linha do aviso, sem seção
+    { echo ""; head -n 1 "$MARCAS"; } >>"$LINT_DIR/ultimo.md.parcial"
+  elif grep -q . "$MARCAS"; then
+    {
+      echo ""
+      echo "## Notas marcadas como desatualizadas"
+      echo ""
+      echo "AVISO: revise cada nota e, se corrigiu, desfaça a marca no app."
+      cat "$MARCAS"
+    } >>"$LINT_DIR/ultimo.md.parcial"
+  fi
 fi
 mv "$LINT_DIR/ultimo.md.parcial" "$LINT_DIR/ultimo.md"
 log "$(sed -n 3p "$LINT_DIR/ultimo.md") Relatório: $LINT_DIR/ultimo.md"

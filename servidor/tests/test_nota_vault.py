@@ -335,7 +335,7 @@ def test_migracao_0004_sobe_desce_sem_apagar_e_recusa_com_valor(tmp_path):
         cx.execute(text("INSERT INTO atividades (momento, descricao, criado_em, desfeito) "
                         "VALUES (CURRENT_TIMESTAMP, 'Estudei', CURRENT_TIMESTAMP, 0)"))
 
-    _alembic(url, "upgrade", "head")
+    _alembic(url, "upgrade", "0004")  # até a 0004: a 0005 tem o seu teste (test_desatualizadas.py)
     engine.dispose()
     for tabela in ("gastos", "ponto", "atividades"):
         assert "nota_vault" in _colunas(engine, tabela)

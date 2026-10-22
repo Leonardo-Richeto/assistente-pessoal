@@ -7,6 +7,9 @@
 *.syncthing.*.tmp
 .syncthing.*
 
+# Temporário do escrever_nota do assistente (vive milissegundos; nunca entra no commit)
+.escrever-nota-*.tmp
+
 # Cópia parada do .git do Mac (não deve existir dentro do vault)
 .git-mac-parado/
 

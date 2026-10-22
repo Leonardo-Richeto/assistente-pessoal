@@ -1,11 +1,17 @@
-"""Ferramentas nossas sobre o vault (além do mcpvault): busca por relevância e, nos próximos passos, leitura com versão.
+"""Ferramentas nossas sobre o vault (além do mcpvault): busca, leitura com versão e troca da nota inteira com versão.
 
 Só aqui entra lógica do vault; a busca em si fica em vault_busca.py (sem FastMCP).
+Escrita (escrever_nota): temporário na mesma pasta e os.replace, com a versão conferida duas vezes sob uma trava do
+processo. Entre a segunda conferência e o os.replace, o Syncthing (ou o Obsidian) ainda pode escrever a nota, e essa
+escrita se perde: risco aceito, porque a janela é de milissegundos.
 """
 
 import hashlib
+import logging
 import os
 import re
+import secrets
+import stat
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -15,20 +21,41 @@ from zoneinfo import ZoneInfo
 
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
+from fastmcp.server.middleware import Middleware
 from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from . import vault_busca
-from .banco import caminho_da_nota
+from .banco import Modelo, caminho_da_nota
 from .vault_busca import LIMITE_PADRAO, IndiceVault
 
+log = logging.getLogger(__name__)
+
 LEITURA = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
+TROCA = ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=False, openWorldHint=False)
 
 # Nomes para o registro (registro.py) e para o teste de classificação. Os próximos passos acrescentam.
 LEITURAS_VAULT = {"buscar_vault", "ler_nota", "notas_recentes"}
-ESCRITAS_VAULT: set[str] = set()
+ESCRITAS_VAULT = {"escrever_nota"}
 
-LIMITE_CONTEUDO = 200_000  # caracteres devolvidos por ler_nota
+# Caracteres: o máximo que ler_nota devolve e que escrever_nota aceita. Um limite só: a nota que ler_nota
+# corta não pode voltar inteira por escrever_nota (perderia o fim).
+LIMITE_CONTEUDO = 200_000
+VERSAO_NOVA = "nova"
+VERSAO_VALIDA = re.compile(r"[0-9a-f]{16}")
+NOTA_MUDOU = "A nota mudou desde a leitura. Leia de novo com ler_nota."
+_SO_EM_PARTE = ("Não dá para trocar a nota inteira; use vault_patch_note ou vault_write_note "
+                "com mode append.")
+AVISO_CORTADA = "Nota maior que o limite: lida só em parte. " + _SO_EM_PARTE
+RECUSA_GRANDE = "Nota maior que o limite. " + _SO_EM_PARTE
+AVISO_NAO_UTF8 = "A nota não está em UTF-8: só leitura. Edite no Obsidian."
+VAZIO = "Conteúdo vazio: nada foi gravado. Nada se apaga no vault."
+# Trava do mcpvault: write_note no modo padrão (overwrite) troca a nota inteira sem conferir versão.
+# O nome com hash (`<hash12>_vault_write_note`, FastMCP 4.1.0) também conta, por garantia.
+NOME_WRITE_NOTE = re.compile(r"(?:[0-9a-f]{12}_)?vault_write_note")
+MODOS_ACRESCENTAR = {"append", "prepend"}
+RECUSA_WRITE_NOTE = ("vault_write_note só acrescenta (mode append ou prepend). "
+                     "Para trocar a nota inteira, use ler_nota e escrever_nota.")
 LIMITE_RELACIONADAS = 10
 RECENTES_PADRAO, RECENTES_MAXIMO = 10, 30
 IGNORADOS_ESCRITA = {".git", ".obsidian", ".stversions", ".trash"}
@@ -56,6 +83,186 @@ def caminho_seguro(raiz: Path, caminho: str) -> Path:
     if real == real_raiz or set(real.relative_to(real_raiz).parts) & IGNORADOS_ESCRITA:
         raise ToolError("Caminho fora do vault")
     return real
+
+
+# Uma escrita por vez neste processo: a conferência da versão e a troca não se cruzam entre chamadas.
+_trava_escrita = threading.Lock()
+
+
+def _ler_bytes(real: Path) -> bytes:
+    try:
+        return real.read_bytes()
+    except OSError:
+        raise ToolError("Nota não existe ou não pode ser lida") from None
+
+
+def _gravar_temporario(pasta: Path, dados: bytes, modo: int | None = None) -> Path:
+    """Arquivo novo na mesma pasta, com nome `.escrever-nota-<hex>.tmp` (a busca e o lint só olham `.md`).
+
+    Grava, aplica o modo (se dado) e faz fsync. Quem chama remove o temporário se ele sobrar.
+    """
+    tmp = pasta / f".escrever-nota-{secrets.token_hex(8)}.tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o666)
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(dados)
+            f.flush()
+            if modo is not None:
+                os.fchmod(f.fileno(), modo)
+            os.fsync(f.fileno())
+    except BaseException:
+        _remover(tmp)
+        raise
+    return tmp
+
+
+def _remover(caminho: Path) -> None:
+    try:
+        os.unlink(caminho)
+    except FileNotFoundError:
+        pass
+    except OSError:
+        log.warning("Não consegui remover o temporário %s", caminho.name)
+
+
+def _fsync_pasta(pasta: Path) -> None:
+    """A troca de nome fica gravada no disco; onde não dá (Windows, alguns sistemas), segue sem."""
+    try:
+        fd = os.open(pasta, os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        os.fsync(fd)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
+
+
+def _texto_trocavel(dados: bytes) -> None:
+    """ToolError se a nota no disco não pode ser trocada inteira: fora de UTF-8 ou maior que o limite."""
+    try:
+        texto = dados.decode("utf-8")
+    except UnicodeDecodeError:
+        raise ToolError(AVISO_NAO_UTF8) from None
+    if len(texto) > LIMITE_CONTEUDO:
+        raise ToolError(RECUSA_GRANDE)
+
+
+def _criar(raiz_real: Path, real: Path, limpo: str, dados: bytes) -> None:
+    """Cria a nota sem sobrescrever: os.link do temporário falha se o destino já existe."""
+    existe = (f"A nota já existe: {limpo}. Para acrescentar, use vault_write_note com mode append; "
+              "não troque a nota inteira sem o dono pedir.")
+    if os.path.lexists(real):
+        raise ToolError(existe)
+    pasta = real.parent
+    pasta.mkdir(parents=True, exist_ok=True)
+    # A pasta criada continua sendo ela mesma, dentro do vault (link simbólico posto no meio = recusa).
+    if Path(os.path.realpath(pasta)) != pasta or not pasta.is_relative_to(raiz_real):
+        raise ToolError("Caminho fora do vault")
+    tmp = None
+    try:
+        tmp = _gravar_temporario(pasta, dados)
+        try:
+            os.link(tmp, real)
+        except FileExistsError:
+            raise ToolError(existe) from None
+        except OSError:
+            # Sistema sem link (alguns FUSE e montagens): "x" também falha se o arquivo já existe.
+            try:
+                f = open(real, "xb")
+            except FileExistsError:
+                raise ToolError(existe) from None
+            try:
+                with f:
+                    f.write(dados)
+                    f.flush()
+                    os.fsync(f.fileno())
+            except BaseException:
+                _remover(real)  # foi esta chamada que criou
+                raise
+    finally:
+        if tmp is not None:
+            _remover(tmp)
+    _fsync_pasta(pasta)
+
+
+def _trocar(real: Path, limpo: str, dados: bytes, versao: str) -> None:
+    """Troca a nota inteira se ela ainda tem `versao`; confere de novo logo antes do os.replace.
+
+    Nota fora de UTF-8 ou maior que o limite não é trocada (ler_nota não devolve a versão dela).
+    """
+    if not real.is_file():
+        raise ToolError(f"Nota não existe: {limpo}")
+    atual = _ler_bytes(real)
+    _texto_trocavel(atual)
+    if versao_de(atual) != versao:
+        raise ToolError(NOTA_MUDOU)
+    modo = stat.S_IMODE(os.stat(real).st_mode)
+    tmp = None
+    try:
+        tmp = _gravar_temporario(real.parent, dados, modo)
+        if versao_de(_ler_bytes(real)) != versao:
+            raise ToolError(NOTA_MUDOU)
+        os.replace(tmp, real)
+        tmp = None
+    finally:
+        if tmp is not None:
+            _remover(tmp)
+    _fsync_pasta(real.parent)
+
+
+def gravar_nota(raiz: Path, caminho: str, conteudo: str, versao: str) -> dict:
+    """Cria (versao "nova") ou troca a nota inteira, só se a versão no disco ainda é `versao`.
+
+    Grava os bytes UTF-8 do conteúdo como vieram (fim de linha não muda). Nunca põe o conteúdo em mensagem.
+    """
+    real = caminho_seguro(raiz, caminho)
+    limpo = caminho_da_nota(caminho)
+    if not isinstance(conteudo, str):
+        raise ToolError("conteudo precisa ser texto")
+    if not conteudo.strip():
+        raise ToolError(VAZIO)
+    if len(conteudo) > LIMITE_CONTEUDO:
+        raise ToolError(f"Conteúdo grande demais: até {LIMITE_CONTEUDO} caracteres. Nada foi gravado.")
+    if "\x00" in conteudo:
+        raise ToolError("Conteúdo com caractere nulo (NUL). Nada foi gravado.")
+    try:
+        dados = conteudo.encode("utf-8")
+    except UnicodeEncodeError:
+        raise ToolError("Conteúdo com caractere que não existe em UTF-8. Nada foi gravado.") from None
+    versao = versao.strip() if isinstance(versao, str) else ""
+    if versao != VERSAO_NOVA and not VERSAO_VALIDA.fullmatch(versao):
+        raise ToolError('versao inválida: use a versao devolvida por ler_nota, ou "nova" para criar a nota.')
+    raiz_real = Path(os.path.realpath(raiz))
+    try:
+        with _trava_escrita:
+            if versao == VERSAO_NOVA:
+                _criar(raiz_real, real, limpo, dados)
+            else:
+                _trocar(real, limpo, dados, versao)
+    except OSError as e:
+        log.warning("escrever_nota falhou em %s: %s", limpo, type(e).__name__)
+        raise ToolError(f"Não consegui gravar {limpo}: {e.strerror or type(e).__name__}. Nada foi trocado.") from None
+    if versao == VERSAO_NOVA:
+        return {"caminho": limpo, "versao": versao_de(dados), "confirmacao": f"Criei {limpo}."}
+    return {"caminho": limpo, "versao": versao_de(dados), "confirmacao": f"Reescrevi {limpo}."}
+
+
+class TravaEscritaVault(Middleware):
+    """vault_write_note só passa com mode append ou prepend; sem mode (overwrite) troca a nota sem versão.
+
+    Registrada em criar_app depois do RegistroChamadas (mais por dentro): a recusa aparece na auditoria como
+    `escrever` e depois `erro`, e a chamada nunca chega ao mcpvault.
+    """
+
+    async def on_call_tool(self, context, call_next):
+        nome = context.message.name
+        if isinstance(nome, str) and NOME_WRITE_NOTE.fullmatch(nome):
+            modo = (context.message.arguments or {}).get("mode")
+            if not (isinstance(modo, str) and modo in MODOS_ACRESCENTAR):
+                raise ToolError(RECUSA_WRITE_NOTE)
+        return await call_next(context)
 
 
 @dataclass
@@ -181,7 +388,7 @@ def criar_servidor_vault(raiz: Path) -> FastMCP:
         caminho: Annotated[str, Field(description="Caminho da nota relativo ao vault (ex.: 20-areas/perfil-do-leonardo.md).")],
         relacionadas: Annotated[bool, Field(description="Se verdadeiro, traz também as notas ligadas (até 10).")] = True,
     ) -> dict:
-        """Lê uma nota do vault inteira, com a versao (use em escrever_nota) e as notas ligadas a ela (links e backlinks), só com o resumo."""
+        """Lê uma nota do vault inteira, com a versao (use em escrever_nota) e as notas ligadas a ela (links e backlinks), só com o resumo. Com aviso, a versao vem nula: não troque a nota inteira."""
         real = caminho_seguro(raiz, caminho)
         if not real.is_file():
             raise ToolError(f"Nota não existe: {caminho}")
@@ -189,11 +396,20 @@ def criar_servidor_vault(raiz: Path) -> FastMCP:
             dados = real.read_bytes()
         except OSError:
             raise ToolError(f"Nota não existe: {caminho}") from None
-        texto = dados.decode("utf-8", errors="replace")
+        try:
+            texto = dados.decode("utf-8")
+            aviso = None
+        except UnicodeDecodeError:  # só leitura: a troca gravaria o texto com � no lugar dos bytes originais
+            texto = dados.decode("utf-8", errors="replace")
+            aviso = AVISO_NAO_UTF8
         saida: dict = {"caminho": caminho_da_nota(caminho), "conteudo": texto, "versao": versao_de(dados)}
         if len(texto) > LIMITE_CONTEUDO:
             saida["conteudo"] = texto[:LIMITE_CONTEUDO]
             saida["cortado"] = True
+            aviso = aviso or AVISO_CORTADA
+        if aviso:  # sem versão: escrever_nota com o texto devolvido estragaria a nota
+            saida["versao"] = None
+            saida["aviso"] = aviso
         if relacionadas:
             g = grafo.atual()
             rel = real.relative_to(Path(os.path.realpath(raiz))).as_posix()
@@ -223,5 +439,15 @@ def criar_servidor_vault(raiz: Path) -> FastMCP:
             caminhos = [c for c in caminhos if c == p or c.startswith(p + "/")]
         caminhos.sort(key=lambda c: (g.atualizado[c], g.mtime[c], c), reverse=True)
         return [{"caminho": c, "titulo": g.notas[c].titulo, "atualizado": g.atualizado[c]} for c in caminhos[:n]]
+
+    @mcp.tool(annotations=TROCA)
+    def escrever_nota(
+        caminho: Annotated[str, Field(description="Caminho da nota relativo ao vault (ex.: 00-inbox/ideia.md).")],
+        conteudo: Annotated[str, Field(description="O texto inteiro da nota, com o frontmatter (até 200.000 caracteres).")],
+        versao: Annotated[str, Field(description='A versao devolvida por ler_nota; "nova" para criar uma nota que não existe.')],
+        modelo: Modelo = None,
+    ) -> dict:
+        """Troca a nota inteira, só se ela ainda tem a versao lida por ler_nota (ou versao "nova" para criar). Para acrescentar, use vault_write_note com mode append."""
+        return gravar_nota(raiz, caminho, conteudo, versao)
 
     return mcp

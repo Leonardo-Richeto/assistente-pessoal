@@ -1,0 +1,10 @@
+[Unit]
+Description=Lista das notas marcadas como desatualizadas as 03:35 (antes do lint das 03:40)
+
+[Timer]
+OnCalendar=*-*-* 03:35:00
+Persistent=true
+Unit=vault-marcas.service
+
+[Install]
+WantedBy=timers.target

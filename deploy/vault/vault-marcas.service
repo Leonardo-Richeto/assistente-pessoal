@@ -1,0 +1,13 @@
+[Unit]
+Description=Lista das notas marcadas como desatualizadas para o lint do vault (grava /srv/assistente/logs/vault-lint/marcas.md)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# Troque <usuario> por um usuario do grupo docker (o mesmo do backup). Este servico so roda codigo do
+# repositorio; o lint, que roda codigo do vault, le o arquivo que este grava e nao usa docker.
+User=<usuario>
+# Pasta do repositorio (docker-compose.yml) e pasta do relatorio do lint.
+Environment=ASSISTENTE_DIR=/srv/assistente/app LINT_DIR=/srv/assistente/logs/vault-lint
+ExecStart=/bin/bash /srv/assistente/app/deploy/vault/marcas-desatualizadas.sh
