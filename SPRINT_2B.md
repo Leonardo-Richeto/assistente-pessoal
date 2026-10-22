@@ -300,6 +300,8 @@ Um bloco por passo, do mais velho para o mais novo: o que fez, verificado, não 
 
 ## Sprint fechada no Mac (2026-10-22)
 
-Pendente do Leonardo: revisar `git log main..fase-2b`, merge, implantação no i7 (`docs/IMPLANTACAO.md`, Fase 2b) e
+Merge em `main` feito em 2026-10-22 (fast-forward). Pendente do Leonardo: `git push` do repo (13 commits à
+frente do origin) e do vault (5 arquivos sem commit: `onde-parei`, `_planos`, nota do plano, `_meta`,
+`perguntas-da-busca`), implantação no i7 (`docs/IMPLANTACAO.md`, Fase 2b) e
 as decisões do 2b-7 (Vaultwarden, usuário do lint fora do docker, bloqueio de mover nota). Este arquivo sai do repo
 quando a implantação no i7 terminar, consolidado em `CONTEXTO.md` e no vault.
