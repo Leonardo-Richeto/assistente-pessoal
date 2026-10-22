@@ -78,7 +78,7 @@ tabela; eu confiro testes e diff antes de seguir. Effort max nunca.
 | 7 | 2b.6 `contexto_inicial` com limite | B | Sonnet 5.5 | médio | 3 | Pendente |
 | 8 | 2b.8 migração 0005, `marcar_desatualizada`, `consultar_desatualizadas`, desfazer, lista no lint; teste no Postgres de rascunho | A | Opus 5.5 | alto | 0 | Feito 2026-10-21 (Opus 5.5); revisor rodou, correções feitas |
 | 9 | 2b.11 `sync-conflict` no `lint-diario.sh` + teste em `scripts/testes/` | C | Haiku 5.5 | baixo | 0 | Feito 2026-10-21 (Haiku 5.5) |
-| 10 | ⚑ 2b.9a hooks `SessionEnd`/`SessionStart`, resumo por regra, fila local, aviso; testes com transcript sintético | A | Opus 5.5 | alto | 5 | Pendente |
+| 10 | ⚑ 2b.9a hooks `SessionEnd`/`SessionStart`, resumo por regra, fila local, aviso; testes com transcript sintético | A | Opus 5.5 | alto | 5 | Feito 2026-10-22 (Opus 5.5); revisor rodou, correções feitas |
 | 11 | ⚑ 2b.9b migração 0006 `sessoes`, `assistente-sessoes importar`, `enviar.sh` por SSH; teste com Postgres de rascunho | A | Opus 5.5 | alto | 8, 10 | Pendente |
 | 12 | Fechamento: revisor final na branch, `docker build` arm64, docs (`PLANO.md` [x], `CONTEXTO.md`, `README.md`, `docs/IMPLANTACAO.md` com os passos do i7), hooks no Mac (decisão 6), vault (`onde-parei`, nota do plano) | A | Opus 5.5 | alto | todos | Pendente |
 
@@ -174,3 +174,34 @@ Um bloco por passo, do mais velho para o mais novo: o que fez, verificado, não 
 - Verificado: 428 passam, 6 pulados sem Postgres; com o Postgres de rascunho, 6 testes de Postgres passam (GRANT de
   coluna, concorrência do desfazer); `test_lint_desatualizadas.sh` 11 ok; `test_lint_conflitos.sh` ok.
 - Não verificado: units no systemd do i7; mcpvault real com `mode` append numa nota que não existe.
+
+### Estado em 2026-10-22 00:30 (orquestrador, para retomar se cair)
+
+- Passo 6 (2b.4) e Passo 10 (2b.9a) implementados, SEM commit; revisores rodaram (Passo 6: 9 achados; Passo 10: 14).
+  Correções dos dois em andamento (subagentes Opus); pararam pelo limite de uso às ~00:00 e foram retomados às 00:30.
+- Decidido pelo orquestrador no Passo 10: do comando Bash, só a primeira linha (sem heredoc, aspas longas viram "…")
+  e do commit só a primeira linha — vale o "nunca conteúdo" da Ficha 5 sobre os "200 caracteres". Aviso do SessionStart
+  vai por `systemMessage` (o dono vê) e por `additionalContext` marcado como dado.
+- Achado 4 do revisor do Passo 6 (segredo entrando no git pelo commit por escrita) entra no Passo 5: o commit pula o
+  arquivo que tiver segredo.
+- Depois: commit dos Passos 6 e 10, Passo 5 (segredos no servidor, cópia de `ferramentas/sessoes/segredos.py`),
+  Passo 7, Passo 11, Passo 12.
+
+### Passo 10 — 2b.9a captura local das sessões do Claude Code (Opus 5.5, 2026-10-21/22)
+
+- Fez: `ferramentas/sessoes/` (Python só com biblioteca padrão, 3.9+): `resumo.py` (resumo por regra do transcript,
+  leitura em fluxo até 60 MB), `segredos.py` (padrões do ai-memory e do gitleaks; `achar_segredo`, `tirar_segredos`,
+  `parece_segredo` para os genéricos), `fila.py` (`pendentes/<hash12 da raiz>/<sessao>.json`, atômico, chave = sessão),
+  `sessao_fim.py`, `sessao_inicio.py` (aviso por `systemMessage` + contexto marcado como dado), `instalar.py`
+  (`--mostrar`, `--remover`, `--substituir`, `--python`; backup e gravação no realpath), README.
+- Formato dos hooks conferido na documentação (code.claude.com/docs/en/hooks): SessionEnd tem 1,5 s por padrão; o
+  instalador põe `timeout` 10 nele e 5 no SessionStart.
+- Revisor independente (Opus 5.5): 14 achados, todos corrigidos (comando com conteúdo de heredoc, segredos em português
+  e minúsculas, falso positivo, injeção no aviso, commit falso lido de saída de comando, passagem contada em edição
+  que falhou, symlink do settings, entrada alheia removida, id com `\n`, projeto pelo nome, resumo de compactação como
+  título, surrogate, transcript grande).
+- Verificado: 244 testes passam, 1 pulado (espera a cópia do servidor, Passo 5); py_compile no `/usr/bin/python3` 3.9.6;
+  50 MB em 0,15 s e 13 MB de memória.
+- Não verificado: Windows/PowerShell; hooks num Claude Code de verdade (fica para o Passo 12).
+- Ficou de fora (decisão do orquestrador, reversível): frase em prosa ("minha senha é X"), `sudo -S`, `gh secret --body`
+  e valores com menos de 8 caracteres não são pegos: o risco de falso positivo no vault é maior.
