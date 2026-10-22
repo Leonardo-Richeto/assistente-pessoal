@@ -63,10 +63,11 @@ podem escrever. Itens que mudam o que o Claude do app faz (2b.2, 2b.6, 2b.7, 2b.
 "proposta" antes do código. 2b.1 e 2b.10 podem começar no Mac, antes do i7.
 
 **Prioridade 1: alto valor, baixo custo**
-- [ ] 2b.1 `buscar_vault(texto, tipo?, status?)`: busca full-text (SQLite FTS5 em memória ou Postgres) com peso no
+- [x] 2b.1 `buscar_vault(texto, tipo?, status?)`: busca full-text (SQLite FTS5 em memória ou Postgres) com peso no
   título, nome do arquivo, tags e resumo `>`, sem acento obrigatório; devolve caminho, título e resumo das 5 melhores.
   Complementa `vault_search_notes`, que só acha a palavra exata. Prova de 2026-10-21: 123 notas em 48 ms
   - Pronto quando: o conjunto do 2b.10 roda e o resultado está anotado aqui
+  - Medida (2026-10-21, 25 perguntas no vault real, 2b.10): acerto entre 5 = 24/25, em 1º = 19/25, MRR = 0.847, ~3 ms por busca; pesos (10,8,5,4,1).
 - [ ] ⚑ 2b.2 Escrita com conferência de versão: escrever no vault exige o hash do conteúdo lido e recusa se a nota
   mudou desde a leitura (edição pelo Syncthing no meio); `vault_write_note` sem `mode` deixa de aparecer
 - [ ] 2b.3 Barreira de segredo: antes de gravar no vault ou no banco, padrões do gitleaks recusam token, chave e
@@ -90,8 +91,9 @@ podem escrever. Itens que mudam o que o Claude do app faz (2b.2, 2b.6, 2b.7, 2b.
   comandos, commits, duração), fila local por máquina com chave contra duplicata, envio pela Tailscale com token de
   máquina para uma tabela de sessões; hook `SessionStart` avisa quando a sessão anterior do projeto terminou sem
   passagem. Ficha: o que a tabela guarda e por quanto tempo
-- [ ] 2b.10 Teste da busca: 20 a 30 perguntas, cada uma com a nota esperada; mede quantas vezes ela vem entre as 5
+- [x] 2b.10 Teste da busca: 20 a 30 perguntas, cada uma com a nota esperada; mede quantas vezes ela vem entre as 5
   primeiras; roda a cada mudança no ranking
+  (2026-10-21: `servidor/assistente/vault_busca_medida.py`; perguntas em `90-meta/perguntas-da-busca.md` do vault, fora do repo público)
 - [x] 2b.11 O lint avisa quando aparece arquivo `*.sync-conflict-*` no vault (2026-10-21: `deploy/vault/lint-diario.sh`,
   teste `scripts/testes/test_lint_conflitos.sh`)
 

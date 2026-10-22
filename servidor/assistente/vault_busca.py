@@ -29,7 +29,7 @@ TAMANHO_RESUMO = 300
 TAMANHO_CONSULTA = 4096  # bytes, como o fts_query.rs do ai-memory
 STOPWORDS = frozenset(
     "a o e de da do das dos em no na nos nas um uma que para por com como se ao à os as é eu meu minha "
-    "sobre qual quais quando onde".split())
+    "sobre qual quais quando onde me mim pode posso devo cada porque quanto quantos fiz anotei".split())
 
 
 @dataclass
