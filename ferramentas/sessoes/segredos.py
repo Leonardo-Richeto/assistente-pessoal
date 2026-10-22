@@ -8,7 +8,8 @@ Dois usos:
 - `tirar_segredos(texto)`: troca cada achado por `[segredo:<tipo>]` (hooks de
   sessão do Claude Code, que guardam comandos e títulos).
 - `achar_segredo(texto)`: devolve o tipo do primeiro achado ou None (o servidor
-  usa para RECUSAR a escrita inteira, sem redigir).
+  usa para RECUSAR a escrita inteira, sem redigir, e para não comitar no git do
+  vault um arquivo com segredo).
 
 Dois tipos de padrão:
 - De fornecedor (sk-, ghp_, AKIA, glpat- etc.): o formato basta.
@@ -21,8 +22,9 @@ Dois tipos de padrão:
 
 A referência `{{segredo:NOME}}` nunca conta como segredo.
 
-O servidor (Passo 5) copia este arquivo inteiro (`servidor/assistente/segredos.py`);
-um teste confere que `PADROES` das duas cópias é igual. Mude as duas juntas.
+DUAS CÓPIAS IGUAIS, byte a byte: `ferramentas/sessoes/segredos.py` (a canônica, hooks
+do Claude Code) e `servidor/assistente/segredos.py` (a imagem Docker só leva `servidor/`).
+Mude as duas juntas: um teste em cada pasta compara os bytes.
 
 Só biblioteca padrão; compatível com Python 3.9.
 """
@@ -38,6 +40,9 @@ _VALOR = r"""(?P<valor>"[^"\n]*"|'[^'\n]*'|[^\s"'`;|&()<>\[\]{},]+)"""
 _SENHA = r"""(?P<senha>"[^"\n]*"|'[^'\n]*'|[^\s"'`;|&]+)"""
 
 # (regex, tipo). Ordem importa: os específicos antes dos genéricos.
+# Sem backtracking quadrático: todo trecho de tamanho livre que pode falhar no fim tem limite (`{0,80}`, `{1,256}`,
+# `{0,300}?`) ou começa só no início de uma palavra. Um texto hostil de 200.000 caracteres (nota, comando) não pode
+# travar o servidor nem o hook; `test_sem_backtracking_quadratico` confere.
 PADROES: List[Tuple[str, str]] = [
     # Chave privada PEM (várias linhas). Sem END, vai até o fim do texto.
     (
@@ -45,7 +50,7 @@ PADROES: List[Tuple[str, str]] = [
         "chave_privada",
     ),
     # URL com usuário:senha@ (postgres://u:senha@h, https://u:t@github.com).
-    (r"[a-zA-Z][a-zA-Z0-9+\-.]*://[^:/\s@]+:[^@\s]+@[^\s]+", "url_com_senha"),
+    (r"(?<![a-zA-Z0-9+\-.])[a-zA-Z][a-zA-Z0-9+\-.]{0,30}://[^:/\s@]{1,256}:[^@\s]{1,256}@[^\s]+", "url_com_senha"),
     # Authorization: Bearer <token>.
     (r"(?i)\bbearer\s+[A-Za-z0-9._\-+/=]{16,}", "bearer"),
     # Stripe (secreta e restrita, produção e teste).
@@ -81,11 +86,11 @@ PADROES: List[Tuple[str, str]] = [
     (r"\beyJ[A-Za-z0-9_\-+/]{40,}={0,2}", "token_base64"),
     # Senha em contexto de senha: curl -u usuario:senha, sshpass -p, docker login -p.
     (
-        r"(?<![\w-])curl\b[^\n|;&]*?\s(?:-u|--user)(?:=|\s+)[\"']?[^\s:\"']+:" + _SENHA,
+        r"(?<![\w-])curl\b[^\n|;&]{0,300}?\s(?:-u|--user)(?:=|\s+)[\"']?[^\s:\"']+:" + _SENHA,
         "senha_cli",
     ),
-    (r"(?<![\w-])sshpass\b[^\n|;&]*?\s-p\s*" + _SENHA, "senha_cli"),
-    (r"(?<![\w-])docker\s+login\b[^\n|;&]*?\s(?:-p|--password)(?:=|\s+)" + _SENHA, "senha_cli"),
+    (r"(?<![\w-])sshpass\b[^\n|;&]{0,300}?\s-p\s*" + _SENHA, "senha_cli"),
+    (r"(?<![\w-])docker\s+login\b[^\n|;&]{0,300}?\s(?:-p|--password)(?:=|\s+)" + _SENHA, "senha_cli"),
     # Token em parâmetro de URL: ?api_key=..., &token=...
     (
         r"(?i)[?&](?:api_key|apikey|token|key|secret|access_token)=(?P<senha>[^&\s\"'#]+)",
@@ -96,7 +101,7 @@ PADROES: List[Tuple[str, str]] = [
     # porta, e no mysql `-p valor` (com espaço) pede a senha e `valor` é o banco.
     (r"--password(?:=|\s+)" + _VALOR, "senha_cli"),
     (
-        r"\b(?:mysql|mysqldump|mysqladmin|mariadb|mariadb-dump)\b[^\n|;&]*?\s-p(?P<valor>[^\s\-]\S{3,})",
+        r"\b(?:mysql|mysqldump|mysqladmin|mariadb|mariadb-dump)\b[^\n|;&]{0,300}?\s-p(?P<valor>[^\s\-]\S{3,})",
         "senha_cli",
     ),
     # Variável de ambiente (MAIÚSCULAS, com ou sem `export`): *_KEY, *_PWD e, com ou sem
@@ -105,16 +110,16 @@ PADROES: List[Tuple[str, str]] = [
     # (_FILE, _PATH, _URL, _HASH...) fica de fora. `PWD` sozinho é a pasta atual do shell e
     # `KEY` sozinho é genérico demais.
     (
-        r"(?<![A-Za-z0-9_])(?:[A-Z][A-Z0-9_]*_(?:KEY|PWD)"
-        r"|(?![A-Z0-9_]*_(?:FILE|PATH|URL|URI|HASH|NAME|DIR|TYPE|LEN|LENGTH|ENDPOINT|TTL)[\"']?\s*[=:])"
-        r"(?:[A-Z][A-Z0-9_]*_|PG|MYSQL)?(?:TOKEN|SECRET|PASSWORD|PASSWD|PASS|SENHA|AUTHKEY|APIKEY|CREDENTIALS?)"
-        r"(?:_[A-Z0-9]+)*)[\"']?\s*[=:]\s*" + _VALOR,
+        r"(?<![A-Za-z0-9_])(?:[A-Z][A-Z0-9_]{0,80}_(?:KEY|PWD)"
+        r"|(?![A-Z0-9_]{0,80}_(?:FILE|PATH|URL|URI|HASH|NAME|DIR|TYPE|LEN|LENGTH|ENDPOINT|TTL)[\"']?\s*[=:])"
+        r"(?:[A-Z][A-Z0-9_]{0,80}_|PG|MYSQL)?(?:TOKEN|SECRET|PASSWORD|PASSWD|PASS|SENHA|AUTHKEY|APIKEY|CREDENTIALS?)"
+        r"(?:_[A-Z0-9]{1,40}){0,8})[\"']?\s*[=:]\s*" + _VALOR,
         "variavel_segredo",
     ),
     # Campo ou cabecalho de autenticação, qualquer caixa: password=..., X-Api-Key: ...,
     # api_key='...', clientSecret: ..., {"access_token": "..."}, Authorization: Basic ...
     (
-        r"(?i)(?<![A-Za-z0-9])[A-Za-z0-9_-]*?(?:authorization|credentials?|password|passwd|senha|apikey|"
+        r"(?i)(?<![A-Za-z0-9])[A-Za-z0-9_-]{0,40}?(?:authorization|credentials?|password|passwd|senha|apikey|"
         r"authtoken|authkey|(?:api|auth|access|secret|private|session|refresh|client|app)[_-]?"
         r"(?:key|token|secret))[\"']?\s*[=:]\s*(?:(?:basic|bearer|token)\s+)?" + _VALOR,
         "cabecalho_auth",

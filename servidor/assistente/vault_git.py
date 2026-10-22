@@ -5,6 +5,7 @@ Só chama o `git` do sistema por subprocess, com lista de argumentos (nunca shel
 (`*` e `[` no nome não viram padrão). Nenhuma config do repositório, do usuário ou do sistema pode rodar comando:
 sem ganchos, sem fsmonitor, sem diff externo nem textconv, sem ssh, config global e de sistema desligadas, e caminho
 com `filter` no .gitattributes não é comitado. Nada daqui grava conteúdo de nota em log ou mensagem.
+Arquivo com cara de segredo (segredos.achar_segredo) não é comitado nem vira foto (Ficha 5, regra 5).
 O repositório só conta se o `.git` está na raiz do vault: um vault dentro de outro repositório não é comitado.
 Funções síncronas: quem chama do servidor roda numa thread (anyio.to_thread ou ferramenta síncrona do FastMCP).
 """
@@ -23,6 +24,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
+
+from .segredos import achar_segredo
 
 log = logging.getLogger(__name__)
 
@@ -68,6 +71,10 @@ class VersaoInvalida(Exception):
 
 class FotoFalhou(Exception):
     """O vault tem git, a nota tem mudança sem commit e a foto não saiu: a escrita da IA não pode seguir."""
+
+
+class FotoComSegredo(FotoFalhou):
+    """A nota a fotografar tem algo com cara de segredo: não vai para o histórico, e a escrita da IA não segue."""
 
 
 @dataclass(frozen=True)
@@ -200,8 +207,27 @@ def _tentar_commit(raiz_real: Path, caminho: str, mensagem: str,
     return "ok", r
 
 
+def _segredo_no_arquivo(raiz_real: Path, caminho: str) -> str | None:
+    """Tipo do segredo no arquivo do disco (os bytes que o `git add` levaria), ou None. Arquivo que sumiu: None.
+
+    Lê o arquivo de verdade (link simbólico: o alvo, que é o que o Obsidian mostra). ErroGit se não dá para ler.
+    """
+    try:
+        dados = (raiz_real / caminho).read_bytes()
+    except FileNotFoundError:
+        return None
+    except OSError as e:
+        raise ErroGit(f"não consegui ler o arquivo para conferir segredo ({type(e).__name__})") from None
+    return achar_segredo(dados.decode("utf-8", errors="replace"))
+
+
 def _commitar(raiz_real: Path, caminho: str, mensagem: str, autor: tuple[str, str]) -> tuple[str, str]:
-    """Commit só de `caminho`, com as esperas do index.lock. Chame com a trava. ('ok'|'nada'|'filtro'|'falhou', motivo)."""
+    """Commit só de `caminho`, com as esperas do index.lock. Chame com a trava.
+
+    ('ok'|'nada'|'filtro'|'segredo'|'falhou', motivo). Com 'segredo', o motivo é o tipo, nunca o valor.
+    """
+    if (tipo := _segredo_no_arquivo(raiz_real, caminho)) is not None:
+        return "segredo", tipo
     if _filtro(raiz_real, caminho) is not None:
         return "filtro", "o .gitattributes põe filter neste caminho e o filtro rodaria comando"
     for espera in (*ESPERAS_LOCK, None):
@@ -219,6 +245,7 @@ def commitar(raiz: Path | str, caminho_relativo: str, mensagem: str) -> bool:
     """Comita só `caminho_relativo` (relativo à raiz do vault), autor claude-app. True se criou commit.
 
     Nunca levanta exceção: a escrita já valeu. Sem `.git` na raiz: DEBUG. Nada a comitar: não é erro.
+    Arquivo com cara de segredo: não comita (WARNING sem o valor); o commit diário e o gitleaks decidem depois.
     Falha (git ausente, timeout, index.lock ocupado depois das esperas, trava ocupada, filtro, dono do repositório):
     WARNING sem conteúdo; o commit diário leva a mudança.
     """
@@ -238,6 +265,9 @@ def commitar(raiz: Path | str, caminho_relativo: str, mensagem: str) -> bool:
         return True
     if situacao == "nada":
         log.debug("Nada a comitar em %s", caminho_relativo)
+        return False
+    if situacao == "segredo":
+        log.warning("Escrita de %s ficou sem commit: o arquivo tem algo com cara de segredo.", caminho_relativo)
         return False
     log.warning("Commit do vault falhou em %s (%s); a escrita vale", caminho_relativo, motivo)
     return False
@@ -293,7 +323,8 @@ def foto(raiz: Path | str, caminho_relativo: str, ferramenta: str) -> bool:
     """Antes de a IA trocar `caminho_relativo`: comita o que o dono deixou sem commit nele (autor vault).
 
     True se criou o commit da foto. Sem `.git` na raiz, ou nada a guardar: False.
-    FotoFalhou se o vault tem `.git` e a foto não sai (git falhou, trava ocupada, filtro, index.lock preso).
+    FotoFalhou se o vault tem `.git` e a foto não sai (git falhou, trava ocupada, filtro, index.lock preso);
+    FotoComSegredo (uma FotoFalhou) se a nota tem algo com cara de segredo: não guarda isso no histórico.
     """
     mensagem = f"vault: estado antes de {ferramenta} {caminho_relativo}"
     try:
@@ -311,6 +342,10 @@ def foto(raiz: Path | str, caminho_relativo: str, ferramenta: str) -> bool:
         return True
     if situacao == "nada":
         return False
+    if situacao == "segredo":
+        log.warning("Foto do vault recusada em %s: algo com cara de segredo (%s); %s recusada", caminho_relativo,
+                    motivo, ferramenta)
+        raise FotoComSegredo(motivo)
     log.warning("Foto do vault falhou em %s (%s); %s recusada", caminho_relativo, motivo, ferramenta)
     raise FotoFalhou(motivo)
 

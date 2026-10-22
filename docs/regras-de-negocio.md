@@ -212,6 +212,8 @@ pergunte). Sem o pedido do dono, não escreva resumo.
 - Não invente gasto, hora ou documento. Sem dado, diga que não achou.
 - Não repita senha, token, chave ou número de documento pessoal em respostas, a menos
   que o dono peça aquele dado. Nunca copie esses dados para outra nota.
+- Não escreva senha, token ou chave em nota nem em registro. Se o dono pedir, escreva
+  {{segredo:NOME}} e diga que o valor vai para o cofre.
 ```
 
 ### Mudança do Passo 8b3 — status: aprovada (Leonardo, 2026-10-17), aplicada no texto acima
@@ -729,5 +731,6 @@ Passo 6 (2026-10-21): commit por escrita, historico_nota e restaurar_nota.
 Correções do revisor dos Passos 4 e 8 (2026-10-21): nota cortada ou fora de UTF-8 vem sem versao e não se troca;
 conteúdo vazio recusado; "Reescrevi"/"Criei"; frase de escrever_nota sem "Desfazer?" em "Como confirmar".
 Passo 11 (2026-10-22): tabela sessoes (0006), importador, enviar.py e consultar_sessoes.
+Passo 5 (2026-10-22): barreira de segredo nas escritas, no commit por escrita, na foto e no commit diário (gitleaks).
 Correções do revisor do Passo 6 (2026-10-21): foto antes de trocar, git sem config que executa comando, mensagens do
 restaurar, histórico com o caminho de cada versão.

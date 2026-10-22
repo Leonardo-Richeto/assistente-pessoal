@@ -31,6 +31,8 @@ from pydantic import Field
 
 from . import vault_busca, vault_git
 from .banco import Modelo, caminho_da_nota
+from .segredos import achar_segredo
+from .segredos_mcp import mensagem_recusa
 from .vault_busca import LIMITE_PADRAO, IndiceVault
 
 log = logging.getLogger(__name__)
@@ -299,6 +301,8 @@ NOMES_COMMIT = re.compile(r"(?:[0-9a-f]{12}_)?(vault_write_note|vault_patch_note
                           r"|vault_manage_tags)")
 SEM_GIT = "O vault não tem histórico (sem git)."
 RECUSA_FOTO = "Não consegui guardar a versão atual no histórico; nada foi trocado."
+RECUSA_FOTO_SEGREDO = ("A nota tem algo com cara de segredo; não guardo isso no histórico. Tire o segredo no Obsidian "
+                       "e tente de novo.")
 RESTAURAR_MUDOU = ("A nota mudou agora há pouco (outro aparelho). Nada foi trocado. Confira com o dono e tente "
                    "restaurar de novo.")
 RESTAURAR_NAO_TROCAVEL = ("A nota atual não pode ser trocada pelo assistente (grande demais ou fora de UTF-8). "
@@ -375,6 +379,8 @@ def foto_ou_recusa(raiz: Path, rel: str, ferramenta: str) -> None:
     """Guarda no git o que o dono deixou sem commit em `rel` antes de a IA trocar; ToolError se não conseguir."""
     try:
         vault_git.foto(raiz, rel, ferramenta)
+    except vault_git.FotoComSegredo:
+        raise ToolError(RECUSA_FOTO_SEGREDO) from None
     except vault_git.FotoFalhou:
         raise ToolError(RECUSA_FOTO) from None
 
@@ -413,6 +419,7 @@ def restaurar(raiz: Path, caminho: str, versao_git: str) -> dict:
     """Grava a nota como estava em `versao_git`, como versão nova, pelas mesmas regras de gravar_nota, e comita.
 
     Antes de trocar, guarda no git o que o dono deixou sem commit na nota (foto); sem foto, não troca.
+    Versão com cara de segredo: recusa com a mensagem da barreira, sem o valor.
     """
     rel = relativo_no_vault(raiz, caminho)
     limpo = caminho_da_nota(caminho)
@@ -429,6 +436,10 @@ def restaurar(raiz: Path, caminho: str, versao_git: str) -> dict:
         texto = antiga.dados.decode("utf-8")
     except UnicodeDecodeError:
         raise ToolError("Essa versão da nota não está em UTF-8: não dá para restaurar. Nada foi trocado.") from None
+    # O conteúdo vem do git, não dos argumentos: a BarreiraSegredo não o viu (Ficha 5, regra 5).
+    if (tipo := achar_segredo(texto)) is not None:
+        log.warning("restaurar_nota recusada em %s: a versão tem algo com cara de segredo (%s)", rel, tipo)
+        raise ToolError(mensagem_recusa(tipo))
     curta = antiga.versao_git[:vault_git.TAMANHO_ID]
     real = caminho_seguro(raiz, caminho)
     saida = {"caminho": limpo, "versao_git_restaurada": curta}

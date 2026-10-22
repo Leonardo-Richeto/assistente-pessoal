@@ -18,7 +18,9 @@ Código 0 se rodou (mesmo com recusadas); 2 se o banco falhou ou falta a variáv
 Duas importações ao mesmo tempo com o mesmo resumo: a segunda esbarra no índice único e sai com 2 sem gravar
 nada; a próxima execução conta o resumo como repetido.
 
-O Passo 5 acrescenta aqui a barreira de segredo do servidor (o resumo já sai da máquina sem segredo).
+Segredos (Passo 5): o resumo já sai da máquina sem segredo, mas é dado de fora. Antes de gravar, `titulo`,
+`comandos`, `arquivos` e a mensagem dos `commits` passam por `segredos.tirar_segredos` (cada achado vira
+`[segredo:<tipo>]`). Aqui redigir é certo: o texto não é do dono, e recusar perderia a sessão inteira.
 """
 
 import argparse
@@ -35,6 +37,7 @@ from sqlalchemy.orm import Session
 
 from .db import opcoes_engine
 from .modelos import Auditoria, Sessao
+from .segredos import tirar_segredos
 
 MAX_LINHAS = 2000
 MAX_BYTES = 2 * 1024 * 1024
@@ -54,9 +57,15 @@ class Recusa(ValueError):
     """Resumo inválido; a mensagem diz o campo e o problema, nunca o valor."""
 
 
+REDIGIDOS = {"titulo", "comandos", "arquivos", "commits.mensagem"}  # passam por tirar_segredos antes do corte
+
+
 def _texto(valor: Any, campo: str, tamanho: int, vazio: bool = True) -> str:
     if not isinstance(valor, str):
         raise Recusa(f"{campo}: não é texto")
+    if campo in REDIGIDOS:
+        # Antes do corte: um segredo cortado ao meio deixaria de casar com o padrão e entraria pela metade.
+        valor = tirar_segredos(valor)
     # Surrogate solto (vindo de "\ud83d") vira "?"; caractere de controle (inclusive NUL, que o Postgres recusa)
     # vira espaço.
     limpo = _CONTROLE.sub(" ", valor.encode("utf-8", "replace").decode("utf-8"))[:tamanho]

@@ -19,6 +19,7 @@ from .banco import ESCRITAS_BANCO, LEITURAS_BANCO, criar_servidor_banco
 from .config import Config, config
 from .db import Bancos
 from .registro import RegistroChamadas
+from .segredos_mcp import BarreiraSegredo
 from .vault import ESCRITAS_VAULT, LEITURAS_VAULT, CommitPorEscrita, TravaEscritaVault, criar_servidor_vault
 
 log = logging.getLogger("assistente")
@@ -68,6 +69,7 @@ ESCRITAS_PECAS = {
     "paperless_bulk_rotate_documents",
 }
 PERMITIDAS = LEITURAS_PECAS | ESCRITAS_PECAS
+ESCRITAS_PECAS_VAULT = {n for n in ESCRITAS_PECAS if n.startswith("vault_")}  # passam pela barreira de segredo
 
 # Segunda trava e registro do porquê: irreversíveis ou que abrem dados para fora. Nunca entram em
 # PERMITIDAS (o teste confere).
@@ -176,8 +178,14 @@ def criar_app(cfg: Config | None = None) -> FastMCP:
     # Também grava cada chamada (inclusive leitura) em `chamadas`, com a origem (Passo 8b3).
     app.add_middleware(RegistroChamadas(bancos, leituras=LEITURAS_PECAS | LEITURAS_BANCO | LEITURAS_VAULT,
                                       auditadas=ESCRITAS_BANCO, do_vault=LEITURAS_VAULT | ESCRITAS_VAULT))
-    # Depois do registro = mais por dentro (FastMCP 4.1.0 monta a cadeia com o primeiro middleware por fora):
-    # vault_write_note sem mode append/prepend é recusada antes da peça, e a auditoria grava `escrever` e `erro`.
+    # Ordem (FastMCP 4.1.0 monta a cadeia com o primeiro middleware registrado por fora):
+    #   RegistroChamadas → BarreiraSegredo → TravaEscritaVault → CommitPorEscrita → ferramenta.
+    # Toda recusa de dentro aparece no registro (`chamadas` com `erro`; nas escritas do vault, também `escrever` e
+    # `erro` em `auditoria`), e nada é escrito antes da barreira e da trava (nem a foto do CommitPorEscrita).
+    # Barreira de segredo (Ficha 5, regra 5): escritas do banco, as nossas do vault e as do mcpvault. Paperless fica
+    # de fora (a regra fala de vault e banco; documento tem número de conta e upload é binário).
+    app.add_middleware(BarreiraSegredo(ESCRITAS_BANCO | ESCRITAS_VAULT | ESCRITAS_PECAS_VAULT))
+    # vault_write_note sem mode append/prepend é recusada antes da peça.
     app.add_middleware(TravaEscritaVault())
     # Mais por dentro ainda: antes de uma escrita do mcpvault, foto da nota se o dono a mudou sem commit (sem a
     # foto, recusa); depois da escrita sem erro, commit só daquela nota (2b.4). escrever_nota e restaurar_nota

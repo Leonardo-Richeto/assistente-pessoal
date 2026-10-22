@@ -172,7 +172,10 @@ No Mac/Windows/iPhone, cole o conteúdo na aba "Ignorar padrões" da pasta (mesm
 
 Roda às 03:30, só comita se houver mudança, com mensagem datada. Não apaga nada.
 
+Antes do commit, o script roda o gitleaks (imagem Docker com versão e digest fixos, sem rede, vault só leitura) no que está no stage; se ele achar segredo, falhar ou o docker não existir, nada é comitado, o stage é desfeito (o disco não muda), o journal diz "ERRO: gitleaks achou segredo em: <arquivos>; nada foi comitado hoje." e o relatório sem o valor fica em `/srv/assistente/logs/vault-commit/gitleaks.json`. Tire o segredo da nota (o valor vai para o cofre; na nota fica `{{segredo:NOME}}`) e rode de novo. Por isso o usuário do `vault-commit.service` precisa estar no grupo `docker` (o `scripts/preparar_host.sh` já põe o `$USER`), e um `.gitleaks.toml` ou `.gitleaksignore` na raiz do vault faz o script recusar (desligariam regras).
+
 ```bash
+sudo install -d -o "$USER" -g "$USER" /srv/assistente/logs/vault-commit
 sudo cp /srv/assistente/app/deploy/vault/vault-commit.service /etc/systemd/system/
 sudo cp /srv/assistente/app/deploy/vault/vault-commit.timer   /etc/systemd/system/
 sudo sed -i "s/<usuario>/$USER/" /etc/systemd/system/vault-commit.service

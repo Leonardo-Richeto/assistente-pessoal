@@ -70,9 +70,10 @@ podem escrever. Itens que mudam o que o Claude do app faz (2b.2, 2b.6, 2b.7, 2b.
   - Medida (2026-10-21, 25 perguntas no vault real, 2b.10): acerto entre 5 = 24/25, em 1º = 19/25, MRR = 0.847, ~3 ms por busca; pesos (10,8,5,4,1).
 - [ ] ⚑ 2b.2 Escrita com conferência de versão: escrever no vault exige o hash do conteúdo lido e recusa se a nota
   mudou desde a leitura (edição pelo Syncthing no meio); `vault_write_note` sem `mode` deixa de aparecer
-- [ ] 2b.3 Barreira de segredo: antes de gravar no vault ou no banco, padrões do gitleaks recusam token, chave e
+- [x] 2b.3 Barreira de segredo: antes de gravar no vault ou no banco, padrões do gitleaks recusam token, chave e
   senha; a referência `{{segredo:NOME}}` passa. O valor fica no Vaultwarden, fora do vault, e o servidor nunca o
   resolve (resolvido, iria para o contexto do modelo). O `commit-diario.sh` roda o gitleaks antes do commit
+  - Feito (2026-10-22, Passo 5): middleware `BarreiraSegredo` recusa escrita do banco e do vault com cara de segredo; restaurar_nota confere o conteúdo do git; commit por escrita pula e foto recusa arquivo com segredo; importador de sessões redige; `commit-diario.sh` roda gitleaks v8.30.1 (digest fixo) e não comita se achar. Vault real: 125 notas, 0 achados.
 - [ ] ⚑ 2b.3a Vaultwarden no i7 (Leonardo, 2026-10-21), em Docker Compose próprio, guarda os valores do 2b.3.
   Proposta: acesso só pela Tailscale, sem Funnel. Os dados dele entram no backup cifrado da Fase 7 (`exportar.sh`)
   - Pronto quando: o backup da Fase 7 leva o volume do Vaultwarden para fora do SSD do i7 e a restauração foi testada, antes do primeiro segredo.

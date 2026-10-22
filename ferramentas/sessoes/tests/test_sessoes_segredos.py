@@ -215,11 +215,13 @@ def test_padroes_compilam_e_tem_tipo():
 
 
 def test_copia_do_servidor_igual():
-    """O servidor (Passo 5) guarda uma cópia de PADROES; as duas têm de ser iguais."""
+    """O servidor guarda uma cópia deste arquivo (a imagem só leva servidor/); as duas são iguais byte a byte."""
     raiz = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     caminho = os.path.join(raiz, "servidor", "assistente", "segredos.py")
     if not os.path.exists(caminho):
-        pytest.skip("servidor/assistente/segredos.py ainda não existe (Passo 5)")
+        pytest.skip("servidor/assistente/segredos.py não existe (cópia fora do repositório)")
+    with open(caminho, "rb") as f1, open(segredos.__file__, "rb") as f2:
+        assert f1.read() == f2.read(), "As duas cópias de segredos.py divergem: mude as duas juntas."
     import importlib.util
 
     spec = importlib.util.spec_from_file_location("segredos_servidor", caminho)
@@ -227,3 +229,18 @@ def test_copia_do_servidor_igual():
     spec.loader.exec_module(modulo)
     assert list(modulo.PADROES) == list(segredos.PADROES)
     assert getattr(modulo, "REFERENCIA", segredos.REFERENCIA) == segredos.REFERENCIA
+
+
+@pytest.mark.parametrize("unidade", [
+    "a-", "__", "TOKEN_", "password://AKIA", ".curl ", "mysql ", "sshpass ", "docker login ", "a://b:", "a" * 7,
+    "x-api-", "API_", "curl -u a:", "eyJ", "-----BEGIN ", "?token=",
+])
+def test_sem_backtracking_quadratico(unidade):
+    """Texto hostil de 50.000 caracteres (nota, comando) não trava: cada padrão tem limite (antes, 'a-' levava minutos)."""
+    import time
+
+    texto = (unidade * (50_000 // len(unidade) + 1))[:50_000]
+    inicio = time.perf_counter()
+    segredos.achar_segredo(texto)
+    segredos.tirar_segredos(texto)
+    assert time.perf_counter() - inicio < 3.0

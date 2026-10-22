@@ -12,7 +12,8 @@ Classificação falha fechado: só é leitura o que está numa lista explícita 
   Falha aberto: se não grava, só log ERROR (a escrita já tem o rastro em `auditoria`).
 
 Nunca grava o conteúdo dos argumentos. Do vault, só o caminho da nota (`path`, `paths`,
-`oldPath`, `newPath`). Do Paperless, só ids inteiros. Do resto, só o `modelo` declarado, validado.
+`oldPath`, `newPath`), com o que tiver cara de segredo trocado por `[segredo:<tipo>]`.
+Do Paperless, só ids inteiros. Do resto, só o `modelo` declarado, validado.
 As tabelas `auditoria` e `chamadas` são só INSERT.
 """
 
@@ -30,6 +31,7 @@ from fastmcp.server.middleware import Middleware
 
 from .db import Bancos
 from .modelos import Auditoria, Chamada
+from .segredos import achar_segredo, tirar_segredos
 
 log = logging.getLogger(__name__)
 
@@ -94,7 +96,9 @@ def modelo_declarado(v) -> str | None:
     if not isinstance(v, str):
         return None
     v = v.strip()
-    return v if MODELO_VALIDO.fullmatch(v) else None
+    # Uma chave AWS cabe no formato do nome: com cara de segredo, descarta (a barreira recusa a escrita, mas a
+    # linha de `chamadas` é gravada mesmo assim).
+    return v if MODELO_VALIDO.fullmatch(v) and achar_segredo(v) is None else None
 
 
 def _requisicao_http():
@@ -150,7 +154,8 @@ def _peca(nome: str, do_vault: frozenset[str] = frozenset()) -> str | None:
 
 
 def _cortar(v) -> str | None:
-    return v[:TAMANHO_CAMINHO] if isinstance(v, str) else None
+    # Caminho com cara de segredo (a barreira recusa a escrita, mas a linha `escrever` vem antes): só o tipo.
+    return tirar_segredos(v[:TAMANHO_CAMINHO * 2])[:TAMANHO_CAMINHO] if isinstance(v, str) else None
 
 
 def caminhos_do_vault(argumentos: dict) -> dict:

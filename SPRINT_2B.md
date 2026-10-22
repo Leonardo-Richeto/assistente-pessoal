@@ -73,7 +73,7 @@ tabela; eu confiro testes e diff antes de seguir. Effort max nunca.
 | 2 | 2b.10 medida: executor + 25 perguntas no vault (decisão 4); rodar, ajustar pesos, anotar no `PLANO.md` | B | Sonnet 5.5 | médio | 1 | Feito 2026-10-21 (Sonnet 5.5) |
 | 3 | 2b.5 `notas_recentes` + 2b.7 `ler_nota` com `versao` e relacionadas; função única de caminho seguro | B | Sonnet 5.5 | médio | 0 | Feito 2026-10-21 (Sonnet 5.5) |
 | 4 | ⚑ 2b.2 `escrever_nota` com versão + trava do `vault_write_note`; testes de corrida, caminho hostil, link simbólico | A | Opus 5.5 | alto | 3 | Feito 2026-10-21 (Opus 5.5); revisor rodou, correções feitas |
-| 5 | 2b.3 barreira de segredo no middleware + gitleaks no `commit-diario.sh` | A | Opus 5.5 | alto | 4 | Pendente |
+| 5 | 2b.3 barreira de segredo no middleware + gitleaks no `commit-diario.sh` | A | Opus 5.5 | alto | 4 | Feito 2026-10-22 (Opus 5.5); revisor pendente |
 | 6 | 2b.4 commit por escrita, `historico_nota`, `restaurar_nota`; `git` na imagem; `docker build` local | A | Opus 5.5 | alto | 4 | Feito 2026-10-22 (Opus 5.5); revisor rodou, correções feitas |
 | 7 | 2b.6 `contexto_inicial` com limite | B | Sonnet 5.5 | médio | 3 | Pendente |
 | 8 | 2b.8 migração 0005, `marcar_desatualizada`, `consultar_desatualizadas`, desfazer, lista no lint; teste no Postgres de rascunho | A | Opus 5.5 | alto | 0 | Feito 2026-10-21 (Opus 5.5); revisor rodou, correções feitas |
@@ -231,3 +231,15 @@ Um bloco por passo, do mais velho para o mais novo: o que fez, verificado, não 
   leitura só SELECT; UPDATE/DELETE/TRUNCATE recusados); `ferramentas/sessoes/tests` 264 passam; envio ponta a ponta
   com o importador real contra SQLite.
 - Não verificado: SSH real e `docker compose exec` no i7; launchd; Windows.
+
+### Passo 5 — 2b.3 barreira de segredo (Opus 5.5, 2026-10-22)
+
+- Fez: `servidor/assistente/segredos.py` (cópia byte a byte de `ferramentas/sessoes/segredos.py`, teste compara);
+  `BarreiraSegredo` (`segredos_mcp.py`) recusa escrita do banco e do vault com cara de segredo, sem chamar a ferramenta
+  e sem o valor na mensagem/log/banco; `restaurar_nota`, commit por escrita (pula com WARNING) e foto (recusa) conferem
+  o arquivo; importador de sessões redige; `RegistroChamadas` redige caminho e descarta `modelo` com cara de segredo;
+  padrões sem backtracking quadrático (200 mil caracteres hostis em ≤ 0,6 s); `commit-diario.sh` com gitleaks v8.30.1
+  por digest, sem rede, só leitura, `--redact`, recusa `.gitleaks.toml`/`.gitleaksignore` do vault, falha fechado.
+- Verificado: 609 passam, 10 pulados; `ferramentas/sessoes/tests` 281 passam, 0 pulados; gitleaks real pegou chave AWS
+  falsa e deixou passar `{{segredo:wifi}}`; varredura do vault real: 125 notas, 0 achados (nenhum falso positivo).
+- Não verificado: gitleaks no amd64 do i7; tempo da conferência em nota de vários MB (~3 s/MB no pior caso).
