@@ -23,7 +23,7 @@ Leitura complementar: `README.md` (arquitetura e princípios), `PLANO.md` (fases
   completo **sem dados reais**, só sintéticos, sem Tailscale/Funnel e sem credencial real. Produção continua no i7.
 
 - **Fase 2b (vault inteligente, ideias do ai-memory) feita no Mac em 2026-10-21/22** (Opus 5.5 orquestrando
-  subagentes); merge em `main` em 2026-10-22 (fast-forward, `4d95078`), **sem push**: faça `git push` antes de clonar no i7. Plano e registro passo a passo em `SPRINT_2B.md`. Falta
+  subagentes); merge em `main` e push em 2026-10-22 (o GitHub liberou a chave Stripe falsa do teste dos hooks como "usada em testes"). Plano e registro passo a passo em `SPRINT_2B.md`. Falta
   implantar no i7 (`docs/IMPLANTACAO.md`, seção da Fase 2b). Mac = só desenvolvimento; i7 = hospedeiro (Leonardo, 2026-10-21).
 
 ## Histórico
@@ -228,7 +228,7 @@ Vale para todo projeto longo dividido em fases, executado por modelos diferentes
 
 ## Prompt para a próxima etapa
 
-**Fase 2b no i7 (merge feito em 2026-10-22; antes de começar, `git push` do repo e do vault no Mac).** Modelo: Opus 5.5, effort alto (toca login, vault real e SSH).
+**Fase 2b no i7 (merge e push feitos em 2026-10-22).** Modelo: Opus 5.5, effort alto (toca login, vault real e SSH).
 
 ```
 Leia CONTEXTO.md (entrada 2026-10-21/22), SPRINT_2B.md, AGENTS.md, docs/IMPLANTACAO.md (seção da Fase 2b),
