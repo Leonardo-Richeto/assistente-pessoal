@@ -148,11 +148,13 @@ def test_importador_e_consulta_com_os_papeis_de_verdade(pg):
         bancos = Bancos(leitura=sessionmaker(leitura, expire_on_commit=False),
                         escrita=sessionmaker(escrita, expire_on_commit=False))
         consultar = anyio.run(criar_servidor_banco(bancos, TZ).get_tool, "consultar_sessoes").fn
-        lista = consultar(projeto=prefixo, dias=1)
-        assert [(x["sessao"], x["titulo"], x["passagem"]) for x in lista] == [
+        resposta = consultar(projeto=prefixo, dias=1)
+        assert resposta["cortado"] is False
+        lista = resposta["sessoes"]
+        assert [(x["sessao"], x["texto_de_fora"]["titulo"], x["passagem"]) for x in lista] == [
             (a["sessao"], "retomada", True), (b["sessao"], "teste de GRANT", False)]
         assert lista[0]["fim"].endswith("-03:00")
-        assert consultar(projeto=prefixo, sem_passagem=True)[0]["sessao"] == b["sessao"]
+        assert consultar(projeto=prefixo, sem_passagem=True)["sessoes"][0]["sessao"] == b["sessao"]
     finally:
         escrita.dispose()
         leitura.dispose()

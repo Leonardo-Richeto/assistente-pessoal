@@ -36,10 +36,11 @@ def _resumo(sessao, raiz="/repos/p", fim="2026-10-20T13:00:00+00:00", **extra):
 
 
 def _nomes(estado, pasta):
+    """Ids das sessões numa pasta da fila (`<sessao>.json` em pendentes; `<sessao>.<fim>.json` nas outras)."""
     base = estado / pasta
     if not base.exists():
         return set()
-    return {p.stem for p in base.rglob("*.json")}
+    return {p.name.split(".")[0] if not p.name.startswith(".") else p.stem for p in base.rglob("*.json")}
 
 
 def _rodar(estado, argumentos, extra_env=None):
@@ -87,11 +88,15 @@ def test_ponta_a_ponta_aceitas_e_repetidas_vao_para_enviadas(estado, banco):
 
     r = _rodar(estado, ["--comando", comando], env)
     assert r.returncode == 0, r.stderr
-    assert "Enviadas 2 de 3 (aceitas 2, repetidas 0), recusadas 1" in r.stdout
+    assert "Enviadas 2 de 3 (aceitas 2, repetidas 0), recusadas 1 (em recusadas/ 1)" in r.stdout
     assert _nomes(estado, "enviadas") == {"sessao-aaaa-01", "sessao-bbbb-02"}
-    assert _nomes(estado, "pendentes") == {"sessao-ruim-03"}
-    # Mesma subpasta do projeto em enviadas.
-    assert (estado / "enviadas" / fila.chave_projeto("/repos/outro") / "sessao-bbbb-02.json").exists()
+    # A recusada sai de pendentes (não trava a fila) e guarda o motivo ao lado.
+    assert _nomes(estado, "pendentes") == set() and _nomes(estado, "recusadas") == {"sessao-ruim-03"}
+    recusadas = estado / "recusadas" / fila.chave_projeto("/repos/p")
+    assert (recusadas / "sessao-ruim-03.sem-fim.json").exists()
+    assert "fim: data sem fuso" in (recusadas / "sessao-ruim-03.sem-fim.motivo.txt").read_text(encoding="utf-8")
+    # Mesma subpasta do projeto em enviadas, com o fim no nome.
+    assert (estado / "enviadas" / fila.chave_projeto("/repos/outro") / "sessao-bbbb-02.20261020T130000Z.json").exists()
     sessoes, auditoria = _no_banco(caminho)
     assert sessoes == ["sessao-aaaa-01", "sessao-bbbb-02"]
     assert auditoria == [{"quantidade": 2, "repetidas": 0, "recusadas": 1, "maquinas": ["maquina-teste"]}]
@@ -102,14 +107,17 @@ def test_ponta_a_ponta_aceitas_e_repetidas_vao_para_enviadas(estado, banco):
     fila.gravar(_resumo("sessao-aaaa-01"))
     r = _rodar(estado, ["--comando", comando], env)
     assert r.returncode == 0, r.stderr
-    assert "Enviadas 1 de 2 (aceitas 0, repetidas 1), recusadas 1" in r.stdout
-    assert _nomes(estado, "pendentes") == {"sessao-ruim-03"}
+    assert "Enviadas 1 de 1 (aceitas 0, repetidas 1), recusadas 0" in r.stdout
+    assert _nomes(estado, "pendentes") == set()
     assert _no_banco(caminho)[0] == ["sessao-aaaa-01", "sessao-bbbb-02"]
 
-    # Sessão retomada (outro fim): linha nova no banco.
+    # Sessão retomada (outro fim): linha nova no banco e arquivo novo em enviadas, sem sobrescrever os outros.
     fila.gravar(_resumo("sessao-aaaa-01", fim="2026-10-20T15:00:00+00:00"))
     assert _rodar(estado, ["--comando", comando], env).returncode == 0
     assert _no_banco(caminho)[0] == ["sessao-aaaa-01", "sessao-bbbb-02", "sessao-aaaa-01"]
+    assert sorted(os.listdir(estado / "enviadas" / fila.chave_projeto("/repos/p"))) == [
+        "sessao-aaaa-01.20261020T130000Z-2.json", "sessao-aaaa-01.20261020T130000Z.json",
+        "sessao-aaaa-01.20261020T150000Z.json"]
 
 
 def test_comando_que_falha_nao_move_nada(estado, banco):
@@ -156,13 +164,41 @@ def test_assistente_ssh_invalida_sai_com_1(estado, destino):
     assert r.returncode == 1 and "ASSISTENTE_SSH inválida" in r.stderr
 
 
-def test_comando_padrao(monkeypatch):
+def test_comando_padrao(monkeypatch, tmp_path):
+    monkeypatch.setenv("HOME", str(tmp_path))  # sem ~/.ssh/assistente_sessoes
+    monkeypatch.delenv("ASSISTENTE_SSH_CHAVE", raising=False)
     monkeypatch.setenv("ASSISTENTE_SSH", "leo@i7")
     assert enviar.comando_padrao() == [
         "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "leo@i7",
         "docker compose --project-directory /srv/assistente/app exec -T servidor python -m assistente.sessoes importar"]
     monkeypatch.delenv("ASSISTENTE_SSH")
     assert enviar.comando_padrao() is None
+
+
+def test_comando_padrao_com_a_chave_so_do_envio(monkeypatch, tmp_path):
+    """Revisor do Passo 11: a chave do envio é outra, restrita no i7 pelo command= do authorized_keys."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("ASSISTENTE_SSH_CHAVE", raising=False)
+    monkeypatch.setenv("ASSISTENTE_SSH", "leo@i7")
+    padrao = tmp_path / ".ssh" / "assistente_sessoes"
+    padrao.parent.mkdir()
+    padrao.write_text("chave falsa")
+    comando = enviar.comando_padrao()
+    assert comando[:9] == ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-i", str(padrao), "-o",
+                           "IdentitiesOnly=yes"]
+    assert comando[9] == "leo@i7"
+    # A variável escolhe outra chave; ~ é expandido.
+    outra = tmp_path / "outra_chave"
+    outra.write_text("chave falsa")
+    monkeypatch.setenv("ASSISTENTE_SSH_CHAVE", "~/outra_chave")
+    assert enviar.comando_padrao()[5:7] == ["-i", str(outra)]
+
+
+def test_chave_definida_que_nao_existe_sai_com_1(estado, tmp_path):
+    fila.gravar(_resumo("sessao-aaaa-01"))
+    r = _rodar(estado, [], {"ASSISTENTE_SSH": "leo@i7", "ASSISTENTE_SSH_CHAVE": str(tmp_path / "nao-existe")})
+    assert r.returncode == 1 and "ASSISTENTE_SSH_CHAVE não aponta para um arquivo" in r.stderr
+    assert _nomes(estado, "pendentes") == {"sessao-aaaa-01"}
 
 
 def test_nada_a_enviar_nao_roda_o_comando(estado):
@@ -252,7 +288,103 @@ def test_formato_antigo_sem_subpasta_tambem_vai(estado, tmp_path):
                                                               encoding="utf-8")
     comando, _ = _eco(tmp_path, ["sessao-velha-01"])
     assert enviar.main(["--comando", comando]) == 0
-    assert (estado / "enviadas" / "sessao-velha-01.json").exists()
+    assert (estado / "enviadas" / "sessao-velha-01.20261020T130000Z.json").exists()
+
+
+# --- Correções do revisor do Passo 11 ---
+
+def test_600_recusadas_nao_impedem_a_sessao_nova_de_sair(estado, banco):
+    """Antes, a recusada ficava em pendentes e voltava sempre na frente do lote (as mais antigas primeiro): com mais
+    de 500, a sessão nova nunca saía."""
+    caminho, url = banco
+    for i in range(600):
+        arquivo = fila.gravar(_resumo("ruim-%04d-xx" % i, fim="2026-10-20T13:00:00"))  # sem fuso: recusada
+        os.utime(arquivo, (1_700_000_000 + i, 1_700_000_000 + i))
+    fila.gravar(_resumo("sessao-nova-01"))
+    env, comando = _importador(url)
+
+    r = _rodar(estado, ["--comando", comando], env)
+    assert r.returncode == 0, r.stderr
+    assert "recusadas 500 (em recusadas/ 500)" in r.stdout and "ficaram para depois 101" in r.stdout
+    # Só recusadas: o importador não gravou auditoria.
+    assert _no_banco(caminho) == ([], [])
+
+    r = _rodar(estado, ["--comando", comando], env)
+    assert r.returncode == 0, r.stderr
+    assert "Enviadas 1 de 101 (aceitas 1, repetidas 0), recusadas 100" in r.stdout
+    assert _nomes(estado, "pendentes") == set() and _nomes(estado, "enviadas") == {"sessao-nova-01"}
+    assert len(_nomes(estado, "recusadas")) == 600
+    assert len(list((estado / "recusadas").rglob("*.motivo.txt"))) == 600
+    assert _no_banco(caminho) == (["sessao-nova-01"], [
+        {"quantidade": 1, "repetidas": 0, "recusadas": 100, "maquinas": ["maquina-teste"]}])
+
+
+def test_recusa_adiada_pelo_limite_do_importador_fica_em_pendentes(estado, tmp_path):
+    for i in range(3):
+        arquivo = fila.gravar(_resumo("sessao-%04d-xx" % i))
+        os.utime(arquivo, (1_700_000_000 + i, 1_700_000_000 + i))
+    comando, _ = _eco(tmp_path, ["sessao-0000-xx"], recusadas=[
+        {"linha": 2, "motivo": "passou de 2000 linhas por execução; esta e as seguintes ficam para a próxima",
+         "adiada": True}])
+    assert enviar.main(["--comando", comando]) == 0
+    assert _nomes(estado, "enviadas") == {"sessao-0000-xx"}
+    assert _nomes(estado, "pendentes") == {"sessao-0001-xx", "sessao-0002-xx"} and _nomes(estado, "recusadas") == set()
+
+
+def test_regravada_no_meio_do_rename_volta_para_pendentes(estado, tmp_path, monkeypatch):
+    """O hook regrava a sessão (retomada que terminou) depois da conferência da marca e antes do rename: o arquivo
+    movido é a versão nova, que o banco não tem. Ela volta para pendentes; a próxima rodada envia."""
+    caminho = fila.gravar(_resumo("sessao-aaaa-01"))
+    comando, _ = _eco(tmp_path, ["sessao-aaaa-01"])
+    original = fila.arquivar
+
+    def regrava_e_arquiva(origem, *a, **k):
+        fila.gravar(_resumo("sessao-aaaa-01", fim="2026-10-20T15:00:00+00:00", titulo="retomada"))
+        return original(origem, *a, **k)
+
+    monkeypatch.setattr(enviar.fila, "arquivar", regrava_e_arquiva)
+    assert enviar.main(["--comando", comando]) == 0
+    assert _nomes(estado, "pendentes") == {"sessao-aaaa-01"} and _nomes(estado, "enviadas") == set()
+    with open(caminho, encoding="utf-8") as f:
+        assert json.load(f)["titulo"] == "retomada"
+    log = (estado / "hooks.log").read_text(encoding="utf-8")
+    assert "foi regravada durante o envio; a versão nova voltou para pendentes" in log
+    assert "mudaram no envio 1" in log
+
+    monkeypatch.setattr(enviar.fila, "arquivar", original)
+    comando, recebido = _eco(tmp_path, ["sessao-aaaa-01"])
+    assert enviar.main(["--comando", comando]) == 0
+    assert json.loads(recebido.read_bytes())["titulo"] == "retomada"
+    assert _nomes(estado, "enviadas") == {"sessao-aaaa-01"} and _nomes(estado, "pendentes") == set()
+
+
+def test_regravada_duas_vezes_no_meio_nao_sobrescreve_a_mais_nova(estado, tmp_path, monkeypatch):
+    caminho = fila.gravar(_resumo("sessao-aaaa-01"))
+    comando, _ = _eco(tmp_path, ["sessao-aaaa-01"])
+    original = fila.arquivar
+
+    def duas_regravacoes(origem, *a, **k):
+        fila.gravar(_resumo("sessao-aaaa-01", fim="2026-10-20T15:00:00+00:00", titulo="do meio"))
+        destino = original(origem, *a, **k)
+        fila.gravar(_resumo("sessao-aaaa-01", fim="2026-10-20T16:00:00+00:00", titulo="a mais nova"))
+        return destino
+
+    monkeypatch.setattr(enviar.fila, "arquivar", duas_regravacoes)
+    assert enviar.main(["--comando", comando]) == 0
+    with open(caminho, encoding="utf-8") as f:
+        assert json.load(f)["titulo"] == "a mais nova"
+    assert "foi regravada duas vezes durante o envio" in (estado / "hooks.log").read_text(encoding="utf-8")
+
+
+def test_marca_inclui_o_inode(estado, tmp_path):
+    """Regravação atômica com o mesmo tamanho e a mesma data ainda muda a marca (o st_ino é outro)."""
+    caminho = fila.gravar(_resumo("sessao-aaaa-01"))
+    antes = enviar._marca(caminho)
+    st = os.stat(caminho)
+    fila.gravar(_resumo("sessao-aaaa-01"))
+    os.utime(caminho, ns=(st.st_atime_ns, st.st_mtime_ns))
+    depois = enviar._marca(caminho)
+    assert antes[1:] == depois[1:] and antes != depois
 
 
 def test_compila_no_python_39():

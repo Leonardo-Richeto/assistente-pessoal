@@ -2,6 +2,8 @@
 <!--
   Exemplo (NÃO instalado): envia a fila de sessões do Claude Code para o i7 a cada hora.
   Troque USUARIO pelo seu usuário do Mac e usuario@i7 pelo destino SSH. Como instalar: README.md, "Envio para o i7".
+  Antes, crie a chave só do envio (~/.ssh/assistente_sessoes, restrita no i7 por command=) e aceite a host key à mão;
+  o enviar.py usa essa chave sozinho. Para outra chave, acrescente ASSISTENTE_SSH_CHAVE com o caminho absoluto.
   O launchd não expande "~" nem "$HOME": use caminhos absolutos.
 -->
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

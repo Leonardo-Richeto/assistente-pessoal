@@ -81,12 +81,19 @@ só os nomes-base, até 10. Dos commits, só os ids. Com `source` `compact`, o h
 
 - `pendentes/<projeto>/<sessao>.json`: ainda não enviadas. `<projeto>` são 12 dígitos do sha256 da
   raiz normalizada. A mesma sessão retomada substitui o arquivo.
-- `enviadas/<projeto>/<sessao>.json`: já enviadas. Nada é apagado.
+- `enviadas/<projeto>/<sessao>.<fim>.json`: já no banco do i7. `<fim>` é o fim da sessão em UTC
+  (`AAAAMMDDTHHMMSSZ`). Cada versão da sessão retomada fica no seu arquivo; nome já usado ganha
+  `-2`, `-3`. Nada é apagado nem sobrescrito.
+- `recusadas/<projeto>/<sessao>.<fim>.json`: o importador do i7 recusou. O motivo fica ao lado, em
+  `<sessao>.<fim>.motivo.txt` (`<fim>` vira `sem-fim` quando o fim é inválido). Não volta sozinha
+  para o envio: corrija a causa e mova o arquivo de volta para `pendentes/<projeto>/<sessao>.json`.
 - `hooks.log`: erros dos hooks. O hook nunca trava a sessão; quando falha, só anota aqui.
 
-Arquivos do formato antigo (`pendentes/<sessao>.json`, sem subpasta) continuam sendo lidos. O id da
-sessão precisa ter de 8 a 80 caracteres `[A-Za-z0-9-]`. O nome da máquina vem de
-`ASSISTENTE_MAQUINA` ou do nome curto do computador, em minúsculas.
+O aviso do `SessionStart` lê as três pastas: a sessão recusada também avisa. Arquivos do formato
+antigo continuam sendo lidos: `pendentes/<sessao>.json` (sem subpasta) e `enviadas/.../<sessao>.json`
+(sem `<fim>`). O id da sessão precisa ter de 8 a 80 caracteres `[A-Za-z0-9-]`. O nome da máquina
+vem de `ASSISTENTE_MAQUINA` ou do nome curto do computador: minúsculo, só `[a-z0-9._-]` (o resto
+vira `-`), até 60. O importador recusa outro formato.
 
 ## Limites
 
@@ -151,36 +158,72 @@ O que ele faz:
 1. Junta as pendentes de todas as subpastas, as mais antigas primeiro, até 500 e 2 MB por vez.
 2. Manda uma linha JSON por sessão para `python -m assistente.sessoes importar` no container
    `servidor` do i7, que valida cada resumo e grava (ver `servidor/assistente/sessoes.py`).
-3. Move para `enviadas/` as aceitas e as que o banco já tinha (repetidas). As recusadas ficam em
-   `pendentes/`, com o motivo no `hooks.log`. Nada é apagado.
-4. Se o SSH ou o importador falha, ou passa de 120 s, nada se move: o próximo envio tenta de novo.
+3. Move para `enviadas/` as aceitas e as que o banco já tinha (repetidas), e para `recusadas/` as
+   recusadas, com o motivo ao lado e no `hooks.log`. Assim uma recusada não trava a fila. Nada é
+   apagado.
+4. Move só o arquivo exato do lote, e só se ele não mudou desde a leitura. Se o hook regravou a
+   sessão no meio (sessão retomada que terminou), a versão nova fica ou volta para `pendentes/` e
+   vai no próximo envio.
+5. Se o SSH ou o importador falha, ou passa de 120 s, nada se move: o próximo envio tenta de novo.
 
 Sessão retomada chega de novo com outro `fim` e vira linha nova; o app mostra a mais nova
 (`consultar_sessoes`).
 
-Pré-requisitos no Mac (ou em outra máquina com Tailscale):
+### Chave SSH só para o envio
 
-- SSH sem senha para o i7: Tailscale SSH ligado no i7 (`tailscale up --ssh`) ou chave SSH em
-  `~/.ssh/authorized_keys` do i7. Com `BatchMode=yes`, o SSH nunca pede senha: sem acesso, falha.
-- O usuário do i7 no grupo `docker` (o comando roda `docker compose exec` sem `sudo`).
-- `ASSISTENTE_SSH` no ambiente, no formato `usuario@maquina` (ex.: `leo@i7`, o nome da Tailscale).
+O comando roda `docker compose exec` no i7, então o usuário de lá está no grupo `docker`. Quem
+está no grupo `docker` tem, na prática, poder de root na máquina. Por isso o envio **não** usa a
+sua chave SSH de sempre nem o Tailscale SSH (os dois abrem um shell inteiro). Use uma chave só
+para o envio, presa a um único comando no i7. Essa chave, mesmo restrita, roda como um usuário do
+grupo `docker`, mas só aquele comando: não abre shell, não encaminha porta e não troca o comando.
 
-Comando:
+1. No Mac, gere a chave, sem senha (o launchd não tem o agente SSH do terminal):
+
+   ```bash
+   ssh-keygen -t ed25519 -f ~/.ssh/assistente_sessoes -N '' -C assistente-sessoes
+   ```
+
+2. No i7, acrescente uma linha em `~/.ssh/authorized_keys` do usuário que vai receber o envio,
+   com o conteúdo de `~/.ssh/assistente_sessoes.pub` do Mac no lugar de `ssh-ed25519 ...`:
+
+   ```
+   restrict,command="docker compose --project-directory /srv/assistente/app exec -T servidor python -m assistente.sessoes importar" ssh-ed25519 AAAA... assistente-sessoes
+   ```
+
+   O `command=` força o importador: qualquer comando pedido pelo Mac é ignorado. Recomendado: um
+   usuário próprio no i7, por exemplo `sessoes`, no grupo `docker` e só com essa linha no
+   `authorized_keys`, em vez do seu usuário.
+3. Aceite a host key do i7 uma vez, à mão (o envio usa `BatchMode=yes` e nunca pergunta):
+
+   ```bash
+   ssh -n -i ~/.ssh/assistente_sessoes -o IdentitiesOnly=yes usuario@i7 true
+   ```
+
+   O `-n` manda entrada vazia: sem ele, o importador forçado espera o fim da entrada do terminal.
+   Responda `yes` à pergunta da host key. A resposta esperada é a importação vazia:
+   `{"aceitas": [], "repetidas": [], "recusadas": []}`. Entrada vazia não grava nada no banco,
+   nem auditoria.
+
+O `enviar.py` usa essa chave sozinho quando `~/.ssh/assistente_sessoes` existe: passa
+`-i ~/.ssh/assistente_sessoes -o IdentitiesOnly=yes`. Outra chave: `ASSISTENTE_SSH_CHAVE=caminho`
+(se o arquivo não existe, sai com 1). Sem chave nenhuma, o SSH usa as chaves padrão.
+
+### Rodar
+
+- `ASSISTENTE_SSH` no ambiente, no formato `usuario@maquina` (ex.: `sessoes@i7`, o nome da
+  Tailscale). Com `BatchMode=yes`, o SSH nunca pede senha: sem acesso, falha.
 
 ```bash
 ASSISTENTE_SSH=usuario@i7 /usr/bin/python3 ferramentas/sessoes/enviar.py
 ```
 
-No i7 ele roda:
-
-```bash
-docker compose --project-directory /srv/assistente/app exec -T servidor python -m assistente.sessoes importar
-```
-
+O comando que o `enviar.py` pede ao i7 é o mesmo do `command=` acima (vale sem a chave restrita).
 Sem `ASSISTENTE_SSH`, sai com 1 e não toca na fila. `--comando "..."` troca o comando inteiro
 (os testes usam para rodar o importador local). Código 0 se enviou ou não havia o que enviar.
 
-Agendar no Mac (launchd, a cada hora):
+### Agendar no Mac (launchd, a cada hora)
+
+Antes, faça os passos de "Chave SSH só para o envio", inclusive aceitar a host key.
 
 1. Copie o exemplo e troque `USUARIO` e `usuario@i7`:
    `cp ferramentas/sessoes/exemplos/local.assistente.sessoes-enviar.plist ~/Library/LaunchAgents/`
@@ -189,9 +232,8 @@ Agendar no Mac (launchd, a cada hora):
 4. Rode uma vez para testar: `launchctl kickstart gui/$(id -u)/local.assistente.sessoes-enviar`.
 5. Desligue: `launchctl bootout gui/$(id -u)/local.assistente.sessoes-enviar`.
 
-O launchd roda sem o agente SSH do terminal: a chave precisa estar sem senha ou no Keychain
-(`ssh-add --apple-use-keychain`), ou use Tailscale SSH. A saída fica em `enviar-launchd.log`, na
-pasta de estado.
+O launchd roda sem o agente SSH do terminal: por isso a chave do envio é sem senha. A saída fica em
+`enviar-launchd.log`, na pasta de estado.
 
 ## Testes
 

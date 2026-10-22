@@ -76,7 +76,7 @@ def test_marcar_enviada_e_regravar(estado):
     fila.gravar(_r("sessao-01", "2026-10-20T10:00:00+00:00"))
     fila.marcar_enviada("sessao-01")
     assert os.listdir(_pendentes(estado)) == []
-    assert os.listdir(estado / "enviadas" / fila.chave_projeto(RAIZ)) == ["sessao-01.json"]
+    assert os.listdir(estado / "enviadas" / fila.chave_projeto(RAIZ)) == ["sessao-01.20261020T100000Z.json"]
     fila.gravar(_r("sessao-01", "2026-10-20T12:00:00+00:00", titulo="de novo"))
     assert os.listdir(_pendentes(estado)) == ["sessao-01.json"]
     assert fila.ultima_do_projeto(RAIZ, "maquina-teste")["titulo"] == "de novo"
@@ -132,7 +132,7 @@ def test_le_formato_antigo_sem_subpasta(estado):
     assert not (estado / "pendentes" / "antiga-01.json").exists()
     assert fila.ultima_do_projeto(RAIZ, "maquina-teste")["sessao"] == "antiga-01"
     fila.marcar_enviada("antiga-01")
-    assert (estado / "enviadas" / fila.chave_projeto(RAIZ) / "antiga-01.json").exists()
+    assert (estado / "enviadas" / fila.chave_projeto(RAIZ) / "antiga-01.20261020T100000Z.json").exists()
 
 
 def test_surrogate_solto_nao_derruba_a_gravacao(estado):
@@ -171,3 +171,87 @@ def test_pasta_padrao(monkeypatch, tmp_path):
     monkeypatch.setenv("HOME", str(tmp_path))
     if os.name != "nt":
         assert fila.pasta_estado() == os.path.join(str(tmp_path), ".local", "state", "assistente", "sessoes")
+
+
+# --- Correções do revisor do Passo 11: enviadas/ sem sobrescrever, recusadas/ ---
+
+@pytest.mark.parametrize("fim, esperado", [
+    ("2026-10-20T10:00:00+00:00", "20261020T100000Z"),
+    ("2026-10-20T07:00:00-03:00", "20261020T100000Z"),
+    ("2026-10-20T10:00:00Z", "20261020T100000Z"),
+    ("2026-10-20T10:00:00.123456+00:00", "20261020T100000Z"),
+    ("2026-10-20T10:00:00", "sem-fim"),  # sem fuso
+    ("ontem", "sem-fim"),
+    (None, "sem-fim"),
+    (1729420000, "sem-fim"),
+    ("../../x", "sem-fim"),
+])
+def test_carimbo_do_fim(fim, esperado):
+    assert fila.carimbo(fim) == esperado
+
+
+def test_enviadas_guarda_cada_versao_sem_sobrescrever(estado):
+    enviadas = estado / "enviadas" / fila.chave_projeto(RAIZ)
+    fila.gravar(_r("sessao-01", "2026-10-20T10:00:00+00:00", titulo="primeira"))
+    fila.marcar_enviada("sessao-01")
+    fila.gravar(_r("sessao-01", "2026-10-20T10:00:00+00:00", titulo="mesmo fim de novo"))
+    fila.marcar_enviada("sessao-01")
+    fila.gravar(_r("sessao-01", "2026-10-20T12:00:00+00:00", titulo="retomada"))
+    [novo] = fila.marcar_enviada("sessao-01")
+    assert novo == str(enviadas / "sessao-01.20261020T120000Z.json")
+    assert sorted(os.listdir(enviadas)) == ["sessao-01.20261020T100000Z-2.json", "sessao-01.20261020T100000Z.json",
+                                            "sessao-01.20261020T120000Z.json"]
+    titulos = {n: json.loads((enviadas / n).read_text())["titulo"] for n in os.listdir(enviadas)}
+    assert titulos["sessao-01.20261020T100000Z.json"] == "primeira"
+    assert titulos["sessao-01.20261020T100000Z-2.json"] == "mesmo fim de novo"
+    assert fila.ultima_do_projeto(RAIZ, "maquina-teste")["titulo"] == "retomada"
+    assert not [n for n in os.listdir(enviadas) if n.startswith(".")]  # o temporário do rename não fica
+
+
+def test_ultima_entende_nome_antigo_e_novo_em_enviadas(estado):
+    enviadas = estado / "enviadas" / fila.chave_projeto(RAIZ)
+    enviadas.mkdir(parents=True)
+    (enviadas / "velha-001.json").write_text(json.dumps(_r("velha-001", "2026-10-20T08:00:00+00:00")))
+    fila.gravar(_r("nova-0001", "2026-10-20T09:00:00+00:00"))
+    fila.marcar_enviada("nova-0001")
+    assert fila.ultima_do_projeto(RAIZ, "maquina-teste")["sessao"] == "nova-0001"
+    assert fila.ultima_do_projeto(RAIZ, "maquina-teste", "nova-0001")["sessao"] == "velha-001"
+
+
+def test_marcar_enviada_so_o_arquivo_dado(estado):
+    """Com `origem`, move só aquele arquivo (o do lote), não as outras cópias da sessão."""
+    velho = estado / "pendentes" / "sessao-01.json"  # formato antigo, sem subpasta
+    velho.parent.mkdir(parents=True)
+    velho.write_text(json.dumps(_r("sessao-01", "2026-10-20T08:00:00+00:00")))
+    pasta = _pendentes(estado)
+    pasta.mkdir(parents=True)
+    (pasta / "sessao-01.json").write_text(json.dumps(_r("sessao-01", "2026-10-20T09:00:00+00:00")))
+    [destino] = fila.marcar_enviada("sessao-01", origem=str(pasta / "sessao-01.json"))
+    assert destino.endswith(os.path.join(fila.chave_projeto(RAIZ), "sessao-01.20261020T090000Z.json"))
+    assert velho.exists() and not (pasta / "sessao-01.json").exists()
+
+
+def test_arquivar_recusa_arquivo_fora_de_pendentes(estado, tmp_path):
+    fora = tmp_path / "fora.json"
+    fora.write_text("{}")
+    with pytest.raises(ValueError):
+        fila.arquivar(str(fora), "enviadas", "sessao-01", None)
+    assert fora.exists()
+
+
+def test_recusada_com_motivo_e_ainda_avisa(estado):
+    """A recusada sai de pendentes, guarda o motivo ao lado e continua valendo para o aviso do SessionStart."""
+    caminho = fila.gravar(_r("sem-passagem-1", "2026-10-20T10:00:00+00:00", passagem=False))
+    destino = fila.marcar_recusada("sem-passagem-1", caminho, "2026-10-20T10:00:00+00:00", "fim: data\nsem fuso")
+    recusadas = estado / "recusadas" / fila.chave_projeto(RAIZ)
+    assert destino == str(recusadas / "sem-passagem-1.20261020T100000Z.json")
+    assert os.listdir(_pendentes(estado)) == []
+    motivo = (recusadas / "sem-passagem-1.20261020T100000Z.motivo.txt").read_text(encoding="utf-8")
+    assert motivo.endswith(" fim: data sem fuso\n") and motivo[:2] == "20"
+    assert fila.ultima_do_projeto(RAIZ, "maquina-teste")["sessao"] == "sem-passagem-1"
+    # Recusada de novo (outro envio, mesmo fim): não sobrescreve a primeira nem o motivo dela.
+    caminho = fila.gravar(_r("sem-passagem-1", "2026-10-20T10:00:00+00:00", titulo="de novo"))
+    fila.marcar_recusada("sem-passagem-1", caminho, None, "outro motivo")
+    assert sorted(os.listdir(recusadas)) == [
+        "sem-passagem-1.20261020T100000Z.json", "sem-passagem-1.20261020T100000Z.motivo.txt",
+        "sem-passagem-1.sem-fim.json", "sem-passagem-1.sem-fim.motivo.txt"]

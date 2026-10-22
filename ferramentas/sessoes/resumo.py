@@ -34,6 +34,8 @@ MAX_ASPAS = 40  # string entre aspas maior que isso vira "…" no comando
 LIMITE_TOTAL = 60 * 1024 * 1024  # bytes lidos no total (sessão + subagentes)
 FIM_BYTES = 15 * 1024 * 1024  # transcript principal grande: lê também este tanto do fim
 MAX_LINHA = 16 * 1024 * 1024  # linha maior que isso é pulada sem carregar na memória
+MAX_MAQUINA = 60
+_FORA_DA_MAQUINA = re.compile(r"[^a-z0-9._-]")  # ASCII: "é" também vira "-"
 
 # Por nome do arquivo (em qualquer pasta): `docs/CONTEXTO.md` também conta.
 ARQUIVOS_DE_PASSAGEM = {"onde-parei.md", "SPRINT_NOTAS.md", "CONTEXTO.md", "ACOMPANHAMENTO.md"}
@@ -73,14 +75,15 @@ _SED_PASSAGEM = re.compile(
 
 
 def nome_maquina() -> str:
-    """`ASSISTENTE_MAQUINA` do ambiente, senão o nome curto do computador, minúsculo."""
+    """`ASSISTENTE_MAQUINA` do ambiente, senão o nome curto do computador: minúsculo, só `[a-z0-9._-]` (o resto
+    vira `-`), até 60. É o formato que o importador do i7 aceita (`servidor/assistente/sessoes.py`)."""
     nome = os.environ.get("ASSISTENTE_MAQUINA", "").strip()
     if not nome:
         try:
             nome = socket.gethostname()
         except OSError:
             nome = ""
-    nome = nome.split(".")[0].strip().lower()
+    nome = _FORA_DA_MAQUINA.sub("-", nome.split(".")[0].strip().lower())[:MAX_MAQUINA]
     return nome or "desconhecida"
 
 

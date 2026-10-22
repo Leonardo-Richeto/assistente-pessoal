@@ -79,7 +79,7 @@ tabela; eu confiro testes e diff antes de seguir. Effort max nunca.
 | 8 | 2b.8 migração 0005, `marcar_desatualizada`, `consultar_desatualizadas`, desfazer, lista no lint; teste no Postgres de rascunho | A | Opus 5.5 | alto | 0 | Feito 2026-10-21 (Opus 5.5); revisor rodou, correções feitas |
 | 9 | 2b.11 `sync-conflict` no `lint-diario.sh` + teste em `scripts/testes/` | C | Haiku 5.5 | baixo | 0 | Feito 2026-10-21 (Haiku 5.5) |
 | 10 | ⚑ 2b.9a hooks `SessionEnd`/`SessionStart`, resumo por regra, fila local, aviso; testes com transcript sintético | A | Opus 5.5 | alto | 5 | Feito 2026-10-22 (Opus 5.5); revisor rodou, correções feitas |
-| 11 | ⚑ 2b.9b migração 0006 `sessoes`, `assistente-sessoes importar`, `enviar.sh` por SSH; teste com Postgres de rascunho | A | Opus 5.5 | alto | 8, 10 | Feito 2026-10-22 (Opus 5.5); revisor pendente |
+| 11 | ⚑ 2b.9b migração 0006 `sessoes`, `assistente-sessoes importar`, `enviar.sh` por SSH; teste com Postgres de rascunho | A | Opus 5.5 | alto | 8, 10 | Feito 2026-10-22 (Opus 5.5); revisor rodou, correções feitas |
 | 12 | Fechamento: revisor final na branch, `docker build` arm64, docs (`PLANO.md` [x], `CONTEXTO.md`, `README.md`, `docs/IMPLANTACAO.md` com os passos do i7), hooks no Mac (decisão 6), vault (`onde-parei`, nota do plano) | A | Opus 5.5 | alto | todos | Pendente |
 
 Ordem de execução: 0, 1, 3, 9, 8, 2, 4, 5, 6, 7, 10, 11, 12 (o que não depende do anterior vem antes).
@@ -243,3 +243,12 @@ Um bloco por passo, do mais velho para o mais novo: o que fez, verificado, não 
 - Verificado: 609 passam, 10 pulados; `ferramentas/sessoes/tests` 281 passam, 0 pulados; gitleaks real pegou chave AWS
   falsa e deixou passar `{{segredo:wifi}}`; varredura do vault real: 125 notas, 0 achados (nenhum falso positivo).
 - Não verificado: gitleaks no amd64 do i7; tempo da conferência em nota de vários MB (~3 s/MB no pior caso).
+
+### Correções do revisor do Passo 11 (Opus 5.5, 2026-10-22)
+
+- Revisor: 7 achados, todos corrigidos: chave SSH só para o envio com `restrict,command=` (antes valia root no i7 pelo
+  grupo docker); `consultar_sessoes` devolve `texto_de_fora` e a Ficha 1 trata sessão como dado; recusada vai para
+  `recusadas/` e não trava a fila; envio move só o arquivo enviado e devolve versão regravada; consulta com 5 commits,
+  10 arquivos e ~40.000 caracteres (`{"sessoes", "cortado"}`); `enviadas/` guarda cada versão; `maquina` validada.
+- Verificado: 621 passam, 10 pulados; `ferramentas/sessoes/tests` 307 passam; testes `_pg` (10) no Postgres de rascunho.
+- Não verificado: SSH real com `command=` no i7.

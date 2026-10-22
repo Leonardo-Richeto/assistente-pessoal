@@ -3,7 +3,11 @@
 Pasta de estado: `ASSISTENTE_SESSOES_DIR`; senão, no Windows,
 `%LOCALAPPDATA%\\assistente\\sessoes`; senão `~/.local/state/assistente/sessoes`.
 - `pendentes/<projeto>/<sessao>.json`: ainda não enviados ao i7 (`enviar.py`).
-- `enviadas/<projeto>/<sessao>.json`: já enviados. Nada é apagado (retenção: guardar tudo).
+- `enviadas/<projeto>/<sessao>.<fim>.json`: já no banco do i7. `<fim>` em UTC, `AAAAMMDDTHHMMSSZ`; cada versão
+  (sessão retomada) fica no seu arquivo, e nome repetido ganha `-2`, `-3`. O nome antigo (`<sessao>.json`, sem
+  `<fim>`) continua sendo lido. Nada é apagado (retenção: guardar tudo).
+- `recusadas/<projeto>/<sessao>.<fim>.json`: o importador recusou; o motivo fica ao lado, em
+  `<sessao>.<fim>.motivo.txt`. Não volta sozinho para o envio.
 - `hooks.log`: erros e avisos dos hooks (cortado em ~1 MB, mantendo o fim).
 
 `<projeto>` são os 12 primeiros dígitos do sha256 da raiz normalizada
@@ -23,7 +27,7 @@ import json
 import os
 import re
 import tempfile
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 ID_VALIDO = re.compile(r"[A-Za-z0-9-]{8,80}")  # sempre com fullmatch
@@ -32,7 +36,8 @@ NOMES_RESERVADOS = re.compile(r"(?i)(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])")
 LIMITE_LOG = 1024 * 1024
 MANTER_LOG = 512 * 1024
 MAX_ARQUIVOS_LIDOS = 500  # `ultima_do_projeto` lê só os mais recentes do projeto, por data do arquivo
-PASTAS = ("pendentes", "enviadas")
+PASTAS = ("pendentes", "enviadas", "recusadas")  # todas lidas por `ultima_do_projeto`
+SEM_FIM = "sem-fim"  # carimbo de quem não tem `fim` válido (só acontece em recusadas)
 
 
 def pasta_estado() -> str:
@@ -127,20 +132,115 @@ def gravar(resumo: Dict[str, Any]) -> str:
     return destino
 
 
-def marcar_enviada(sessao: str) -> List[str]:
-    """Move a sessão de `pendentes/` para `enviadas/` (mesma subpasta). Devolve os caminhos novos."""
+def carimbo(fim: Any) -> str:
+    """`fim` (ISO com fuso) em UTC como `AAAAMMDDTHHMMSSZ`; sem fim válido, `sem-fim`."""
+    if not isinstance(fim, str) or len(fim) > 40:
+        return SEM_FIM
+    texto = fim[:-1] + "+00:00" if fim.endswith(("Z", "z")) else fim  # o 3.9 não lê "Z"
+    try:
+        momento = datetime.fromisoformat(texto)
+    except ValueError:
+        return SEM_FIM
+    if momento.tzinfo is None or momento.utcoffset() is None:
+        return SEM_FIM
+    try:
+        return momento.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    except (OverflowError, ValueError):
+        return SEM_FIM
+
+
+def _ligar_sem_sobrescrever(origem: str, destino: str) -> bool:
+    """Cria `destino` apontando para o arquivo de `origem`, sem sobrescrever. False se `destino` já existe."""
+    try:
+        os.link(origem, destino)
+        return True
+    except FileExistsError:
+        return False
+    except OSError:
+        # Sistema de arquivos sem link: confere e renomeia (só o envio escreve aqui; a janela é mínima).
+        if os.path.lexists(destino):
+            return False
+        os.replace(origem, destino)
+        return True
+
+
+def arquivar(origem: str, nome_pasta: str, sessao: str, fim: Any) -> str:
+    """Move o arquivo exato `origem` (de `pendentes/`) para `<nome_pasta>/<mesma subpasta>/<sessao>.<carimbo>.json`.
+
+    Nunca sobrescreve: nome já usado ganha `-2`, `-3`. Leva o arquivo que estiver em `origem` na hora (rename
+    atômico), não um que for gravado depois. Devolve o caminho novo.
+    """
     _conferir_id(sessao)
     pendentes = os.path.join(pasta_estado(), "pendentes")
+    relativo = os.path.dirname(os.path.relpath(origem, pendentes))
+    if relativo.startswith(os.pardir):
+        raise ValueError("arquivo fora de pendentes: %s" % os.path.basename(origem))
+    pasta = os.path.join(pasta_estado(), nome_pasta, relativo)
+    os.makedirs(pasta, exist_ok=True)
+    # Primeiro um rename para um nome temporário nosso (oculto: ninguém lê), depois o nome final sem sobrescrever.
+    fd, temporario = tempfile.mkstemp(prefix=".mov-", suffix=".tmp", dir=pasta)
+    os.close(fd)
+    try:
+        os.replace(origem, temporario)
+    except BaseException:
+        os.unlink(temporario)
+        raise
+    base = os.path.join(pasta, "%s.%s" % (sessao, carimbo(fim)))
+    numero = 1
+    while True:
+        destino = base + (".json" if numero == 1 else "-%d.json" % numero)
+        if _ligar_sem_sobrescrever(temporario, destino):
+            break
+        numero += 1
+    try:
+        os.unlink(temporario)
+    except OSError:
+        pass
+    return destino
+
+
+def devolver(caminho: str, origem: str) -> bool:
+    """Põe `caminho` de volta em `origem` (em `pendentes/`) sem sobrescrever. False se `origem` já tem arquivo novo."""
+    os.makedirs(os.path.dirname(origem), exist_ok=True)
+    if not _ligar_sem_sobrescrever(caminho, origem):
+        return False
+    try:
+        os.unlink(caminho)
+    except OSError:
+        pass
+    return True
+
+
+def marcar_enviada(sessao: str, origem: Optional[str] = None, fim: Any = None) -> List[str]:
+    """Move para `enviadas/` (mesma subpasta, nome `<sessao>.<fim>.json`) o arquivo `origem` ou, sem ele, todas as
+    cópias da sessão em `pendentes/`. Sem `fim`, lê do arquivo. Devolve os caminhos novos."""
+    _conferir_id(sessao)
+    origens = [origem] if origem else _copias("pendentes", sessao)
     movidos = []
-    for origem in _copias("pendentes", sessao):
-        relativo = os.path.relpath(origem, pendentes)
-        destino = os.path.join(pasta_estado(), "enviadas", relativo)
-        os.makedirs(os.path.dirname(destino), exist_ok=True)
-        os.replace(origem, destino)
-        movidos.append(destino)
+    for caminho in origens:
+        if not os.path.isfile(caminho):
+            continue
+        fim_do_arquivo = fim if fim is not None else (_ler(caminho) or {}).get("fim")
+        movidos.append(arquivar(caminho, "enviadas", sessao, fim_do_arquivo))
     if not movidos:
         raise FileNotFoundError("sessão %s não está em pendentes" % sessao)
     return movidos
+
+
+def anotar_motivo(recusada: str, motivo: str) -> str:
+    """Grava `<recusada sem .json>.motivo.txt` com a data e o motivo (uma linha). Devolve o caminho."""
+    caminho = recusada[: -len(".json")] + ".motivo.txt"
+    texto = "%s %s\n" % (datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S%z"),
+                         " ".join(str(motivo).split())[:500])
+    _gravar_atomico(caminho, texto.encode("utf-8", "backslashreplace"))
+    return caminho
+
+
+def marcar_recusada(sessao: str, origem: str, fim: Any, motivo: str) -> str:
+    """Move o arquivo `origem` para `recusadas/` e grava o motivo ao lado (`.motivo.txt`). Devolve o caminho novo."""
+    destino = arquivar(origem, "recusadas", sessao, fim)
+    anotar_motivo(destino, motivo)
+    return destino
 
 
 def _ler(caminho: str) -> Optional[Dict[str, Any]]:
@@ -168,7 +268,8 @@ def _jsons(pasta: str) -> List[str]:
 def ultima_do_projeto(
     raiz: str, maquina: str, exceto_sessao: Optional[str] = None, ignorar_vazias: bool = True
 ) -> Optional[Dict[str, Any]]:
-    """A sessão mais recente (por `fim`) do projeto (pela raiz) nesta máquina, em pendentes e enviadas."""
+    """A sessão mais recente (por `fim`) do projeto (pela raiz) nesta máquina, em pendentes, enviadas e recusadas
+    (a recusada também avisa: o dono não fez a passagem, mesmo que o i7 não a tenha). Lê os nomes antigo e novo."""
     alvo = raiz_normalizada(raiz)
     chave = chave_projeto(raiz)
     candidatos: List[Tuple[float, int, str]] = []
@@ -189,7 +290,7 @@ def ultima_do_projeto(
         if resumo is None:
             continue
         sessao = resumo.get("sessao")
-        # pendentes vem antes de enviadas na mesma data; a primeira cópia vale.
+        # A cópia gravada por último vale (pendentes antes de enviadas e recusadas na mesma data).
         if sessao in vistas:
             continue
         vistas.add(sessao)

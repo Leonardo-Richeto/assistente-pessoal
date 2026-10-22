@@ -3,16 +3,20 @@
     python -m assistente.sessoes importar < resumos.jsonl
 
 Lê JSONL da entrada padrão: um resumo por linha (o JSON que `ferramentas/sessoes/fila.py` grava), no máximo
-2.000 linhas e 2 MB por execução; o que passa disso fica para a próxima (a linha do corte sai em `recusadas`).
+2.000 linhas e 2 MB por execução; o que passa disso fica para a próxima (a linha do corte sai em `recusadas`, com
+`"adiada": true`: o envio deixa essa e as seguintes na fila).
 Cada resumo é dado de fora: tipos conferidos um a um, textos cortados ao tamanho das colunas, listas cortadas
-(arquivos 50, comandos 30, commits 20), campo desconhecido descartado. Linha inválida é recusada sozinha; as
-outras seguem.
+(arquivos 50, comandos 30, commits 20), campo desconhecido descartado. `maquina` só com `[a-z0-9._-]`, até 60 (o
+hook já normaliza; fora disso, recusa). Linha inválida é recusada sozinha; as outras seguem.
 
 Grava pela conexão de escrita (`DATABASE_URL_ESCRITA`, só INSERT e SELECT em `sessoes`) numa transação, com UMA
-linha de `auditoria` por execução (`sessoes_importar`, `sessoes`, `criar`; `dados` só com as contagens e as
-máquinas). O mesmo (`sessao`, `fim`) já gravado, ou repetido na entrada, conta como repetido e não entra.
+linha de `auditoria` por execução (`sessoes_importar`, `sessoes`, `criar`, autor `sessoes_importar`; `dados` só com
+as contagens e as máquinas validadas). Sem aceita nem repetida (entrada vazia ou só recusadas), não abre o banco nem
+grava auditoria: só imprime o resultado. O mesmo (`sessao`, `fim`) já gravado, ou repetido na entrada, conta como
+repetido e não entra.
 
-Imprime em JSON: {"aceitas": [ids], "repetidas": [ids], "recusadas": [{"linha": n, "motivo": "..."}]}.
+Imprime em JSON: {"aceitas": [ids], "repetidas": [ids], "recusadas": [{"linha": n, "motivo": "..."}]}; a recusa
+por limite traz também `"adiada": true`.
 As aceitas e as repetidas já estão no banco: o envio pode marcá-las como enviadas.
 Código 0 se rodou (mesmo com recusadas); 2 se o banco falhou ou falta a variável (sem a URL na mensagem).
 Duas importações ao mesmo tempo com o mesmo resumo: a segunda esbarra no índice único e sai com 2 sem gravar
@@ -44,8 +48,10 @@ MAX_BYTES = 2 * 1024 * 1024
 VERSOES_CONHECIDAS = {2}  # VERSAO_RESUMO de ferramentas/sessoes/resumo.py
 ID_SESSAO = re.compile(r"[A-Za-z0-9-]{8,80}")  # sempre com fullmatch
 ID_COMMIT = re.compile(r"[0-9a-f]{7,40}")
+MAQUINA = re.compile(r"[a-z0-9._-]{1,60}")  # sempre com fullmatch; = resumo.nome_maquina do hook
+AUTOR = "sessoes_importar"
 # Tamanho de cada coluna de texto (modelos.Sessao) e dos itens das listas.
-TAMANHOS = {"projeto": 120, "raiz": 300, "maquina": 60, "titulo": 200, "motivo_fim": 40}
+TAMANHOS = {"projeto": 120, "raiz": 300, "titulo": 200, "motivo_fim": 40}
 LISTAS = {"arquivos": (50, 300), "comandos": (30, 300)}  # (itens, caracteres por item)
 MAX_COMMITS, MAX_MENSAGEM_COMMIT = 20, 200
 MAX_DURACAO_MIN = 1_000_000
@@ -137,10 +143,14 @@ def validar(dado: Any) -> dict:
     inicio, fim = _data(dado["inicio"], "inicio", nula=True), _data(dado["fim"], "fim")
     if inicio is not None and inicio > fim:
         raise Recusa("inicio: depois do fim")
+    maquina = dado["maquina"]
+    if not isinstance(maquina, str) or MAQUINA.fullmatch(maquina) is None:
+        raise Recusa("maquina: fora de [a-z0-9._-], 1 a 60")
     limpo = {
         "sessao": sessao,
         **{campo: _texto(dado[campo], campo, tamanho, vazio=campo in ("titulo", "motivo_fim"))
            for campo, tamanho in TAMANHOS.items()},
+        "maquina": maquina,
         "inicio": inicio,
         "fim": fim,
         "duracao_min": _inteiro(dado["duracao_min"], "duracao_min", 0, MAX_DURACAO_MIN),
@@ -167,12 +177,12 @@ def ler_entrada(fluxo: BinaryIO) -> tuple[list[tuple[int, bytes]], list[dict]]:
             continue
         if len(resumos) == MAX_LINHAS:
             recusas.append({"linha": numero, "motivo": f"passou de {MAX_LINHAS} linhas por execução; esta e as "
-                                                      "seguintes ficam para a próxima"})
+                                                      "seguintes ficam para a próxima", "adiada": True})
             return resumos, recusas
         resumos.append((numero, linha))
     if cortou:
         recusas.append({"linha": len(linhas) + 1, "motivo": f"passou de {MAX_BYTES // (1024 * 1024)} MB por execução; "
-                                                            "esta e as seguintes ficam para a próxima"})
+                                                            "esta e as seguintes ficam para a próxima", "adiada": True})
     return resumos, recusas
 
 
@@ -198,10 +208,12 @@ def importar(fluxo: BinaryIO, engine: Engine) -> dict:
 
     aceitas: list[dict] = []
     repetidas: list[str] = []
+    if not validos:  # só recusadas (ou nada): não há o que gravar nem auditar
+        return {"aceitas": [], "repetidas": [], "recusadas": recusadas}
     with Session(engine) as s, s.begin():
         ids = sorted({r["sessao"] for _, r in validos})
         vistos = {(sessao, _utc(fim)) for sessao, fim in s.execute(
-            select(Sessao.sessao, Sessao.fim).where(Sessao.sessao.in_(ids)))} if ids else set()
+            select(Sessao.sessao, Sessao.fim).where(Sessao.sessao.in_(ids)))}
         for _, resumo in validos:
             chave = (resumo["sessao"], resumo["fim"])
             if chave in vistos:
@@ -211,7 +223,7 @@ def importar(fluxo: BinaryIO, engine: Engine) -> dict:
             aceitas.append(resumo)
             s.add(Sessao(**resumo))
         maquinas = sorted({r["maquina"] for _, r in validos})
-        s.add(Auditoria(ferramenta="sessoes_importar", tabela="sessoes", registro_id=None, acao="criar",
+        s.add(Auditoria(ferramenta="sessoes_importar", tabela="sessoes", registro_id=None, acao="criar", autor=AUTOR,
                         dados={"quantidade": len(aceitas), "repetidas": len(repetidas), "recusadas": len(recusadas),
                                "maquinas": maquinas}))
     return {"aceitas": [r["sessao"] for r in aceitas], "repetidas": repetidas, "recusadas": recusadas}

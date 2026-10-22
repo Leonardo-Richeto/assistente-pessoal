@@ -4,10 +4,19 @@
     /usr/bin/python3 ferramentas/sessoes/enviar.py --comando "..."   # outro comando (testes)
 
 Junta as pendentes de todas as subpastas de `pendentes/` (até 500 por vez e 2 MB, as mais antigas primeiro), manda
-como JSONL para o importador do i7 pela Tailscale (SSH) e move para `enviadas/` as que o importador aceitou ou já
-tinha (`aceitas` + `repetidas`), com `fila.marcar_enviada`. As recusadas ficam em `pendentes/`. Nada é apagado.
-Comando que falha, demora mais de 120 s ou responde algo que não é o JSON esperado: nada se move.
-O arquivo que mudou durante o envio (sessão retomada que terminou nesse meio-tempo) também fica: vai na próxima.
+como JSONL para o importador do i7 pela Tailscale (SSH) e move, arquivo por arquivo (o caminho exato do lote):
+- para `enviadas/<projeto>/<sessao>.<fim>.json` as que o importador aceitou ou já tinha (`aceitas` + `repetidas`);
+- para `recusadas/<projeto>/<sessao>.<fim>.json` as recusadas, com o motivo em `<sessao>.<fim>.motivo.txt` ao lado.
+  Assim a recusada não trava a fila (antes ficava em `pendentes/` e voltava sempre na frente).
+A recusa por limite do importador (`"adiada": true`) não é recusa: essa linha e as seguintes ficam para o próximo envio.
+Nada é apagado. Comando que falha, demora mais de 120 s ou responde algo que não é o JSON esperado: nada se move.
+
+Corrida com o hook (sessão retomada que terminou durante o envio): o arquivo só se move se a marca
+(`st_ino`, `st_mtime_ns`, `st_size`) ainda é a da leitura; depois de mover, o conteúdo é relido e comparado com a
+linha enviada. Diferente (regravado entre a conferência e o rename): volta para `pendentes/` e vai no próximo envio.
+
+SSH: com a chave só do envio (`ASSISTENTE_SSH_CHAVE` ou `~/.ssh/assistente_sessoes`, se existir), passa
+`-i <chave> -o IdentitiesOnly=yes`; no i7, o `command=` do `authorized_keys` força o importador (ver README).
 
 Não roda no fim da sessão (o SessionEnd tem 1,5 s): rode à mão ou por timer (launchd no Mac; ver README).
 Log em `hooks.log` da pasta de estado (`fila.log`). Código 0 se enviou ou não havia o que enviar; 1 se faltou
@@ -38,25 +47,43 @@ COMANDO_REMOTO = (
     "docker compose --project-directory %s exec -T servidor python -m assistente.sessoes importar" % PASTA_APP_I7
 )
 SEM_SSH = "Defina ASSISTENTE_SSH (ex.: usuario@i7). O PC do trabalho fica só com a fila local."
+CHAVE_PADRAO = os.path.join("~", ".ssh", "assistente_sessoes")  # chave só do envio (README, "Envio para o i7")
 DESTINO_VALIDO = re.compile(r"[A-Za-z0-9._@-]{1,200}")  # usuario@maquina; nunca começa com "-" (opção do ssh)
+
+
+Marca = Tuple[int, int, int]  # (st_ino, st_mtime_ns, st_size): o rename atômico do hook troca o st_ino
 
 
 class Pendente:
     """Um arquivo de `pendentes/` lido para o envio, com a marca do arquivo na hora da leitura."""
 
-    def __init__(self, caminho: str, sessao: str, linha: bytes, marca: Tuple[int, int]) -> None:
+    def __init__(self, caminho: str, sessao: str, fim: Any, linha: bytes, marca: Marca) -> None:
         self.caminho = caminho
         self.sessao = sessao
+        self.fim = fim
         self.linha = linha
         self.marca = marca
 
 
-def _marca(caminho: str) -> Optional[Tuple[int, int]]:
+def _marca(caminho: str) -> Optional[Marca]:
     try:
         st = os.stat(caminho)
     except OSError:
         return None
-    return (st.st_mtime_ns, st.st_size)
+    return (st.st_ino, st.st_mtime_ns, st.st_size)
+
+
+def _linha(dado: Any) -> bytes:
+    """Uma linha JSONL do resumo. ASCII: o surrogate solto e o acento atravessam o SSH sem depender do terminal."""
+    return json.dumps(dado, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode("ascii") + b"\n"
+
+
+def _linha_do_arquivo(caminho: str) -> Optional[bytes]:
+    try:
+        with open(caminho, "r", encoding="utf-8") as f:
+            return _linha(json.load(f))
+    except (OSError, ValueError):
+        return None
 
 
 def arquivos_pendentes() -> List[str]:
@@ -83,7 +110,7 @@ def arquivos_pendentes() -> List[str]:
             continue
         marca = _marca(caminho)
         if marca is not None:
-            candidatos.append((marca[0], caminho))
+            candidatos.append((marca[1], caminho))
     candidatos.sort()
     return [c for _, c in candidatos]
 
@@ -107,16 +134,27 @@ def ler_lote() -> Tuple[List[Pendente], int]:
         if marca is None or not fila.id_valido(sessao) or os.path.basename(caminho) != sessao + ".json":
             fila.log("enviar: %s não é um resumo válido; fica em pendentes" % os.path.basename(caminho))
             continue
-        # ASCII: o surrogate solto e o acento atravessam o SSH sem depender da codificação do terminal.
-        linha = json.dumps(dado, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode("ascii") + b"\n"
+        linha = _linha(dado)
         if len(linha) > MAX_BYTES:
             fila.log("enviar: %s passa de 2 MB; fica em pendentes" % os.path.basename(caminho))
             continue
         if total + len(linha) > MAX_BYTES:
             return lote, len(caminhos) - indice
         total += len(linha)
-        lote.append(Pendente(caminho, sessao, linha, marca))
+        lote.append(Pendente(caminho, sessao, dado.get("fim"), linha, marca))
     return lote, 0
+
+
+def chave_ssh() -> Optional[str]:
+    """Caminho absoluto da chave só do envio: `ASSISTENTE_SSH_CHAVE` (precisa existir) ou a padrão, se existir."""
+    definida = os.environ.get("ASSISTENTE_SSH_CHAVE", "").strip()
+    if definida:
+        caminho = os.path.abspath(os.path.expanduser(definida))
+        if not os.path.isfile(caminho):
+            raise ValueError("ASSISTENTE_SSH_CHAVE não aponta para um arquivo: %s" % caminho)
+        return caminho
+    padrao = os.path.abspath(os.path.expanduser(CHAVE_PADRAO))
+    return padrao if os.path.isfile(padrao) else None
 
 
 def comando_padrao() -> Optional[List[str]]:
@@ -125,7 +163,12 @@ def comando_padrao() -> Optional[List[str]]:
         return None
     if DESTINO_VALIDO.fullmatch(destino) is None or destino.startswith("-"):
         raise ValueError("ASSISTENTE_SSH inválida: use usuario@maquina")
-    return ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", destino, COMANDO_REMOTO]
+    comando = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10"]
+    chave = chave_ssh()
+    if chave:
+        comando += ["-i", chave, "-o", "IdentitiesOnly=yes"]
+    # Com a chave restrita, o `command=` do authorized_keys força o importador e este comando é ignorado.
+    return comando + [destino, COMANDO_REMOTO]
 
 
 def _resposta(saida: bytes) -> Optional[Dict[str, Any]]:
@@ -144,6 +187,40 @@ def _resposta(saida: bytes) -> Optional[Dict[str, Any]]:
 
 def _curto(texto: bytes) -> str:
     return " ".join(texto.decode("utf-8", "replace").split())[-300:]
+
+
+def _arquivar(pendente: Pendente, nome_pasta: str, motivo: Optional[str] = None) -> str:
+    """Move o arquivo exato do lote para `enviadas/` ou `recusadas/`. Devolve "movida", "mudou" ou "erro".
+
+    Só move se a marca ainda é a da leitura; depois de mover, relê e compara com a linha enviada. Se o hook regravou
+    o arquivo entre a conferência e o rename, a versão nova volta para `pendentes/` (vai no próximo envio).
+    """
+    if _marca(pendente.caminho) != pendente.marca:
+        fila.log("enviar: %s mudou durante o envio; fica em pendentes" % pendente.sessao)
+        return "mudou"
+    try:
+        destino = fila.arquivar(pendente.caminho, nome_pasta, pendente.sessao, pendente.fim)
+    except (OSError, ValueError) as e:
+        fila.log("enviar: não movi %s para %s (%s)" % (pendente.sessao, nome_pasta, type(e).__name__))
+        return "erro"
+    if _linha_do_arquivo(destino) != pendente.linha:
+        try:
+            voltou = fila.devolver(destino, pendente.caminho)
+        except OSError:
+            voltou = False
+        if voltou:
+            fila.log("enviar: %s foi regravada durante o envio; a versão nova voltou para pendentes" % pendente.sessao)
+        else:
+            # Três gravações da mesma sessão dentro de um envio: a do meio já foi trocada por outra mais nova.
+            fila.log("enviar: %s foi regravada duas vezes durante o envio; a versão do meio ficou em %s"
+                     % (pendente.sessao, os.path.relpath(destino, fila.pasta_estado())))
+        return "mudou"
+    if motivo is not None:
+        try:
+            fila.anotar_motivo(destino, motivo)
+        except OSError as e:
+            fila.log("enviar: não gravei o motivo de %s (%s)" % (pendente.sessao, type(e).__name__))
+    return "movida"
 
 
 def enviar(comando: List[str]) -> int:
@@ -169,27 +246,32 @@ def enviar(comando: List[str]) -> int:
         return 1
 
     no_banco = {s for s in resposta["aceitas"] + resposta["repetidas"] if isinstance(s, str)}
-    movidas, mudaram = 0, 0
-    for pendente in lote:
-        if pendente.sessao not in no_banco:
+    recusas: Dict[int, str] = {}
+    adiada_desde = len(lote) + 1  # a recusa por limite: dessa linha em diante, nada foi processado
+    for recusa in resposta["recusadas"]:
+        if not isinstance(recusa, dict) or type(recusa.get("linha")) is not int:
             continue
-        no_banco.discard(pendente.sessao)  # a mesma sessão em duas subpastas: marcar_enviada move as duas
-        if _marca(pendente.caminho) != pendente.marca:
-            mudaram += 1
-            fila.log("enviar: %s mudou durante o envio; fica em pendentes" % pendente.sessao)
-            continue
-        try:
-            fila.marcar_enviada(pendente.sessao)
-            movidas += 1
-        except (OSError, ValueError) as e:
-            fila.log("enviar: não movi %s para enviadas (%s)" % (pendente.sessao, type(e).__name__))
-    recusadas = [r for r in resposta["recusadas"] if isinstance(r, dict)]
-    linhas = {indice + 1: p.sessao for indice, p in enumerate(lote)}
-    for recusa in recusadas:
-        fila.log("enviar: recusada %s: %s" % (linhas.get(recusa.get("linha"), "linha %s" % recusa.get("linha")),
-                                              str(recusa.get("motivo"))[:200]))
-    resumo = "enviadas %d de %d (aceitas %d, repetidas %d), recusadas %d, mudaram no envio %d, ficaram para depois %d" % (
-        movidas, len(lote), len(resposta["aceitas"]), len(resposta["repetidas"]), len(recusadas), mudaram, de_fora)
+        if recusa.get("adiada") is True:
+            adiada_desde = min(adiada_desde, recusa["linha"])
+        else:
+            recusas[recusa["linha"]] = " ".join(str(recusa.get("motivo")).split())[:200]
+    movidas, recusadas, mudaram, adiadas = 0, 0, 0, 0
+    for numero, pendente in enumerate(lote, start=1):
+        if numero >= adiada_desde:
+            adiadas += 1
+        elif numero in recusas:
+            fila.log("enviar: recusada %s: %s" % (pendente.sessao, recusas[numero]))
+            situacao = _arquivar(pendente, "recusadas", recusas[numero])
+            recusadas += situacao == "movida"
+            mudaram += situacao == "mudou"
+        elif pendente.sessao in no_banco:
+            situacao = _arquivar(pendente, "enviadas")
+            movidas += situacao == "movida"
+            mudaram += situacao == "mudou"
+    resumo = ("enviadas %d de %d (aceitas %d, repetidas %d), recusadas %d (em recusadas/ %d), mudaram no envio %d, "
+              "ficaram para depois %d") % (
+        movidas, len(lote), len(resposta["aceitas"]), len(resposta["repetidas"]), len(recusas), recusadas, mudaram,
+        de_fora + adiadas)
     fila.log("enviar: " + resumo)
     print(resumo[:1].upper() + resumo[1:] + ".")
     return 0

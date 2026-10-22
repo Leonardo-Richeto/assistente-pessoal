@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import json
 import os
+import re
 
+import pytest
 from conftest import SESSAO, escrever_transcript
 
 import resumo
@@ -125,6 +127,23 @@ def test_maquina_do_hostname(monkeypatch):
     monkeypatch.delenv("ASSISTENTE_MAQUINA", raising=False)
     monkeypatch.setattr(resumo.socket, "gethostname", lambda: "MacBook-Air.local")
     assert resumo.nome_maquina() == "macbook-air"
+
+
+@pytest.mark.parametrize("bruto, esperado", [
+    ("MacBook do Léo.local", "macbook-do-l-o"),
+    ("PC_Trabalho", "pc_trabalho"),
+    ("i7;rm -rf", "i7-rm--rf"),
+    ("x" * 80, "x" * 60),
+    ("   ", "desconhecida"),
+])
+def test_maquina_normalizada_no_formato_do_importador(monkeypatch, bruto, esperado):
+    """O importador recusa `maquina` fora de ^[a-z0-9._-]{1,60}$ (revisor do Passo 11): o hook já sai nesse formato."""
+    monkeypatch.delenv("ASSISTENTE_MAQUINA", raising=False)
+    monkeypatch.setattr(resumo.socket, "gethostname", lambda: bruto)
+    nome = resumo.nome_maquina()
+    assert nome == esperado and re.fullmatch(r"[a-z0-9._-]{1,60}", nome)
+    monkeypatch.setenv("ASSISTENTE_MAQUINA", bruto)
+    assert resumo.nome_maquina() == esperado
 
 
 # --- Transcripts pequenos montados no teste (achados 1, 4, 5, 9 e 11 do revisor do Passo 10) ---
