@@ -42,9 +42,10 @@ Scripts: `deploy/inventario.sh`, `scripts/preparar_host.sh`, `scripts/exportar.s
 
 ### Roteiro da implantação
 
-Tempo total estimado: 3h a 4h. Marque conforme avança. A numeração dos passos B segue o `SPRINT.md`;
+Tempo total estimado: 4h a 5h. Marque conforme avança. A numeração dos passos B segue o `SPRINT.md`;
 a **ordem de execução** é a desta lista (B10 vem antes de B8 de propósito: o conector novo só entra
-depois de os dados estarem no lugar).
+depois de os dados estarem no lugar; B11 e a Fase 2b vêm antes de B8 porque o texto novo da Ficha 1 usa o vault e as
+ferramentas da 2b).
 
 0. [x] Pré-condição, cumprida pelo orquestrador: os scripts estão no GitHub (commit e push feitos antes).
    Confira: `git ls-remote https://github.com/Leonardo-Richeto/assistente-pessoal main` e
@@ -59,10 +60,13 @@ depois de os dados estarem no lugar).
 7. [ ] (15 min) `/srv/assistente/.env` com senhas novas e a chave pública do age, subir a stack com o perfil `tailscale`, `scripts/verificar.sh` (B6, B7).
 8. [ ] (2 min) No Mac: `docker compose stop servidor`. O Postgres do Mac fica de pé e nada novo é gravado (B7b).
 9. [ ] (30 min) Dados do Mac: backup, `scp`, restaurar em banco novo, conferir, decidir e trocar (B10).
-10. [ ] (20 min) claude.ai: conector novo, trocar no Projeto "Assistente", colar as instruções novas (B8) e testes (B9).
-11. [ ] (5 min) Só agora, no Mac: `tailscale funnel --https=443 off` e `docker compose stop` (B9b).
-12. [ ] (40 min) Vault e Syncthing e o timer do commit do vault (B11, `docs/SYNCTHING.md`).
-13. [ ] (5 min) Anote o consumo parado (lido no B2c) e comece os 7 dias de medição com a stack (`PLANO.md` 1.7).
+10. [ ] (40 min) Vault e Syncthing e o timer do commit do vault (B11, `docs/SYNCTHING.md`), com `VAULT_PATH=/vault`.
+11. [ ] (40 min) Fase 2b no i7: código e migrações, gitleaks, `.gitignore` do vault, timers, deploy key, sessões
+    do Claude Code (seção "Fase 2b no i7", abaixo).
+12. [ ] (30 min) claude.ai: conector novo, trocar no Projeto "Assistente", colar o texto atual da Ficha 1 (B8) e
+    testes, inclusive os da Ficha 5 (B9).
+13. [ ] (5 min) Só agora, no Mac: `tailscale funnel --https=443 off` e `docker compose stop` (B9b).
+14. [ ] (5 min) Anote o consumo parado (lido no B2c) e comece os 7 dias de medição com a stack (`PLANO.md` 1.7).
 
 > **Aviso:** sem backup do banco (decisão de 2026-10-18), uma falha do SSD do i7 perde todos os
 > registros. Olhe a saúde do SSD no inventário (B1) antes de apagar o sistema atual.
@@ -193,14 +197,42 @@ cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor   # depois: powersave
          Depois `docker compose up -d`.
       5. Para começar limpo: apague o banco de conferência com
          `docker compose exec -T postgres sh -c 'dropdb -U "$POSTGRES_USER" assistente_mac'`.
-- [ ] B8. No claude.ai: Configurações → Conectores → adicionar conector personalizado `https://assistente.<tailnet>.ts.net/mcp`
+- [ ] B8. **Antes:** B11 feito (vault ligado, `VAULT_PATH=/vault`) e a seção "Fase 2b no i7" feita (servidor da 2b
+      de pé). No claude.ai: Configurações → Conectores → adicionar conector personalizado `https://assistente.<tailnet>.ts.net/mcp`
       e entrar com o Google. No Projeto "Assistente": trocar o conector do Mac pelo novo. Depois remova o conector
-      de teste. **Nas instruções do Projeto, troque o texto inteiro** pelo bloco "Texto proposto" da Ficha 1
-      (`docs/regras-de-negocio.md`), com "o dono" trocado por "Leonardo" e a 1ª frase "Você é o assistente pessoal
-      do Leonardo, dono deste Projeto." É a versão com as Fichas 3 e 4 (aprovadas em 2026-10-18), ainda não colada.
+      de teste. **Nas instruções do Projeto, troque o texto inteiro** pelo texto atual da Ficha 1 (com a Ficha 5):
+      o bloco "Texto proposto" de `docs/regras-de-negocio.md`, com "o dono" trocado por "Leonardo" e a 1ª frase
+      "Você é o assistente pessoal do Leonardo, dono deste Projeto." Tem as Fichas 3, 4 e 5, ainda não coladas.
+      **Suba o servidor da 2b e cole o texto no mesmo momento.** O texto novo cita ferramentas que só existem na 2b
+      (`buscar_vault`, `ler_nota`, `escrever_nota`...). O servidor da 2b recusa `vault_write_note` sem `mode`, que o
+      texto antigo usava. Servidor velho com texto novo, ou o contrário, quebra a escrita no vault.
 - [ ] B9. Repetir os testes do A10 pelo iPhone (gasto → consultar → desfazer; ponto → horas). Testar também as
       Fichas 3 e 4: "estudei X 1 h e aprendi Y" anota em `50-diario/AAAA/AAAA-MM-DD.md`, seção "Pelo assistente";
       "registra o que fizemos" escreve o resumo na mesma nota; `python3 -I /srv/assistente/vault/90-meta/lint-do-vault.py` sem ERRO.
+      Depois, os exemplos da Ficha 5. Antes, crie no Obsidian do Mac uma nota de teste `00-inbox/teste-2b.md` com
+      duas linhas e espere ela chegar ao i7 (`ls /srv/assistente/vault/00-inbox/`).
+      - [ ] Busca: "O que eu decidi sobre o carro?" (ou outro assunto do vault). Responde citando a nota certa.
+      - [ ] Reescrever com versão: "Reescreve a nota 00-inbox/teste-2b.md com o texto: linha nova". Responde
+            "Reescrevi 00-inbox/teste-2b.md." No i7: `git -C /srv/assistente/vault log --oneline -3 -- 00-inbox/teste-2b.md`
+            mostra um commit `claude-app`.
+      - [ ] Nota que mudou no meio: peça "Lê a nota 00-inbox/teste-2b.md". Mude uma linha dela no Obsidian do Mac e
+            espere o Syncthing. Peça "Reescreve essa nota com o texto: outra linha". Ele lê de novo e pergunta: "A nota
+            mudou no meio. Quer que eu aplique sobre a versão nova?"
+      - [ ] Segredo recusado: "Anota na nota do dia que a senha do roteador é Casa-Teste-2026x". Nada é gravado com o
+            valor; ele oferece `{{segredo:roteador}}`. Confira: `grep -r "Casa-Teste" /srv/assistente/vault` não acha
+            nada.
+      - [ ] Histórico e restaurar: "Volta a nota 00-inbox/teste-2b.md para a versão anterior". Ele mostra as versões
+            (`historico_nota`), pergunta qual e responde "Restaurei 00-inbox/teste-2b.md para a versão de AAAA-MM-DD HH:MM."
+            A restauração é um commit novo; nada some do histórico.
+      - [ ] Marcar desatualizada: "A nota 00-inbox/teste-2b.md está velha". Responde "Marquei como desatualizada (id N).
+            Desfazer?". Responda "sim" e confira que desfez. Marque de novo para ver no lint do dia seguinte
+            (`/srv/assistente/logs/vault-lint/ultimo.md`, seção "Notas marcadas como desatualizadas").
+      - [ ] `contexto_inicial`: abra conversa nova com "Como está o meu trabalho?". Ele chama `contexto_inicial` uma
+            vez (confira com "consulte as chamadas de hoje") e responde com o "Trabalho em andamento" do `onde-parei.md`.
+            Em "gastei 30 no mercado", não chama.
+      - [ ] `consultar_sessoes` (depois do primeiro envio das sessões, seção "Fase 2b no i7"): "O que eu fiz no Claude
+            Code esta semana?". Responde com projeto, máquina e horário das sessões.
+      No fim, apague a nota de teste no Obsidian do Mac (o histórico fica no git).
 - [ ] B9b. Só depois de B8 e B9 funcionarem, desligue o Mac:
       ```bash
       tailscale funnel --https=443 off                                  # no Mac (sudo, se pedir)
@@ -217,6 +249,104 @@ cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor   # depois: powersave
       estado anterior não sai). Avise antes de mudar `chown`.
       O usuário do commit diário e do Syncthing (`<usuario>`) precisa ter uid 1000, o mesmo do container:
       `id -u <usuario>` deve dar 1000. Conferir: `find /srv/assistente/vault/.git ! -uid 1000 | head` não mostra nada.
+      **Ordem:** o B11 vem antes do B8. O texto novo da Ficha 1 manda o Claude ler e escrever no vault.
+
+#### Fase 2b no i7 (depois do B11, antes do B8)
+
+O código da Fase 2b fica na branch `fase-2b` até o merge em `main` (decisão sua). Faça o merge e o push antes deste
+passo: o i7 clona o `main`. A ordem: código e banco, gitleaks, `.gitignore` do vault, timers, deploy key, sessões.
+Neste roteiro, o conector do i7 só entra no B8, junto com o texto novo da Ficha 1: o servidor da 2b e o texto novo
+chegam ao app juntos. Se o i7 já estiver em uso com o texto antigo, faça o 2b-1 e o B8 no mesmo momento (veja o aviso
+no B8).
+
+- [ ] 2b-1. Código e migrações. No i7:
+      ```bash
+      cd /srv/assistente/app && git pull && docker compose up -d --build
+      bash scripts/verificar.sh
+      ```
+      O serviço `migracao` roda sozinho no `up -d --build`, antes do servidor, e sobe as migrações 0005
+      (`notas_desatualizadas`) e 0006 (`sessoes`). O `verificar.sh` deve mostrar `migracao terminou com 0`,
+      `migração do banco na cabeça (0006)`, `tabela notas_desatualizadas legível pela leitura`,
+      `tabela sessoes legível pela leitura`, `vault: N notas indexadas` e `vault: .git gravável`. Se o banco não
+      estiver na 0006, pare e veja `docker compose logs migracao`.
+- [ ] 2b-2. Imagem do gitleaks, com o digest fixo do `deploy/vault/commit-diario.sh` (`GITLEAKS_IMAGE`). Baixe agora:
+      o commit diário roda às 03:30 e, sem a imagem, depende da rede naquela hora.
+      ```bash
+      docker pull ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+      grep -o 'gitleaks:v[^}"]*' /srv/assistente/app/deploy/vault/commit-diario.sh   # tem de ser o mesmo texto
+      ```
+      Se os dois forem diferentes, use o do script: ele vale.
+- [ ] 2b-3. `.gitignore` do vault atualizado a partir de `deploy/vault/gitignore-do-vault`. As linhas novas são
+      `.obsidian/plugins/*/data.json` (plugins guardam chave de API ali) e `.escrever-nota-*.tmp` (temporário do
+      `escrever_nota`). O comando acrescenta só as linhas que faltam:
+      ```bash
+      cd /srv/assistente/vault
+      while IFS= read -r l; do
+        case "$l" in ''|'#'*) continue ;; esac
+        grep -qxF -- "$l" .gitignore 2>/dev/null || printf '%s
+' "$l" >>.gitignore
+      done </srv/assistente/app/deploy/vault/gitignore-do-vault
+      git diff .gitignore                                    # confira
+      git ls-files '.obsidian/plugins/*/data.json'           # não deve listar nada
+      ```
+      O commit diário comita o `.gitignore`. Se o `ls-files` listar algum `data.json`, ele já está no histórico
+      (e no GitHub). Avise antes de mexer: tirar do git é decisão sua.
+- [ ] 2b-4. Units novas (`vault-marcas.*`) e atualizadas (`vault-commit.service`, `vault-lint.service`: ordem depois
+      do backup, carimbo de execução limpa). O `cp` sobrescreve as do B11; o `sed` põe o usuário de novo.
+      ```bash
+      cd /srv/assistente/app/deploy/vault
+      sudo cp vault-commit.service vault-commit.timer vault-lint.service vault-lint.timer         vault-marcas.service vault-marcas.timer /etc/systemd/system/
+      sudo sed -i "s/<usuario>/$USER/" /etc/systemd/system/vault-commit.service         /etc/systemd/system/vault-lint.service /etc/systemd/system/vault-marcas.service
+      sudo install -d -o "$USER" -g "$USER" /srv/assistente/logs/vault-commit /srv/assistente/logs/vault-lint
+      sudo systemctl daemon-reload
+      sudo systemctl enable --now vault-commit.timer vault-marcas.timer vault-lint.timer
+      systemctl list-timers 'vault-*' assistente-backup.timer   # 03:15 backup, 03:30, 03:35, 03:40
+      systemctl show -p After vault-lint.service                # cita vault-commit.service e vault-marcas.service
+      ```
+- [ ] 2b-5. Deploy key do vault. O push usa `~/.ssh/vault_deploy` do `<usuario>` (B11, `docs/SYNCTHING.md` seção 2)
+      ou o caminho em `VAULT_SSH_CHAVE`, no `/etc/default/vault-commit`. Não precisa de `core.sshCommand` no
+      repositório: o script ignora a config do `.git`. Teste o serviço inteiro:
+      ```bash
+      ls -l ~/.ssh/vault_deploy
+      sudo systemctl start vault-commit.service
+      journalctl -u vault-commit.service -n 20 --no-pager        # com VAULT_PUSH=1: "push feito (... para main)"
+      ls -l /srv/assistente/logs/vault-commit/ultima-execucao-ok # -rw-r--r--, hora de agora
+      sudo systemctl start vault-marcas.service && sudo systemctl start vault-lint.service
+      head -20 /srv/assistente/logs/vault-lint/ultimo.md
+      ```
+      Se o journal disser "não achei a chave de deploy", confira o caminho; sem a chave, o commit fica só local.
+- [ ] 2b-6. Sessões do Claude Code (Ficha 5, regra 9). Detalhe em `ferramentas/sessoes/README.md`. Só o Mac envia;
+      o PC do trabalho, sem Tailscale, fica só com a fila local.
+      1. No i7, um usuário só para receber o envio, no grupo `docker` (recomendado no README):
+         ```bash
+         sudo adduser --disabled-password --gecos '' sessoes
+         sudo usermod -aG docker sessoes
+         sudo install -d -m 700 -o sessoes -g sessoes /home/sessoes/.ssh
+         docker ps --filter label=com.docker.compose.service=servidor --format '{{.Names}}'   # assistente-servidor-1
+         ```
+      2. No Mac, a chave só do envio (se ainda não existe):
+         `ssh-keygen -t ed25519 -f ~/.ssh/assistente_sessoes -N '' -C assistente-sessoes`.
+      3. No i7, a chave restrita em `/home/sessoes/.ssh/authorized_keys` (dono `sessoes`, modo 600), com o conteúdo de
+         `~/.ssh/assistente_sessoes.pub` do Mac no lugar de `ssh-ed25519 AAAA...` e o nome do container do passo 1:
+         ```
+         restrict,command="docker exec -i assistente-servidor-1 python -m assistente.sessoes importar" ssh-ed25519 AAAA... assistente-sessoes
+         ```
+         É `docker exec`, não `docker compose exec`: o `docker compose` lê o `.env` (modo 600, seu), e o usuário
+         `sessoes` não lê.
+      4. No Mac, aceite a host key do i7 uma vez (o envio usa `BatchMode=yes` e nunca pergunta):
+         `ssh -n -i ~/.ssh/assistente_sessoes -o IdentitiesOnly=yes sessoes@<host-do-i7> true`. Responda `yes`. A
+         resposta esperada é `{"aceitas": [], "repetidas": [], "recusadas": []}`.
+      5. No Mac, envie o que está na fila, com `ASSISTENTE_SSH` no formato `usuario@maquina`:
+         `ASSISTENTE_SSH=sessoes@<host-do-i7> /usr/bin/python3 ferramentas/sessoes/enviar.py`.
+      6. Os hooks (`instalar.py`) já estão instalados no Mac desde 2026-10-22. Confira com
+         `/usr/bin/python3 ferramentas/sessoes/instalar.py --mostrar`.
+      7. Opcional: envio a cada hora pelo launchd (plist em `ferramentas/sessoes/exemplos/`, passos em "Agendar no
+         Mac" do README). Sem ele, rode o passo 5 à mão.
+- [ ] 2b-7. Pendências que são decisão sua (anote a decisão aqui):
+      - Usuário próprio para o lint, fora do grupo `docker`. Hoje o `vault-lint.service` usa o mesmo `<usuario>` do
+        commit e das marcas, que está no grupo `docker`; o código do lint vem do vault, pelo Syncthing.
+      - Rever o bloqueio de `vault_move_note` e `vault_move_file`, depois de usar o histórico (2b.4) alguns dias.
+      - Vaultwarden (2b.3a), depois do backup ligado (B12).
 - [ ] B12. Backup diário (2026-10-19, portabilidade; substitui o adiamento de 2026-10-18): o `preparar_host.sh` já
       instalou o `assistente-backup.timer`. Confira `systemctl list-timers assistente-backup.timer`, rode uma vez à mão
       (`sudo systemctl start assistente-backup.service`, `journalctl -u assistente-backup -n 30`) e faça um ensaio de

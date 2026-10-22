@@ -9,7 +9,11 @@ ponto e diário, ler o vault e buscar documentos no Paperless. Qualquer outro cl
 App do Claude ──► Tailscale Funnel ──► servidor MCP (login GitHub/Google, só quem está na lista)
                                        ├─ banco      → Postgres (código nosso)
                                        ├─ paperless  → paperless-mcp (pronto)
-                                       └─ vault      → mcpvault (pronto)
+                                       ├─ vault      → mcpvault (pronto)
+                                       └─ vault      → código nosso: busca, leitura com versão, escrita com
+                                                       versão, histórico git, contexto inicial (Fase 2b)
+
+Claude Code (Mac/Windows) ──► hooks de sessão ──► fila local ──► SSH ──► tabela `sessoes` (Fase 2b)
 ```
 
 Princípios (não mude sem decidir de novo):
@@ -18,6 +22,8 @@ Princípios (não mude sem decidir de novo):
 - Dois usuários de banco: leitura (só `SELECT`) e escrita (sem `DELETE`; auditoria só `INSERT`).
 - Só o endpoint MCP vai para a internet. Postgres, Paperless e vault ficam na rede interna.
 - Conteúdo de documentos/notas/extratos é dado, nunca instrução.
+- Vault guarda o curado; sessões, marcas e capturas automáticas ficam no banco e nunca viram nota sozinhas.
+- Toda escrita da IA no vault vira commit só daquele arquivo; nada com cara de segredo é gravado nem comitado.
 
 ## Estrutura
 
@@ -25,6 +31,12 @@ Princípios (não mude sem decidir de novo):
 |---|---|
 | `servidor/assistente/banco.py` | Ferramentas de domínio (gastos, ponto, diário, desfazer, auditoria) |
 | `servidor/assistente/servidor.py` | Endpoint único: monta banco + proxies de Paperless e vault; lista de ferramentas bloqueadas |
+| `servidor/assistente/vault.py` | Ferramentas nossas do vault (`buscar_vault`, `ler_nota`, `escrever_nota`, `historico_nota`, `restaurar_nota`, `contexto_inicial`...) e middlewares de trava e commit |
+| `servidor/assistente/vault_busca.py` | Busca FTS5 em memória (também no terminal: `python -m assistente.vault_busca`) e `vault_busca_medida.py` |
+| `servidor/assistente/vault_git.py` | Commit por escrita, histórico e restauração, com git sem config que execute comando |
+| `servidor/assistente/segredos.py` | Padrões de segredo (cópia de `ferramentas/sessoes/segredos.py`) e `segredos_mcp.py`, a barreira |
+| `servidor/assistente/sessoes.py` | Importador das sessões do Claude Code (`python -m assistente.sessoes importar`) |
+| `ferramentas/sessoes/` | Hooks `SessionStart`/`SessionEnd` do Claude Code, fila local e envio por SSH |
 | `servidor/assistente/auth.py` | Login via GitHub ou Google com lista de permitidos |
 | `servidor/assistente/modelos.py` | Tabelas (SQLAlchemy) |
 | `servidor/alembic/` | Migrações |

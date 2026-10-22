@@ -114,6 +114,11 @@ def test_acha_segredo_em_texto_dict_e_lista(argumentos, tipo):
     {"frontmatter": {"password": ["{{segredo:wifi}}"], "tags": ["senha", "token"], "pin": 1234}},
     {"frontmatter": {"credentials": "~/.config/gcloud/application_default_credentials.json"}},
     {"conteudo": "DATABASE_URL: postgresql+psycopg://app:${DB_PASS}@db:5432/app"},
+    # Revisor final da Sprint 2b: texto comum com acento, data no PIN, "resenha" e frase entre aspas.
+    {"conteudo": "Troquei a senha do Itaú: Atualização feita no app.\n| Banco | Senha | Situação |\n"
+                 "Senha do Netflix: Anotação na agenda\nA senha nova é Provisória até sexta\n"
+                 "Pass: Bilhete-Único-Mensal\npin: 20261022\nResenha: Duna-2021\n"
+                 'resenha: "Ótimo livro, recomendo"\nsenha: "ver no Bitwarden"\n'},
 ])
 def test_referencia_e_texto_comum_passam(argumentos):
     assert segredos_mcp.segredo_nos_argumentos(argumentos) is None
@@ -308,6 +313,36 @@ async def test_escrita_do_vault_com_referencia_passa(app, raiz, url):  # noqa: F
                                                "frontmatter": {"password": "{{segredo:wifi}}"}})
     assert "{{segredo:roteador}}" in (raiz / "00-inbox/roteador.md").read_text(encoding="utf-8")
     assert _git(raiz, "status", "--porcelain").strip() == ""  # as duas viraram commit
+
+
+async def test_patch_nao_confere_o_old_string(app, raiz, url):  # noqa: F811
+    """Revisor final da Sprint 2b: o oldString já está no disco (a nota do dono); só o newString entra no vault.
+
+    Conferir o oldString recusaria tirar um segredo da nota pelo app. A peça falsa recebe a chamada e devolve o erro
+    dela (não a recusa da barreira); com o segredo no newString, a barreira recusa.
+    """
+    async with Client(app) as c:
+        with pytest.raises(ToolError) as erro:
+            await c.call_tool("vault_patch_note", {"path": HORTA, "oldString": f"chave {AWS}",
+                                                   "newString": "chave no cofre: {{segredo:aws}}"})
+        assert "oldString não encontrado" in str(erro.value)
+        with pytest.raises(ToolError) as erro:
+            await c.call_tool("0123456789ab_vault_patch_note", {"path": HORTA, "oldString": "Horta",
+                                                                "newString": f"chave {AWS}"})
+        assert str(erro.value) == _msg("aws")
+        with pytest.raises(ToolError) as erro:
+            await c.call_tool("vault_patch_note", {"path": HORTA, "oldString": "Horta", "newString": f"chave {AWS}"})
+        assert str(erro.value) == _msg("aws")
+    _sem_valor(url, str(erro.value))
+
+
+def test_barreira_tira_so_o_old_string_do_patch():
+    barreira = segredos_mcp.BarreiraSegredo(set())
+    argumentos = {"path": "a.md", "oldString": f"chave {AWS}", "newString": "x"}
+    assert barreira._conferidos("vault_patch_note", argumentos) == {"path": "a.md", "newString": "x"}
+    assert barreira._conferidos("0123456789ab_vault_patch_note", argumentos) == {"path": "a.md", "newString": "x"}
+    assert barreira._conferidos("vault_write_note", argumentos) == argumentos  # só o patch
+    assert argumentos["oldString"] == f"chave {AWS}"  # não muda os argumentos da chamada
 
 
 # ---------------- commit por escrita e foto ----------------

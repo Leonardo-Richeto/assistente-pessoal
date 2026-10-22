@@ -80,7 +80,7 @@ tabela; eu confiro testes e diff antes de seguir. Effort max nunca.
 | 9 | 2b.11 `sync-conflict` no `lint-diario.sh` + teste em `scripts/testes/` | C | Haiku 5.5 | baixo | 0 | Feito 2026-10-21 (Haiku 5.5) |
 | 10 | ⚑ 2b.9a hooks `SessionEnd`/`SessionStart`, resumo por regra, fila local, aviso; testes com transcript sintético | A | Opus 5.5 | alto | 5 | Feito 2026-10-22 (Opus 5.5); revisor rodou, correções feitas |
 | 11 | ⚑ 2b.9b migração 0006 `sessoes`, `assistente-sessoes importar`, `enviar.sh` por SSH; teste com Postgres de rascunho | A | Opus 5.5 | alto | 8, 10 | Feito 2026-10-22 (Opus 5.5); revisor rodou, correções feitas |
-| 12 | Fechamento: revisor final na branch, `docker build` arm64, docs (`PLANO.md` [x], `CONTEXTO.md`, `README.md`, `docs/IMPLANTACAO.md` com os passos do i7), hooks no Mac (decisão 6), vault (`onde-parei`, nota do plano) | A | Opus 5.5 | alto | todos | Pendente |
+| 12 | Fechamento: revisor final na branch, `docker build` arm64, docs (`PLANO.md` [x], `CONTEXTO.md`, `README.md`, `docs/IMPLANTACAO.md` com os passos do i7), hooks no Mac (decisão 6), vault (`onde-parei`, nota do plano) | A | Opus 5.5 | alto | todos | Feito 2026-10-22 (Opus 5.5); revisor final rodou, correções feitas |
 
 Ordem de execução: 0, 1, 3, 9, 8, 2, 4, 5, 6, 7, 10, 11, 12 (o que não depende do anterior vem antes).
 
@@ -280,3 +280,26 @@ Um bloco por passo, do mais velho para o mais novo: o que fez, verificado, não 
   código, a leitura de `notas_desatualizadas` e `sessoes`, e o vault (notas indexadas e tempo, `.git` gravável,
   `index.lock` velho, `.gitattributes` com filtro); `--sem-banco` roda só a parte do vault.
 - Verificado: 25 testes; no vault real (só leitura): "114 notas indexadas em 37 ms", ".git gravável".
+
+### Passo 12 — fechamento (Opus 5.5, 2026-10-22)
+
+- Revisor final na branch inteira: 15 achados; corrigidos os 12 claros (`.gitattributes` com comentário recusava o
+  dia no vault real; push sem a deploy key; regressão que recusava texto com acento; push do topo varrido; retry do
+  `git add`; `oldString` fora da barreira; `python3` no host; carimbo de execução limpa; timers em ordem; nome com
+  hash no registro; `ler_nota` na Ficha 1; usuário `sessoes` com `docker exec`). Ficaram como limite conhecido: senha
+  sem entropia (`senha: minhacasa`) não é pega; `git` da imagem sem versão fixa (como `nodejs`).
+- `docs/IMPLANTACAO.md`: roteiro reordenado (vault ligado antes de colar a Ficha 1) e seção "Fase 2b no i7" (2b-1 a 2b-7).
+- Ensaio de migração com a imagem nova: ok (schema 0006, contagens iguais, verificação nova ok); stack do ensaio removida.
+- Hooks de sessão instalados no `~/.claude/settings.json` do Mac (backup `settings.json.bak-20261022-054011`); testados
+  com o transcript real desta sessão (0,7 s).
+- Docs: `README.md`, `PLANO.md` (2b `[x]`, menos 2b.3a), `CONTEXTO.md` (histórico e prompt do i7), `SPRINT_NOTAS.md`;
+  vault: `onde-parei.md`, nota do plano e `_planos.md` (lint: 0 erros).
+- Verificado: 684 passam, 10 pulados (Postgres); `ferramentas/sessoes/tests` 436; testes de shell ok.
+- Não verificado: tudo que é do i7 (systemd, uid 1000, SSH, gitleaks amd64), mcpvault real, Windows. Um teste de
+  tempo do gitleaks falhou uma vez com a máquina carregada; sozinho passou.
+
+## Sprint fechada no Mac (2026-10-22)
+
+Pendente do Leonardo: revisar `git log main..fase-2b`, merge, implantação no i7 (`docs/IMPLANTACAO.md`, Fase 2b) e
+as decisões do 2b-7 (Vaultwarden, usuário do lint fora do docker, bloqueio de mover nota). Este arquivo sai do repo
+quando a implantação no i7 terminar, consolidado em `CONTEXTO.md` e no vault.

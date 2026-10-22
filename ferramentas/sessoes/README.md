@@ -171,7 +171,7 @@ Sessão retomada chega de novo com outro `fim` e vira linha nova; o app mostra a
 
 ### Chave SSH só para o envio
 
-O comando roda `docker compose exec` no i7, então o usuário de lá está no grupo `docker`. Quem
+O comando roda `docker exec` no i7, então o usuário de lá está no grupo `docker`. Quem
 está no grupo `docker` tem, na prática, poder de root na máquina. Por isso o envio **não** usa a
 sua chave SSH de sempre nem o Tailscale SSH (os dois abrem um shell inteiro). Use uma chave só
 para o envio, presa a um único comando no i7. Essa chave, mesmo restrita, roda como um usuário do
@@ -187,12 +187,28 @@ grupo `docker`, mas só aquele comando: não abre shell, não encaminha porta e 
    com o conteúdo de `~/.ssh/assistente_sessoes.pub` do Mac no lugar de `ssh-ed25519 ...`:
 
    ```
-   restrict,command="docker compose --project-directory /srv/assistente/app exec -T servidor python -m assistente.sessoes importar" ssh-ed25519 AAAA... assistente-sessoes
+   restrict,command="docker exec -i assistente-servidor-1 python -m assistente.sessoes importar" ssh-ed25519 AAAA... assistente-sessoes
    ```
 
    O `command=` força o importador: qualquer comando pedido pelo Mac é ignorado. Recomendado: um
    usuário próprio no i7, por exemplo `sessoes`, no grupo `docker` e só com essa linha no
    `authorized_keys`, em vez do seu usuário.
+
+   Por que `docker exec` e não `docker compose exec`: o `docker compose` lê o `/srv/assistente/.env`
+   (pelo link `app/.env`), que tem `chmod 600` e é do seu usuário. O usuário `sessoes` não lê esse
+   arquivo, e o `docker compose` falha antes de chegar ao container. O `docker exec` fala direto com o
+   Docker pelo nome do container e não precisa do `.env`. O `-i` passa a entrada (as linhas JSON) para o
+   importador.
+
+   O nome é `<COMPOSE_PROJECT_NAME>-servidor-1`. Com o padrão do `.env.example`
+   (`COMPOSE_PROJECT_NAME=assistente`), fica `assistente-servidor-1`. Confira no i7, com a stack de pé:
+
+   ```bash
+   docker ps --filter label=com.docker.compose.service=servidor --format '{{.Names}}'
+   ```
+
+   Se der outro nome, use esse no `command=`. O nome não muda quando o container é recriado
+   (`docker compose up -d --build`).
 3. Aceite a host key do i7 uma vez, à mão (o envio usa `BatchMode=yes` e nunca pergunta):
 
    ```bash
@@ -217,7 +233,10 @@ O `enviar.py` usa essa chave sozinho quando `~/.ssh/assistente_sessoes` existe: 
 ASSISTENTE_SSH=usuario@i7 /usr/bin/python3 ferramentas/sessoes/enviar.py
 ```
 
-O comando que o `enviar.py` pede ao i7 é o mesmo do `command=` acima (vale sem a chave restrita).
+O `enviar.py` pede ao i7 `docker compose --project-directory /srv/assistente/app exec -T servidor
+python -m assistente.sessoes importar`. Com a chave restrita, o `command=` do i7 vale no lugar dele (o
+`docker exec` acima). Sem a chave restrita, o pedido roda como está e precisa de um usuário que leia o
+`.env` (o seu).
 Sem `ASSISTENTE_SSH`, sai com 1 e não toca na fila. `--comando "..."` troca o comando inteiro
 (os testes usam para rodar o importador local). Código 0 se enviou ou não havia o que enviar.
 

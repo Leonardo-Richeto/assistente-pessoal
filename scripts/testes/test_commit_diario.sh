@@ -17,6 +17,11 @@ export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 export LOG_DIR="$RAIZ/logs"
 # Chave AWS inventada, montada em partes (scanner de repositório não acusa este arquivo).
 CHAVE_FALSA="AKIA""Q3EGUJ7KZP2WXY5T"
+# Chave de deploy falsa (o push só sai com ela); o ssh falso só confere o caminho. Espera curta entre os `git add`.
+export VAULT_SSH_CHAVE="$RAIZ/chave deploy"
+: >"$VAULT_SSH_CHAVE"
+export VAULT_ADD_ESPERA=1
+GIT_REAL="$(command -v git)"
 
 # docker falso. `run`: grava os argumentos (docker-args-stage ou docker-args-commits) e age conforme
 # $DOCKER_FALSO (varredura do stage) ou $DOCKER_FALSO_COMMITS (varredura dos commits): limpo, achou, quebrado, dorme.
@@ -39,6 +44,13 @@ printf '%s\n' "$@" >"$LOG_DIR/docker-args-$tipo"
 if [ "$tipo" = stage ]; then modo="${DOCKER_FALSO:-limpo}"; else modo="${DOCKER_FALSO_COMMITS:-limpo}"; fi
 case "$modo" in
   limpo) echo '[]' >"$relatorio"; exit 0 ;;
+  # Limpo, e o servidor comita uma escrita no meio da varredura (o HEAD anda depois do commit varrido).
+  limpo-e-comita)
+    echo '[]' >"$relatorio"
+    echo "escrita no meio" >>"$vault/00-inbox/meio.md"
+    git -C "$vault" add 00-inbox/meio.md
+    git -C "$vault" -c user.name=claude-app -c user.email=c@l -c commit.gpgsign=false commit -q -m meio
+    exit 0 ;;
   achou)
     if [ "$tipo" = stage ]; then
       git -C "$vault" -c core.fsmonitor=false diff --cached --name-only -z \
@@ -76,6 +88,38 @@ FALSO
   chmod +x "$BIN_TIMEOUT/timeout"
 fi
 PATH_FALSO="$BIN_FALSO:$BIN_TIMEOUT:$PATH"
+
+# ssh falso (push para remoto ssh://): grava os argumentos em ssh-args e roda o git receive-pack local no caminho
+# pedido, como o sshd do GitHub faria. `-G` é a pergunta do git "é OpenSSH?": sim.
+BIN_SSH="$RAIZ/bin-ssh"
+mkdir -p "$BIN_SSH"
+cat >"$BIN_SSH/ssh" <<'FALSO'
+#!/bin/bash
+printf '%s\n' "$@" >>"$LOG_DIR/ssh-args"
+for a in "$@"; do [ "$a" = -G ] && exit 0; done
+comando="${*: -1}"
+case "$comando" in "git-receive-pack "*) exec sh -c "git receive-pack ${comando#git-receive-pack }" ;; esac
+exit 1
+FALSO
+chmod +x "$BIN_SSH/ssh"
+PATH_SSH="$BIN_SSH:$PATH_FALSO"
+
+# git que cria um .git/index.lock no primeiro `git add` (o servidor comitando no meio) e o tira depois de 1 s
+# (GIT_LOCK_SOME=1) ou nunca.
+BIN_GIT_LOCK="$RAIZ/bin-git-lock"
+mkdir -p "$BIN_GIT_LOCK"
+cat >"$BIN_GIT_LOCK/git" <<FALSO
+#!/bin/bash
+for a in "\$@"; do
+  if [ "\$a" = add ] && [ ! -e "\$LOG_DIR/lock-feito" ]; then
+    : >"\$LOG_DIR/lock-feito"; : >.git/index.lock
+    [ "\${GIT_LOCK_SOME:-1}" = 1 ] && ( sleep 1; rm -f .git/index.lock ) >/dev/null 2>&1 &
+    break
+  fi
+done
+exec "$GIT_REAL" "\$@"
+FALSO
+chmod +x "$BIN_GIT_LOCK/git"
 
 # PATH só com o que o script usa, sem docker (link para cada comando).
 COMANDOS="git date wc tr sleep mkdir rm id grep sed sort paste cat find python3 chmod dirname"
@@ -170,6 +214,31 @@ for onde in raiz subpasta info binario; do
   fi
 done
 
+# (a3) .gitattributes com comentário que cita "diff" (como o do vault real) e `text eol`: não recusa. Atributo de
+# verdade (diff=x, -diff, binary, filter, macro [attr]) recusa.
+v="$(novo_vault attr-comentario)"
+printf '%s\n' '# Sem isto, cada troca de maquina gera' '# diff de arquivo inteiro (binary, filter).' '* text=auto eol=lf' \
+  >"$v/.gitattributes"
+echo "texto comum" >"$v/b.md"
+rodar "$v" limpo
+if [ "$codigo" -eq 0 ] && [ "$(git -C "$v" rev-list --count HEAD)" -eq 2 ] && ! grep -q "ERRO" "$RAIZ/saida"; then
+  ok ".gitattributes com comentário sobre diff: comita"
+else
+  falhou ".gitattributes com comentário, código $codigo"
+fi
+for linha in '*.md diff=x' '*.md -diff' '  *.md   binary' '*.md !filter' '[attr]meu filter=x'; do
+  v="$(novo_vault attr-recusa)"
+  printf '%s\n' '# comentário' "$linha" >"$v/.gitattributes"
+  echo "texto comum" >"$v/b.md"
+  rodar "$v" limpo
+  if [ "$codigo" -eq 1 ] && nada_comitado "$v" && grep -q "ERRO: o vault tem .gitattributes com filter, diff ou binary" "$RAIZ/saida"; then
+    ok ".gitattributes com [$linha]: recusa"
+  else
+    falhou ".gitattributes com [$linha], código $codigo"
+  fi
+  rm -rf "$v"
+done
+
 # (b) index.lock de um commit em andamento: espera ele sair e comita.
 v="$(novo_vault lock)"
 echo "mudou" >>"$v/00-inbox/a.md"
@@ -182,6 +251,31 @@ if [ "$codigo" -eq 0 ] && [ "$n" -eq 2 ]; then
   ok "espera o index.lock e comita"
 else
   falhou "com index.lock temporário, código $codigo e $n commits"
+fi
+
+# (b2) index.lock que aparece no meio do `git add` (o servidor comitou depois da espera) e some: tenta de novo e comita.
+v="$(novo_vault lock-no-add)"
+echo "mudou" >>"$v/00-inbox/a.md"
+rm -f "$LOG_DIR/lock-feito"
+GIT_LOCK_SOME=1 rodar "$v" limpo "$BIN_GIT_LOCK:$PATH_FALSO"
+wait
+if [ "$codigo" -eq 0 ] && [ "$(git -C "$v" rev-list --count HEAD)" -eq 2 ] && [ -e "$LOG_DIR/lock-feito" ] \
+  && grep -q "index.lock ocupado no git add" "$RAIZ/saida"; then
+  ok "index.lock no meio do git add: tenta de novo e comita"
+else
+  falhou "index.lock no git add, código $codigo"
+fi
+# O lock não some: 3 tentativas e ERRO, nada comitado.
+v="$(novo_vault lock-preso)"
+echo "texto comum" >"$v/b.md"
+rm -f "$LOG_DIR/lock-feito"
+GIT_LOCK_SOME=0 rodar "$v" limpo "$BIN_GIT_LOCK:$PATH_FALSO"
+rm -f "$v/.git/index.lock"
+if [ "$codigo" -eq 1 ] && [ "$(git -C "$v" rev-list --count HEAD)" -eq 1 ] \
+  && [ "$(grep -c "index.lock ocupado no git add" "$RAIZ/saida")" -eq 2 ] && grep -q "ERRO: git add falhou" "$RAIZ/saida"; then
+  ok "index.lock preso no git add: 3 tentativas e ERRO"
+else
+  falhou "index.lock preso no git add, código $codigo"
 fi
 
 # (c) gitleaks achou em dois arquivos: só eles saem do stage, o resto é comitado, ERRO com os arquivos e saída 1.
@@ -224,11 +318,13 @@ else
   falhou "só segredo, código $codigo"
 fi
 
-# (d) gitleaks falhou (imagem ausente, erro do docker): falha fechado.
+# (d) gitleaks falhou (imagem ausente, erro do docker): falha fechado, sem carimbo de execução limpa.
 v="$(novo_vault quebrado)"
 echo "texto comum" >"$v/b.md"
+rm -f "$LOG_DIR/ultima-execucao-ok"
 rodar "$v" quebrado
-if [ "$codigo" -eq 1 ] && nada_comitado "$v" && grep -q "ERRO: gitleaks não rodou (docker run saiu com 125" "$RAIZ/saida"; then
+if [ "$codigo" -eq 1 ] && nada_comitado "$v" && grep -q "ERRO: gitleaks não rodou (docker run saiu com 125" "$RAIZ/saida" \
+  && [ ! -e "$LOG_DIR/ultima-execucao-ok" ]; then
   ok "gitleaks que falha não deixa comitar"
 else
   falhou "gitleaks quebrado, código $codigo"
@@ -274,15 +370,18 @@ args_c="$(cat "$LOG_DIR/docker-args-commits" 2>/dev/null)"
 if [ "$codigo" -eq 0 ] && [ "$(git -C "$v" rev-list --count HEAD)" -eq 2 ] \
   && grep -q "gitleaks: nada com cara de segredo no stage." "$RAIZ/saida" \
   && grep -q "varro o histórico inteiro" "$RAIZ/saida" && ! printf '%s\n' "$args_c" | grep -qx -- "--log-opts" \
-  && [ "$(cat "$LOG_DIR/ultimo-varrido")" = "$topo" ] && modo_600 "$LOG_DIR/ultimo-varrido"; then
-  ok "limpo comita; primeira varredura dos commits pega o histórico inteiro"
+  && [ "$(cat "$LOG_DIR/ultimo-varrido")" = "$topo" ] && modo_600 "$LOG_DIR/ultimo-varrido" \
+  && [ "$(ls -l "$LOG_DIR/ultima-execucao-ok" | cut -c1-10)" = "-rw-r--r--" ] \
+  && grep -qx '[0-9]*' "$LOG_DIR/ultima-execucao-ok"; then
+  ok "limpo comita; primeira varredura dos commits pega o histórico inteiro; carimbo de execução limpa, modo 644"
 else
   falhou "limpo, código $codigo"
 fi
+echo 1 >"$LOG_DIR/ultima-execucao-ok"
 rodar "$v" limpo
 if [ "$codigo" -eq 0 ] && grep -q "nenhum commit novo desde a última varredura" "$RAIZ/saida" \
-  && [ ! -e "$LOG_DIR/docker-args-commits" ]; then
-  ok "sem commit novo, não varre de novo"
+  && [ ! -e "$LOG_DIR/docker-args-commits" ] && [ "$(cat "$LOG_DIR/ultima-execucao-ok")" -gt 1 ]; then
+  ok "sem commit novo, não varre de novo; sem mudança também grava o carimbo"
 else
   falhou "sem commit novo, código $codigo"
 fi
@@ -325,6 +424,48 @@ if [ "$codigo" -eq 1 ] && grep -q "ERRO: git push falhou" "$RAIZ/saida" \
   ok "commits limpos: push tentado, e remoto de pasta local recusado (só ssh)"
 else
   falhou "push com commits limpos, código $codigo"
+fi
+
+# (h2) push por ssh: leva a chave de deploy (-i, IdentitiesOnly, BatchMode) e manda o commit VARRIDO para a branch
+# atual, não o HEAD (o servidor comitou no meio da varredura).
+v="$(novo_vault push-ssh)"
+git -C "$v" init -q --bare "$RAIZ/remoto-ssh.git"
+git -C "$v" remote add origin "ssh://i7-falso$RAIZ/remoto-ssh.git"
+git -C "$v" checkout -q -b principal
+echo "texto comum" >"$v/b.md"
+rm -f "$LOG_DIR/ultimo-varrido" "$LOG_DIR/ssh-args"
+VAULT_PUSH=1 rodar "$v" limpo "$PATH_SSH" limpo-e-comita
+varrido="$(cat "$LOG_DIR/ultimo-varrido" 2>/dev/null)"
+remoto="$(git -C "$RAIZ/remoto-ssh.git" rev-parse -q --verify refs/heads/principal)"
+ssh_args="$(cat "$LOG_DIR/ssh-args" 2>/dev/null)"
+if [ "$codigo" -eq 0 ] && grep -q "push feito" "$RAIZ/saida" && [ -n "$varrido" ] && [ "$remoto" = "$varrido" ] \
+  && [ "$(git -C "$v" rev-parse HEAD)" != "$varrido" ] \
+  && printf '%s\n' "$ssh_args" | grep -qx -- "-i" && printf '%s\n' "$ssh_args" | grep -qxF "$VAULT_SSH_CHAVE" \
+  && printf '%s\n' "$ssh_args" | grep -qx "IdentitiesOnly=yes" && printf '%s\n' "$ssh_args" | grep -qx "BatchMode=yes"; then
+  ok "push por ssh com a chave de deploy, do commit varrido para a branch atual"
+else
+  falhou "push por ssh, código $codigo, varrido $varrido, remoto $remoto, ssh: $(printf '%s ' $ssh_args)"
+fi
+# Sem a chave: ERRO claro, nenhum push (o ssh nem roda) e o carimbo de execução limpa não anda.
+echo "outra" >"$v/c.md"
+rm -f "$LOG_DIR/ssh-args"
+echo 1 >"$LOG_DIR/ultima-execucao-ok"
+VAULT_SSH_CHAVE="$RAIZ/nao-existe" VAULT_PUSH=1 rodar "$v" limpo "$PATH_SSH"
+if [ "$codigo" -eq 1 ] && grep -q "ERRO: não achei a chave de deploy em $RAIZ/nao-existe" "$RAIZ/saida" \
+  && [ ! -e "$LOG_DIR/ssh-args" ] && [ "$(git -C "$RAIZ/remoto-ssh.git" rev-parse refs/heads/principal)" = "$remoto" ] \
+  && [ "$(cat "$LOG_DIR/ultima-execucao-ok")" = 1 ]; then
+  ok "sem a chave de deploy: ERRO e sem push"
+else
+  falhou "sem a chave de deploy, código $codigo"
+fi
+# HEAD solto (fora de branch): ERRO e sem push.
+git -C "$v" checkout -q --detach
+rm -f "$LOG_DIR/ssh-args"
+VAULT_PUSH=1 rodar "$v" limpo "$PATH_SSH"
+if [ "$codigo" -eq 1 ] && grep -q "ERRO: HEAD solto" "$RAIZ/saida" && [ ! -e "$LOG_DIR/ssh-args" ]; then
+  ok "HEAD solto: ERRO e sem push"
+else
+  falhou "HEAD solto, código $codigo"
 fi
 
 # (i) gitleaks que não termina: parado em GITLEAKS_TIMEOUT s, container removido, nada comitado.

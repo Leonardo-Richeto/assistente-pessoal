@@ -22,6 +22,10 @@ Leitura complementar: `README.md` (arquitetura e princípios), `PLANO.md` (fases
 - **PC Windows (2026-10-19, Leonardo):** é a máquina do trabalho (domínio corporativo). Uso: testar o sistema
   completo **sem dados reais**, só sintéticos, sem Tailscale/Funnel e sem credencial real. Produção continua no i7.
 
+- **Fase 2b (vault inteligente, ideias do ai-memory) feita no Mac em 2026-10-21/22** (Opus 5.5 orquestrando
+  subagentes), na branch `fase-2b`, sem push nem merge. Plano e registro passo a passo em `SPRINT_2B.md`. Falta
+  implantar no i7 (`docs/IMPLANTACAO.md`, seção da Fase 2b). Mac = só desenvolvimento; i7 = hospedeiro (Leonardo, 2026-10-21).
+
 ## Histórico
 
 ### 2026-10-16 — Fase 0 (Opus 5.5, no app do Claude)
@@ -120,6 +124,40 @@ migração falhava na primeira subida); `SHA256SUMS` listava o próprio temporá
 
 ---
 
+### 2026-10-21/22 — Fase 2b, vault inteligente (Opus 5.5 orquestrador, Claude Code, MacBook Air)
+
+**Pedido:** implementar sozinho, do início ao fim, as melhorias da Fase 2b do `PLANO.md` (estudo do ai-memory do
+Fabio Akita), com liberdade para acrescentar o que valesse. Leonardo aprovou tudo o que foi proposto (Ficha 5 e 6
+decisões em `SPRINT_2B.md`).
+
+**O que foi feito** (detalhe por passo em `SPRINT_2B.md`)
+- Busca `buscar_vault` (FTS5 em memória, sem acento, pesos 10/8/5/4/1) e medida com 25 perguntas no vault real:
+  24/25 entre as 5, MRR 0.847, ~3 ms. As perguntas ficam no vault (`90-meta/perguntas-da-busca.md`), não no repo público.
+- `ler_nota` (versão + links e backlinks), `notas_recentes`, `contexto_inicial`, `escrever_nota` (troca só com a versão
+  lida), `historico_nota` e `restaurar_nota` (commit por escrita, foto da edição do dono antes de trocar),
+  `marcar_desatualizada`/`consultar_desatualizadas` (migração 0005), barreira de segredo em toda escrita, gitleaks no
+  commit diário (stage e commits por escrita, push só depois da varredura limpa).
+- Sessões do Claude Code: hooks `SessionStart`/`SessionEnd` (`ferramentas/sessoes/`), fila local, envio por SSH com
+  chave restrita, tabela `sessoes` (migração 0006, só INSERT), `consultar_sessoes` no app (extensão da Ficha 5).
+  Hooks instalados no Mac em 2026-10-22.
+- Extra inspirado no `doctor` do ai-memory: `verificacao.py` confere migração, tabelas novas e o vault.
+
+**Revisão:** revisor independente em cada passo Tier A e um final na branch; todos os achados claros corrigidos
+(entre eles: perda de dado em nota grande/fora de UTF-8, edição do dono sumindo do git no restaurar, `index.lock`
+órfão, config do git que executava comando, chave SSH que valia root no i7, gitleaks desligável por link, regex com
+backtracking, falsos positivos em português).
+
+**Verificado no Mac:** suíte do servidor e de `ferramentas/sessoes`, testes de shell, gitleaks real, testes de
+Postgres num banco de rascunho, `docker build` arm64, ensaio de migração com a imagem nova (schema 0006, verificação ok).
+
+**Não verificado:** i7 (amd64, systemd, uid 1000, SSH real, gitleaks lá), mcpvault real com as travas novas, Windows.
+
+**Decisões do orquestrador (reversíveis):** comando Bash na fila só com a primeira linha (vale o "nunca conteúdo");
+aviso do SessionStart por `systemMessage` + contexto marcado como dado; push do vault só por SSH; arquivo de
+perguntas fora da busca real; `consultar_sessoes` sem `comandos`.
+
+---
+
 ## O que já se sabe (dito pelo Leonardo, ainda não conferido nas máquinas)
 
 **Máquinas**
@@ -189,6 +227,23 @@ Vale para todo projeto longo dividido em fases, executado por modelos diferentes
 ---
 
 ## Prompt para a próxima etapa
+
+**Fase 2b no i7 (depois do merge da branch `fase-2b`).** Modelo: Opus 5.5, effort alto (toca login, vault real e SSH).
+
+```
+Leia CONTEXTO.md (entrada 2026-10-21/22), SPRINT_2B.md, AGENTS.md, docs/IMPLANTACAO.md (seção da Fase 2b),
+docs/SYNCTHING.md e ferramentas/sessoes/README.md. Máquina: i7 (Debian), com o Leonardo presente.
+Objetivo: ligar a Fase 2b em produção na ordem do IMPLANTACAO: vault ligado (VAULT_PATH=/vault, uid 1000,
+.git gravável), up -d --build (migrações 0005/0006), scripts/verificar.sh, units novas do vault, deploy key,
+gitleaks pull; depois colar a Ficha 1 atual no Projeto "Assistente" e testar o B9 com os exemplos da Ficha 5;
+por fim, chave SSH restrita para as sessões e o primeiro enviar.py do Mac.
+Pronto quando: verificar.sh tudo ok; os exemplos da Ficha 5 funcionam pelo app; uma sessão do Mac aparece em
+consultar_sessoes. Não commitar sem o ok do Leonardo. Nada de segredo no repo.
+```
+
+O prompt anterior (sistema completo no PC Windows com dados sintéticos, Fase 2.1/7.3 em diante) continua valendo
+depois desta etapa:
+
 
 Enquanto houver sprint aberta, o prompt de abertura e o passo atual ficam em `SPRINT.md`
 (§ Prompt de abertura) e `SPRINT_NOTAS.md` (§ Onde estamos).

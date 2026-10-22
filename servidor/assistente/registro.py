@@ -55,6 +55,9 @@ TAMANHO_USER_AGENT = 200
 MODELO_VALIDO = re.compile(r"[A-Za-z0-9 ._-]{1,60}")  # 60 = String(60) em Chamada.modelo_declarado
 ARGUMENTO_MODELO = "modelo"  # parâmetro opcional das escritas do banco (banco.py)
 META_MODELO = "_modelo"  # chave no `_meta` da requisição MCP, se o cliente mandar
+# Nome com hash que o FastMCP 4.1.0 dá às ferramentas de peça (`<hash12>_vault_write_note`): conta como o nome sem
+# o prefixo, aqui, na barreira de segredo (segredos_mcp.py) e na trava do vault (vault.py).
+PREFIXO_HASH = re.compile(r"[0-9a-f]{12}_")
 
 # Ids das linhas de `auditoria` gravadas pelo banco durante a chamada (banco.py chama anotar_auditoria).
 # Lista mutável: a ferramenta síncrona roda numa thread com cópia do contexto e só acrescenta.
@@ -76,6 +79,11 @@ def identidade() -> str | None:
 def nome_seguro(nome) -> str:
     """O nome como veio, se for só letras, números e `_` (até 60); senão `<nome invalido>`."""
     return nome if isinstance(nome, str) and NOME_VALIDO.fullmatch(nome) else NOME_INVALIDO
+
+
+def nome_sem_hash(nome: str) -> str:
+    """O nome sem o prefixo `<hash12>_` do FastMCP; sem o prefixo, o próprio nome."""
+    return nome[13:] if PREFIXO_HASH.match(nome) is not None else nome
 
 
 def anotar_auditoria(auditoria_id: int) -> None:
@@ -149,10 +157,14 @@ def origem(context, argumentos: dict) -> dict:
 
 
 def _peca(nome: str, do_vault: frozenset[str] = frozenset()) -> str | None:
-    """A peça pelo prefixo; `do_vault` são as ferramentas nossas do vault, que não têm o prefixo."""
-    if nome in do_vault:
+    """A peça pelo prefixo; `do_vault` são as ferramentas nossas do vault, que não têm o prefixo.
+
+    O nome com hash (`<hash12>_vault_read_note`) conta como o nome sem ele.
+    """
+    base = nome_sem_hash(nome)
+    if base in do_vault:
         return "vault"
-    return next((p for p in PECAS if nome.startswith(f"{p}_")), None)
+    return next((p for p in PECAS if base.startswith(f"{p}_")), None)
 
 
 def _cortar(v) -> str | None:
@@ -218,11 +230,12 @@ class RegistroChamadas(Middleware):
         self._auditadas = frozenset(auditadas)  # escritas do banco: já gravam a auditoria em _gravar
 
     def _e_escrita(self, nome: str, argumentos: dict) -> bool:
-        """Falha fechado: fora das listas conhecidas, é escrita."""
-        if nome in self._leituras or nome in self._auditadas:
+        """Falha fechado: fora das listas conhecidas, é escrita. O nome com hash conta como o nome sem ele."""
+        base = nome_sem_hash(nome)
+        if base in self._leituras or base in self._auditadas:
             return False
         # manage_tags com operation=list só lê.
-        return not (nome == "vault_manage_tags" and argumentos.get("operation") == "list")
+        return not (base == "vault_manage_tags" and argumentos.get("operation") == "list")
 
     def _logar(self, nome: str, escrita: bool, situacao: str, autor: str, dados: dict) -> None:
         """Escrita (peça ou banco): INFO com autor e dados. Leitura `ok`: DEBUG (caminho e conta fora do INFO).

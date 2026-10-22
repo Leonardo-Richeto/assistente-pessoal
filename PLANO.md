@@ -68,7 +68,7 @@ podem escrever. Itens que mudam o que o Claude do app faz (2b.2, 2b.6, 2b.7, 2b.
   Complementa `vault_search_notes`, que só acha a palavra exata. Prova de 2026-10-21: 123 notas em 48 ms
   - Pronto quando: o conjunto do 2b.10 roda e o resultado está anotado aqui
   - Medida (2026-10-21, 25 perguntas no vault real, 2b.10): acerto entre 5 = 24/25, em 1º = 19/25, MRR = 0.847, ~3 ms por busca; pesos (10,8,5,4,1).
-- [ ] ⚑ 2b.2 Escrita com conferência de versão: escrever no vault exige o hash do conteúdo lido e recusa se a nota
+- [x] ⚑ 2b.2 (Passo 4, 2026-10-21: `escrever_nota` com versão; `vault_write_note` só append/prepend) Escrita com conferência de versão: escrever no vault exige o hash do conteúdo lido e recusa se a nota
   mudou desde a leitura (edição pelo Syncthing no meio); `vault_write_note` sem `mode` deixa de aparecer
 - [x] 2b.3 Barreira de segredo: antes de gravar no vault ou no banco, padrões do gitleaks recusam token, chave e
   senha; a referência `{{segredo:NOME}}` passa. O valor fica no Vaultwarden, fora do vault, e o servidor nunca o
@@ -78,7 +78,7 @@ podem escrever. Itens que mudam o que o Claude do app faz (2b.2, 2b.6, 2b.7, 2b.
   Proposta: acesso só pela Tailscale, sem Funnel. Os dados dele entram no backup cifrado da Fase 7 (`exportar.sh`)
   - Pronto quando: o backup da Fase 7 leva o volume do Vaultwarden para fora do SSD do i7 e a restauração foi testada, antes do primeiro segredo.
     Enquanto o 7.1 estiver desligado (2026-10-21), o 2b.3a espera
-- [ ] 2b.4 Commit por escrita: depois de cada escrita da IA, commit só do arquivo escrito, autor `claude-app`; o
+- [x] 2b.4 (Passo 6, 2026-10-22: `vault_git.py`, foto da edição do dono antes de trocar; mover continua bloqueado) Commit por escrita: depois de cada escrita da IA, commit só do arquivo escrito, autor `claude-app`; o
   commit diário (2.3) fica para as edições do Leonardo. Ferramentas `historico_nota(caminho)` e
   `restaurar_nota(caminho, versao)`; depois, rever o bloqueio de `vault_move_note` e `vault_move_file`
 - [x] 2b.5 `notas_recentes(n)`, pelo campo `atualizado` (Passo 3, 2026-10-21)
@@ -87,8 +87,8 @@ podem escrever. Itens que mudam o que o Claude do app faz (2b.2, 2b.6, 2b.7, 2b.
 - [x] 2b.6 (Passo 7, 2026-10-22) `contexto_inicial()`: resumo do perfil, `onde-parei.md`, nota do dia e pendências numa chamada só, com
   limite de caracteres (hoje são 4 a 6 chamadas no começo da conversa)
 - [x] 2b.7 (Passo 3, 2026-10-21) `ler_nota(caminho, relacionadas=true)`: devolve também links e backlinks a um salto, só com o resumo
-- [ ] 2b.8 `marcar_desatualizada(caminho, motivo)`: grava no banco; o lint diário (M3) lista as notas marcadas
-- [ ] ⚑ 2b.9 Captura das sessões do Claude Code: hook `SessionEnd` resume o transcript por regra (título, arquivos,
+- [x] 2b.8 (Passo 8, 2026-10-21: migração 0005, `consultar_desatualizadas`, `vault-marcas.service`) `marcar_desatualizada(caminho, motivo)`: grava no banco; o lint diário (M3) lista as notas marcadas
+- [x] ⚑ 2b.9 (Passos 10 e 11, 2026-10-22: `ferramentas/sessoes/`, migração 0006, `consultar_sessoes`; envio real espera o i7) Captura das sessões do Claude Code: hook `SessionEnd` resume o transcript por regra (título, arquivos,
   comandos, commits, duração), fila local por máquina com chave contra duplicata, envio pela Tailscale com token de
   máquina para uma tabela de sessões; hook `SessionStart` avisa quando a sessão anterior do projeto terminou sem
   passagem. Ficha: o que a tabela guarda e por quanto tempo

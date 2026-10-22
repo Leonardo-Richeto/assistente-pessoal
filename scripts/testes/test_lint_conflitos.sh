@@ -19,9 +19,9 @@ novo_vault() {  # <nome>
   echo "$v"
 }
 
-# Roda o lint-diario.sh sobre o vault e imprime o código de saída.
+# Roda o lint-diario.sh sobre o vault e imprime o código de saída. Sem CARIMBO_COMMIT, um carimbo que não existe.
 rodar() {  # <nome do vault>
-  VAULT_PATH="$RAIZ/$1" LINT_DIR="$RAIZ/logs-$1" bash "$SCRIPT" >/dev/null 2>&1
+  CARIMBO_COMMIT="${CARIMBO_COMMIT:-$RAIZ/sem-carimbo}" VAULT_PATH="$RAIZ/$1" LINT_DIR="$RAIZ/logs-$1" bash "$SCRIPT" >/dev/null 2>&1
   echo $?
 }
 
@@ -84,33 +84,34 @@ else
   echo "FALHOU: index.lock recente gerou aviso (código $codigo)"; falhas=$((falhas + 1))
 fi
 
-# (f) último commit diário (autor "Vault (commit diário)") há 5 dias: AVISO com os dias, código 0.
-# (g) commit diário de hoje, ou repositório sem commit diário: sem aviso.
-commit_diario() {  # <vault> <data ISO>
-  git -C "$1" -c init.defaultBranch=main init -q 2>/dev/null
-  echo "$2" >>"$1/00-inbox/dia.md"
-  git -C "$1" add -A
-  GIT_AUTHOR_DATE="$2" GIT_COMMITTER_DATE="$2" GIT_CONFIG_GLOBAL=/dev/null git -C "$1" -c user.name="Vault (commit diário)" \
-    -c user.email=vault@localhost -c commit.gpgsign=false commit -q -m "vault: $2"
+# (f) última execução limpa do commit diário (carimbo do commit-diario.sh) há 5 dias: AVISO com os dias, código 0.
+# (g) carimbo de hoje (mesmo sem commit diário há dias: vault sem mudança), ou sem carimbo: sem aviso.
+carimbo() {  # <arquivo> <segundos atrás>
+  echo $(( $(date +%s) - $2 )) >"$1"
 }
 v="$(novo_vault diario-velho)"
-commit_diario "$v" "$(python3 -c 'import datetime as d; print((d.datetime.now() - d.timedelta(days=5, hours=1)).isoformat(timespec="seconds"))')"
-codigo="$(rodar diario-velho)"
-if [ "$codigo" -eq 0 ] && grep -qF "AVISO: último commit diário há 5 dias." "$RAIZ/logs-diario-velho/ultimo.md"; then
-  echo "ok commit diário velho: aviso com os dias e código 0"
+carimbo "$RAIZ/carimbo-velho" $(( 5 * 86400 + 3600 ))
+codigo="$(CARIMBO_COMMIT="$RAIZ/carimbo-velho" rodar diario-velho)"
+if [ "$codigo" -eq 0 ] && grep -qF "AVISO: última execução limpa do commit diário há 5 dias." "$RAIZ/logs-diario-velho/ultimo.md"; then
+  echo "ok commit diário parado: aviso com os dias e código 0"
 else
-  echo "FALHOU: commit diário velho, código $codigo ou aviso ausente"; falhas=$((falhas + 1))
+  echo "FALHOU: commit diário parado, código $codigo ou aviso ausente"; falhas=$((falhas + 1))
 fi
+# Vault sem mudança há 5 dias: o último commit diário é velho, mas a execução de hoje saiu limpa.
 v="$(novo_vault diario-novo)"
-commit_diario "$v" "$(python3 -c 'import datetime as d; print(d.datetime.now().isoformat(timespec="seconds"))')"
-GIT_CONFIG_GLOBAL=/dev/null git -C "$v" -c user.name=claude-app -c user.email=c@l -c commit.gpgsign=false \
-  commit -q --allow-empty -m "escrita da IA"
-codigo="$(rodar diario-novo)"
-v="$(novo_vault sem-git)"
-codigo2="$(rodar sem-git)"
+git -C "$v" -c init.defaultBranch=main init -q
+echo "x" >>"$v/00-inbox/dia.md"
+git -C "$v" add -A
+velho="$(python3 -c 'import datetime as d; print((d.datetime.now() - d.timedelta(days=5)).isoformat(timespec="seconds"))')"
+GIT_AUTHOR_DATE="$velho" GIT_COMMITTER_DATE="$velho" GIT_CONFIG_GLOBAL=/dev/null git -C "$v" \
+  -c user.name="Vault (commit diário)" -c user.email=vault@localhost -c commit.gpgsign=false commit -q -m "vault: velho"
+carimbo "$RAIZ/carimbo-novo" 60
+codigo="$(CARIMBO_COMMIT="$RAIZ/carimbo-novo" rodar diario-novo)"
+v="$(novo_vault sem-carimbo)"
+codigo2="$(CARIMBO_COMMIT="$RAIZ/nao-existe" rodar sem-carimbo)"
 if [ "$codigo" -eq 0 ] && ! grep -q "commit diário" "$RAIZ/logs-diario-novo/ultimo.md" \
-  && [ "$codigo2" -eq 0 ] && ! grep -q "commit diário" "$RAIZ/logs-sem-git/ultimo.md"; then
-  echo "ok commit diário recente ou sem git: sem aviso"
+  && [ "$codigo2" -eq 0 ] && ! grep -q "commit diário" "$RAIZ/logs-sem-carimbo/ultimo.md"; then
+  echo "ok execução limpa recente (vault sem mudança) ou sem carimbo: sem aviso"
 else
   echo "FALHOU: aviso de commit diário indevido (códigos $codigo e $codigo2)"; falhas=$((falhas + 1))
 fi

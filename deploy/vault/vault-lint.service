@@ -1,11 +1,15 @@
 [Unit]
 Description=Lint diario do vault (so le; relatorio em /srv/assistente/logs/vault-lint/ultimo.md)
+# So ordem, sem Requires: quando os timers disparam juntos (Persistent=true), o lint le o carimbo do commit diario e a
+# lista das marcas depois de os dois rodarem.
+After=vault-commit.service vault-marcas.service
 
 [Service]
 Type=oneshot
 # Troque <usuario> pelo usuario dono de /srv/assistente/vault (o mesmo do Syncthing).
 # Este usuario NAO deve estar no grupo docker: o codigo do lint (90-meta/lint-do-vault.py) vem do vault,
-# pelo Syncthing. A lista das notas desatualizadas vem do vault-marcas.service (marcas.md no LINT_DIR).
+# pelo Syncthing. A lista das notas desatualizadas vem do vault-marcas.service (marcas.md no LINT_DIR); a hora da
+# ultima execucao limpa do commit diario, de /srv/assistente/logs/vault-commit/ultima-execucao-ok (CARIMBO_COMMIT).
 User=<usuario>
 Environment=VAULT_PATH=/srv/assistente/vault LINT_DIR=/srv/assistente/logs/vault-lint
 ExecStart=/bin/bash /srv/assistente/app/deploy/vault/lint-diario.sh

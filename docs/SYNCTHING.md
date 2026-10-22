@@ -79,9 +79,11 @@ nesta ordem.
    ```bash
    GIT_SSH_COMMAND='ssh -i ~/.ssh/vault_deploy -o IdentitiesOnly=yes' \
      git clone git@github.com:<conta>/<repositorio-do-vault>.git /srv/assistente/vault
-   git -C /srv/assistente/vault config core.sshCommand 'ssh -i ~/.ssh/vault_deploy -o IdentitiesOnly=yes'
    git -C /srv/assistente/vault log -1 --oneline    # tem de ser o mesmo hash do Mac
    ```
+   Não grave `core.sshCommand` na config do repositório: o commit diário ignora a config do `.git` (a pasta
+   também é escrita pelo container) e passa a chave sozinho no push, de `~/.ssh/vault_deploy` ou do caminho em
+   `VAULT_SSH_CHAVE` (seção 5).
    Se o clone recusar por pasta não vazia, não apague nada: pare e confira o que há nela.
 4. `.gitignore` do vault (defesa para o commit diário não levar `.stversions`, `.stfolder`, temporários e o
    `.obsidian/plugins/*/data.json`, onde plugins guardam chave de API).
@@ -178,7 +180,13 @@ Antes do commit, o script roda o gitleaks (imagem Docker com versão e digest fi
 1. **No que está no stage.** Se ele achar segredo, só os arquivos achados saem do stage (o disco não muda) e o resto é comitado; o journal diz "ERRO: gitleaks achou segredo em: <arquivos>; esses arquivos ficaram fora do commit de hoje". Se o gitleaks falhar, passar do tempo ou o docker não existir, nada é comitado e o stage é desfeito.
 2. **Nos commits desde a última varredura limpa** (commits por escrita do servidor, fotos e o commit do dia). O id do último commit varrido fica em `/srv/assistente/logs/vault-commit/ultimo-varrido`, fora do vault; na primeira vez, o histórico inteiro é varrido. **O push só acontece depois desta varredura sair limpa.** Se ela achar segredo, o journal diz "ERRO: gitleaks achou segredo em commits já feitos, nos arquivos: <arquivos>; sem push." Nada é apagado: tire o segredo do histórico (`git filter-repo`, decisão sua) ou, se aceita o risco, grave o id do HEAD naquele arquivo (`git -C /srv/assistente/vault rev-parse HEAD > /srv/assistente/logs/vault-commit/ultimo-varrido`).
 
-Os relatórios (`gitleaks.json` e `gitleaks-commits.json`, em `/srv/assistente/logs/vault-commit/`, modo 600) trazem só arquivo, regra, linha e commit, nunca o valor nem o trecho. Tire o segredo da nota (o valor vai para o cofre; na nota fica `{{segredo:NOME}}`) e rode de novo. Por isso o usuário do `vault-commit.service` precisa estar no grupo `docker` (o `scripts/preparar_host.sh` já põe o `$USER`). O script recusa o dia inteiro se o vault tiver `.gitleaks.toml` ou `.gitleaksignore` na raiz (mesmo como link simbólico), ou um `.gitattributes` (em qualquer pasta) ou `.git/info/attributes` com `filter`, `diff` ou `binary` (rodariam comando ou esconderiam conteúdo do gitleaks). O push só usa ssh (a chave de deploy). O lint diário avisa "último commit diário há N dias" quando passam 2 dias sem commit diário.
+Os relatórios (`gitleaks.json` e `gitleaks-commits.json`, em `/srv/assistente/logs/vault-commit/`, modo 600) trazem só arquivo, regra, linha e commit, nunca o valor nem o trecho. Tire o segredo da nota (o valor vai para o cofre; na nota fica `{{segredo:NOME}}`) e rode de novo. Por isso o usuário do `vault-commit.service` precisa estar no grupo `docker` (o `scripts/preparar_host.sh` já põe o `$USER`). O script recusa o dia inteiro se o vault tiver `.gitleaks.toml` ou `.gitleaksignore` na raiz (mesmo como link simbólico), ou um `.gitattributes` (em qualquer pasta) ou `.git/info/attributes` com o atributo `filter`, `diff` ou `binary` (com `-` ou `!` antes, ou `=valor` depois) numa linha que não é comentário (rodariam comando ou esconderiam conteúdo do gitleaks). Comentário com a palavra "diff" e `* text=auto eol=lf` passam.
+
+Se o servidor comitar uma escrita da IA no meio do `git add`, o script tenta o `add` de novo (3 vezes, 2 s entre elas). O push manda o commit **varrido** (não o HEAD, que pode ter andado durante a varredura) para a branch atual no `origin`, só por ssh, com a chave de deploy `~/.ssh/vault_deploy` do usuário do serviço (outro caminho: `VAULT_SSH_CHAVE=/caminho` em `/etc/default/vault-commit`). Sem a chave, o journal diz "ERRO: não achei a chave de deploy" e não há push.
+
+Toda execução sem ERRO, mesmo sem mudança no vault, grava a hora em `/srv/assistente/logs/vault-commit/ultima-execucao-ok` (modo 644). O lint diário avisa "última execução limpa do commit diário há N dias" quando ela passa de 2 dias. Sem esse arquivo (o commit diário nunca rodou limpo), o lint não avisa.
+
+Os serviços rodam em ordem quando os timers disparam juntos (por exemplo, depois de a máquina ficar desligada de madrugada: `Persistent=true`): backup, commit, marcas, lint. É só ordem: a falha de um não impede o outro.
 
 ```bash
 sudo install -d -o "$USER" -g "$USER" /srv/assistente/logs/vault-commit
@@ -203,6 +211,11 @@ com escrita (seção 2). Crie o arquivo de ambiente:
 ```bash
 echo 'VAULT_PUSH=1' | sudo tee /etc/default/vault-commit
 ```
+
+Se a chave não está em `~/.ssh/vault_deploy`, acrescente o caminho:
+`echo 'VAULT_SSH_CHAVE=/caminho/da/chave' | sudo tee -a /etc/default/vault-commit`. O push usa
+`BatchMode=yes` e nunca pergunta: a host key do GitHub precisa estar no `~/.ssh/known_hosts` do usuário (o clone
+da seção 2 já gravou).
 
 Sem esse arquivo (ou sem o `1`), o serviço só comita localmente. Teste outra vez com
 `systemctl start` e confira no journal a linha "push feito".

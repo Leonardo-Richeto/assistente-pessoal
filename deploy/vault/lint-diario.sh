@@ -7,7 +7,8 @@
 # O relatório fica FORA do vault, para não virar nota nem entrar no commit diário.
 # Arquivo de conflito do Syncthing (*.sync-conflict-*) vira seção de AVISO no relatório; não muda o código.
 # .git/index.lock com mais de 10 minutos também vira AVISO (o git morreu no meio e travou os commits).
-# Último commit diário (autor "Vault (commit diário)") com mais de 2 dias também vira AVISO.
+# Última execução limpa do commit diário (carimbo $CARIMBO_COMMIT, que o commit-diario.sh grava mesmo sem mudança)
+# com mais de 2 dias também vira AVISO; sem o carimbo, nada.
 # As notas marcadas como desatualizadas no banco viram seção de AVISO, lidas de $LINT_DIR/marcas.md, que o
 # vault-marcas.service (marcas-desatualizadas.sh, 03:35) grava. O lint não chama docker: o código dele vem do
 # vault, e o usuário dele não deve estar no grupo docker.
@@ -16,6 +17,7 @@ set -u
 VAULT_PATH="${VAULT_PATH:-/srv/assistente/vault}"
 LINT_DIR="${LINT_DIR:-/srv/assistente/logs/vault-lint}"
 LINT="$VAULT_PATH/90-meta/lint-do-vault.py"
+CARIMBO_COMMIT="${CARIMBO_COMMIT:-/srv/assistente/logs/vault-commit/ultima-execucao-ok}"
 
 log() { echo "vault-lint: $*"; }
 
@@ -73,18 +75,16 @@ if [ -e "$LOCK" ] && [ -n "$(find "$LOCK" -mmin +10 2>/dev/null)" ]; then
     echo "rodando (pgrep -a git), apague $LOCK."
   } >>"$LINT_DIR/ultimo.md.parcial"
 fi
-# Commit diário parado (gitleaks achando segredo, docker fora, timer desligado): aviso, não erro. Sem repositório git
-# ou sem nenhum commit diário ainda, não diz nada. Nenhuma config do repositório roda comando aqui.
-AUTOR_DIARIO="Vault (commit diário)"  # o mesmo do commit-diario.sh
-ULTIMO_DIARIO="$(GIT_CONFIG_NOSYSTEM=1 git -C "$VAULT_PATH" -c safe.directory="$VAULT_PATH" -c core.hooksPath=/dev/null \
-  -c core.fsmonitor=false -c log.showSignature=false --no-pager log -1 -F --author="$AUTOR_DIARIO" --format=%ct HEAD \
-  2>/dev/null)"
-if [ -n "$ULTIMO_DIARIO" ] && [ "$ULTIMO_DIARIO" -eq "$ULTIMO_DIARIO" ] 2>/dev/null; then
-  DIAS=$(( ($(date +%s) - ULTIMO_DIARIO) / 86400 ))
-  if [ $(( $(date +%s) - ULTIMO_DIARIO )) -gt $((2 * 86400)) ]; then
+# Commit diário parado (gitleaks achando segredo, docker fora, timer desligado): aviso, não erro. Vale a hora da última
+# execução limpa (com ou sem mudança no vault), não a do último commit: vault sem mudança não é commit parado. Sem o
+# carimbo (commit diário nunca rodou limpo) ou com conteúdo que não é número, não diz nada. Não roda git no vault.
+ULTIMA_OK="$(head -c 20 "$CARIMBO_COMMIT" 2>/dev/null | tr -d '[:space:]')"
+if [ -n "$ULTIMA_OK" ] && [ "$ULTIMA_OK" -eq "$ULTIMA_OK" ] 2>/dev/null; then
+  IDADE=$(( $(date +%s) - ULTIMA_OK ))
+  if [ "$IDADE" -gt $((2 * 86400)) ]; then
     {
       echo ""
-      echo "AVISO: último commit diário há $DIAS dias. Veja journalctl -u vault-commit.service (gitleaks, docker, timer)."
+      echo "AVISO: última execução limpa do commit diário há $((IDADE / 86400)) dias. Veja journalctl -u vault-commit.service (gitleaks, docker, timer, push)."
     } >>"$LINT_DIR/ultimo.md.parcial"
   fi
 fi

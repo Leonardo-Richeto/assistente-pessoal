@@ -1,6 +1,8 @@
 [Unit]
 Description=Lista das notas marcadas como desatualizadas para o lint do vault (grava /srv/assistente/logs/vault-lint/marcas.md)
-After=docker.service
+# So ordem, sem Requires (fora o docker): quando os timers disparam juntos (Persistent=true), a lista sai depois do
+# backup e do commit diario.
+After=docker.service assistente-backup.service vault-commit.service
 Requires=docker.service
 
 [Service]

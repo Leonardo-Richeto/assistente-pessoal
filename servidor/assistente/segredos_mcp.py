@@ -12,13 +12,13 @@ Nunca põe o valor achado na mensagem, no log nem no banco: só o tipo (`aws`, `
 """
 
 import logging
-import re
 from collections.abc import Iterable
 
 import anyio
 from fastmcp.exceptions import ToolError
 from fastmcp.server.middleware import Middleware
 
+from .registro import nome_sem_hash
 from .segredos import achar_segredo
 
 log = logging.getLogger(__name__)
@@ -27,8 +27,9 @@ log = logging.getLogger(__name__)
 PROFUNDIDADE_MAXIMA = 20
 ITENS_MAXIMOS = 10_000
 CARACTERES_MAXIMOS = 400_000  # 2 vezes o limite de escrever_nota; cada padrão é linear (test_cada_padrao_e_linear)
-# Nome com hash que o FastMCP 4.1.0 dá às ferramentas de peça (`<hash12>_vault_write_note`) também conta.
-_PREFIXO_HASH = re.compile(r"[0-9a-f]{12}_")
+# Argumentos que não entram no vault e ficam fora da conferência. O `oldString` do patch é texto que já está na nota
+# (o disco): conferi-lo recusaria tirar pelo app um segredo que o dono deixou na nota. O `newString` é conferido.
+NAO_CONFERIDOS = {"vault_patch_note": frozenset({"oldString"})}
 
 
 def mensagem_recusa(tipo: str) -> str:
@@ -106,18 +107,27 @@ class BarreiraSegredo(Middleware):
     def _vigia(self, nome) -> bool:
         if not isinstance(nome, str):
             return True  # falha fechado
-        base = nome[13:] if _PREFIXO_HASH.match(nome) is not None else nome
+        base = nome_sem_hash(nome)
         if nome in self._leituras or base in self._leituras:
             return False
         # Paperless fica de fora por decisão (Ficha 5 fala de vault e banco; documento tem número de conta).
         return not (nome.startswith("paperless_") or base.startswith("paperless_"))
 
+    @staticmethod
+    def _conferidos(nome: str, argumentos: dict) -> dict:
+        """Os argumentos a conferir: todos, menos os de NAO_CONFERIDOS daquela ferramenta (cópia; a chamada não muda)."""
+        fora = NAO_CONFERIDOS.get(nome_sem_hash(nome), frozenset())
+        if not fora or not isinstance(argumentos, dict):
+            return argumentos
+        return {k: v for k, v in argumentos.items() if k not in fora}
+
     async def on_call_tool(self, context, call_next):
         nome = context.message.name
         if self._vigia(nome):
+            argumentos = self._conferidos(nome, context.message.arguments or {})
             try:
                 # Numa thread: conferir 1 MB leva segundos e não pode parar as outras chamadas.
-                tipo = await anyio.to_thread.run_sync(segredo_nos_argumentos, context.message.arguments or {})
+                tipo = await anyio.to_thread.run_sync(segredo_nos_argumentos, argumentos)
             except GrandeDemais:
                 log.warning("Recusei %s: argumentos grandes demais para conferir segredo", nome)
                 raise ToolError(GRANDE_DEMAIS) from None

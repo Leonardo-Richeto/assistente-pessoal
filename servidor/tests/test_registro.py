@@ -304,16 +304,18 @@ async def test_nome_fora_das_listas_que_executa_grava_escrever(app, url):
 
 async def test_caminho_por_hash_do_fastmcp_grava_escrever(app, url):
     # FastMCP 4.1.0 (server.py:1455-1461) aceita `<hash12>_<nome>` para ferramenta visível a apps.
-    # O nome com hash não está em lista nenhuma: conta como escrita, mesmo que o nome local seja leitura.
+    # O nome com hash conta como o nome sem ele (revisor final da Sprint 2b, como a barreira e a trava): fora das
+    # listas, é escrita; leitura conhecida (vault_read_note) é leitura e grava só o `negado`, na tabela vault.
     meta = {"fastmcp": {"tool_hash": "0123456789ab"}, "ui": {"visibility": ["app", "model"]}}
     app.tool(lambda: "feito", name="consultar_gastos_app", meta=meta)
     async with Client(app) as c:
         assert (await c.call_tool("0123456789ab_consultar_gastos_app", {})).content[0].text == "feito"
         with pytest.raises(ToolError, match="Unknown tool"):
             await c.call_tool("abcdefabcdef_vault_read_note", {"path": "a.md"})
-    assert [(a.ferramenta, a.acao) for a in _linhas(url)] == [
-        ("0123456789ab_consultar_gastos_app", "escrever"), ("0123456789ab_consultar_gastos_app", "ok"),
-        ("abcdefabcdef_vault_read_note", "escrever"), ("abcdefabcdef_vault_read_note", "negado")]
+    assert [(a.ferramenta, a.tabela, a.acao) for a in _linhas(url)] == [
+        ("0123456789ab_consultar_gastos_app", "ferramenta", "escrever"),
+        ("0123456789ab_consultar_gastos_app", "ferramenta", "ok"),
+        ("abcdefabcdef_vault_read_note", "vault", "negado")]
 
 
 def test_ferramentas_do_banco_estao_classificadas():
@@ -664,3 +666,19 @@ async def test_identidade_pelo_http_com_token_do_provedor(tmp_path, url, recebid
         ("vault_write_note", "escrever", autor), ("vault_write_note", "ok", autor),
         ("vault_delete_note", "escrever", autor), ("vault_delete_note", "negado", autor),
         ("registrar_gasto", "criar", autor)]
+
+
+def test_nome_com_hash_conta_como_o_nome_sem_hash():
+    """Revisor final da Sprint 2b: o nome `<hash12>_x` do FastMCP 4.1.0 é classificado como `x` (como a barreira)."""
+    assert registro.nome_sem_hash("0123456789ab_vault_read_note") == "vault_read_note"
+    assert registro.nome_sem_hash("vault_read_note") == "vault_read_note"
+    assert registro.nome_sem_hash("0123456789AB_vault_read_note") == "0123456789AB_vault_read_note"  # hash é minúsculo
+    assert registro._peca("0123456789ab_vault_read_note") == "vault"
+    assert registro._peca("0123456789ab_paperless_get_document") == "paperless"
+    assert registro._peca("0123456789ab_escrever_nota", frozenset({"escrever_nota"})) == "vault"
+    r = registro.RegistroChamadas(None, leituras={"vault_read_note"}, auditadas={"registrar_gasto"})
+    assert r._e_escrita("0123456789ab_vault_read_note", {}) is False
+    assert r._e_escrita("0123456789ab_registrar_gasto", {}) is False
+    assert r._e_escrita("0123456789ab_vault_manage_tags", {"operation": "list"}) is False
+    assert r._e_escrita("0123456789ab_vault_manage_tags", {"operation": "add"}) is True
+    assert r._e_escrita("0123456789ab_vault_write_note", {}) is True

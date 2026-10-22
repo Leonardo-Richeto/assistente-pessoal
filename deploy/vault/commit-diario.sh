@@ -12,6 +12,10 @@
 #      arquivos e sem push (nada é apagado; reescrever o histórico fica com o dono).
 # Saída 1 se houve qualquer ERRO (o systemd marca o serviço como falho). Relatórios só com File, RuleID, StartLine e
 # Commit (o `Match` do gitleaks tem contexto mesmo com --redact), em LOG_DIR, modo 600.
+# Execução sem ERRO (com ou sem mudança) grava a hora em $LOG_DIR/ultima-execucao-ok (modo 644): o lint diário avisa
+# quando ela passa de 2 dias.
+# Push (VAULT_PUSH=1): do commit varrido (não do HEAD, que pode ter andado no meio) para a branch atual no `origin`,
+# por ssh com a chave de deploy (VAULT_SSH_CHAVE, padrão ~/.ssh/vault_deploy). Sem a chave: ERRO e sem push.
 # Chamado pelo vault-commit.service; também roda à mão:
 #   VAULT_PATH=/srv/assistente/vault bash deploy/vault/commit-diario.sh
 # Saída vai para o journal: journalctl -u vault-commit.service
@@ -27,9 +31,13 @@ GITLEAKS_CONFIG="${GITLEAKS_CONFIG:-$PASTA_SCRIPT/gitleaks.toml}"
 GITLEAKS_IMAGE="${GITLEAKS_IMAGE:-ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f}"
 GITLEAKS_ACHOU=3  # código de saída do gitleaks quando acha segredo; qualquer outro diferente de 0 é falha dele
 GITLEAKS_TIMEOUT="${GITLEAKS_TIMEOUT:-900}"  # segundos por varredura; o vault-commit.service para tudo em 30 min
-AUTOR_DIARIO="Vault (commit diário)"  # o lint-diario.sh procura este autor
+AUTOR_DIARIO="Vault (commit diário)"
 CONTEINER="assistente-gitleaks-$$"
 ULTIMO_VARRIDO="$LOG_DIR/ultimo-varrido"
+CARIMBO="$LOG_DIR/ultima-execucao-ok"  # o lint-diario.sh lê (CARIMBO_COMMIT)
+CHAVE_SSH="${VAULT_SSH_CHAVE:-${HOME:-}/.ssh/vault_deploy}"
+ESPERA_ADD="${VAULT_ADD_ESPERA:-2}"  # segundos entre as tentativas do git add com index.lock ocupado
+TOPO_VARRIDO=""  # commit que a varredura dos commits viu limpo; o push manda este, não o HEAD
 ERROS=0
 
 log() { echo "vault-commit: $*"; }
@@ -72,9 +80,12 @@ recusa_do_vault() {
   # comando) ou binary (esconderia o conteúdo do gitleaks), em qualquer pasta, ou em .git/info/attributes.
   local lista
   lista="$(find . -path ./.git -prune -o -name .gitattributes -print 2>/dev/null; echo ./.git/info/attributes)"
+  # Linha de comentário (`#`, com ou sem espaço antes) não conta; o atributo, com `-` ou `!` antes ou `=valor` depois,
+  # conta em qualquer posição depois do padrão (inclusive numa macro `[attr]x filter=y`).
   while IFS= read -r f; do
     [ -n "$f" ] || continue
-    if [ -L "$f" ] || { [ -f "$f" ] && grep -qiE 'filter|diff|binary' "$f"; }; then
+    if [ -L "$f" ] || { [ -f "$f" ] && grep -vE '^[[:space:]]*#' "$f" \
+      | grep -qiE '(^|[[:space:]])[-!]?(filter|diff|binary)(=|[[:space:]]|$)'; }; then
       echo "o vault tem ${f#./} com filter, diff ou binary (rodaria comando ou esconderia conteúdo do gitleaks); tire a linha"
       return 0
     fi
@@ -206,9 +217,10 @@ varrer_commits() {
   local falta relatorio="$LOG_DIR/gitleaks-commits.json" saida="$LOG_DIR/gitleaks-commits.log"
   local lista="$LOG_DIR/gitleaks-commits-arquivos" topo ultimo codigo
   topo="$("${GIT[@]}" rev-parse --verify -q 'HEAD^{commit}')" || { log "repositório sem commit; nada a varrer."; return 0; }
-  ultimo="$(tr -d '[:space:]' <"$ULTIMO_VARRIDO" 2>/dev/null)"
+  ultimo="$(tr -d '[:space:]' 2>/dev/null <"$ULTIMO_VARRIDO")"
   if [ "$ultimo" = "$topo" ]; then
     log "gitleaks: nenhum commit novo desde a última varredura."
+    TOPO_VARRIDO="$topo"
     return 0
   fi
   local opcoes=()
@@ -225,6 +237,7 @@ varrer_commits() {
   if [ "$codigo" -eq 0 ]; then
     [ -f "$relatorio" ] && resumir_relatorio "$relatorio" "$lista" >/dev/null 2>&1
     echo "$topo" >"$ULTIMO_VARRIDO" && chmod 600 "$ULTIMO_VARRIDO"
+    TOPO_VARRIDO="$topo"
     log "gitleaks: nada com cara de segredo nos commits até ${topo:0:12}."
     return 0
   fi
@@ -237,6 +250,61 @@ varrer_commits() {
   return 1
 }
 
+# git add de tudo, menos o que o Syncthing deixa na pasta (versões, marcador, temporários) e um .git guardado por
+# engano. O servidor pode comitar uma escrita da IA entre a espera do index.lock e o add: com o lock ocupado, tenta de
+# novo (3 vezes, ESPERA_ADD s entre elas).
+adicionar() {
+  local tentativa saida
+  for tentativa in 1 2 3; do
+    if saida="$("${GIT[@]}" add -A -- . ':!.stversions' ':!.stfolder' ':!*.syncthing.*.tmp' ':!.git-mac-parado' 2>&1)"; then
+      [ -z "$saida" ] || printf '%s\n' "$saida"
+      return 0
+    fi
+    case "$saida" in
+      *index.lock*)
+        if [ "$tentativa" -lt 3 ]; then
+          log "index.lock ocupado no git add (o servidor comitando); tento de novo em $ESPERA_ADD s."
+          sleep "$ESPERA_ADD"
+        fi ;;
+      *) break ;;
+    esac
+  done
+  printf '%s\n' "$saida"
+  return 1
+}
+
+# Push do commit varrido para a branch atual. ssh só com a chave de deploy (o core.sshCommand do repositório não
+# vale), BatchMode (nunca pergunta), só o protocolo ssh (remoto que é pasta local rodaria o receivepack da config
+# aqui) e sem credential.helper do repositório.
+enviar() {
+  local branch
+  if [ -z "$TOPO_VARRIDO" ]; then log "nada varrido para enviar; sem push."; return 0; fi
+  if [ ! -f "$CHAVE_SSH" ]; then
+    erro "não achei a chave de deploy em $CHAVE_SSH (VAULT_SSH_CHAVE); sem push. O commit local ficou."; return 1
+  fi
+  case "$CHAVE_SSH" in *"'"*) erro "o caminho da chave de deploy tem aspas simples; sem push."; return 1 ;; esac
+  if ! branch="$("${GIT[@]}" symbolic-ref --short -q HEAD)"; then
+    erro "HEAD solto (fora de uma branch); sem push. O commit local ficou."; return 1
+  fi
+  if git "${SEGURO[@]}" -c core.sshCommand="ssh -i '$CHAVE_SSH' -o IdentitiesOnly=yes -o BatchMode=yes" \
+    -c protocol.allow=never -c protocol.ssh.allow=always -c credential.helper= \
+    push origin "$TOPO_VARRIDO:refs/heads/$branch"; then
+    log "push feito (${TOPO_VARRIDO:0:12} para $branch)."
+  else
+    erro "git push falhou (credencial ou rede). O commit local ficou."
+  fi
+}
+
+# Hora da última execução sem ERRO (com ou sem mudança), para o lint diário. Modo 644: o lint pode rodar com outro
+# usuário. Falhar aqui não é ERRO (o commit e o push já valeram).
+gravar_carimbo() {
+  if mkdir -p "$LOG_DIR" 2>/dev/null && date +%s 2>/dev/null >"$CARIMBO.parcial" && chmod 644 "$CARIMBO.parcial" && mv -f "$CARIMBO.parcial" "$CARIMBO"; then
+    return 0
+  fi
+  rm -f "$CARIMBO.parcial"
+  log "AVISO: não gravei $CARIMBO; o lint diário pode avisar de commit parado."
+}
+
 if motivo="$(recusa_do_vault)"; then
   erro "$motivo; nada foi comitado hoje."
   exit 1
@@ -245,8 +313,7 @@ fi
 if [ -z "$("${GIT[@]}" status --porcelain)" ]; then
   log "sem mudanças em $(date +%F); nada a comitar."
 else
-  # Exclui o que o Syncthing deixa na pasta (versões, marcador, temporários) e um .git guardado por engano.
-  "${GIT[@]}" add -A -- . ':!.stversions' ':!.stfolder' ':!*.syncthing.*.tmp' ':!.git-mac-parado' || { log "ERRO: git add falhou."; exit 1; }
+  adicionar || { log "ERRO: git add falhou."; exit 1; }
   varrer_stage || exit 1
   N="$("${GIT[@]}" diff --cached --name-only | wc -l | tr -d ' ')"
   if [ "$N" -eq 0 ]; then
@@ -263,15 +330,9 @@ if ! varrer_commits; then
 fi
 
 if [ "$VAULT_PUSH" = "1" ]; then
-  # ssh comum aqui (o push precisa dele); o core.sshCommand do repositório não vale. Só o protocolo ssh (remoto que é
-  # pasta local rodaria o receivepack da config aqui) e sem credential.helper do repositório.
-  if git "${SEGURO[@]}" -c core.sshCommand=ssh -c protocol.allow=never -c protocol.ssh.allow=always \
-    -c credential.helper= push; then
-    log "push feito."
-  else
-    erro "git push falhou (credencial ou rede). O commit local ficou."
-  fi
+  enviar
 else
   log "push desligado (VAULT_PUSH não é 1)."
 fi
+[ "$ERROS" -ne 0 ] || gravar_carimbo
 exit "$ERROS"

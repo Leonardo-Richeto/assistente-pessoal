@@ -3,7 +3,7 @@
 #   sudo bash scripts/preparar_host.sh --dry-run    # só imprime o que faria
 #   sudo bash scripts/preparar_host.sh              # executa
 #
-# Instala: pacotes básicos, git, age, smartmontools, Docker Engine + compose, Tailscale (no host,
+# Instala: pacotes básicos, git, python3, age, smartmontools, Docker Engine + compose, Tailscale (no host,
 # só para SSH de administração pelo nome da tailnet; o Funnel do assistente é o container) e
 # Syncthing (repositórios oficiais), qemu-guest-agent (só em VM).
 # Cria a árvore de ASSISTENTE_HOME (padrão /srv/assistente: a pasta acima de app/):
@@ -93,7 +93,8 @@ export DEBIAN_FRONTEND=noninteractive
 # --- 1. Pacotes básicos ---------------------------------------------------------------------
 
 info "Pacotes básicos, git, age e smartmontools"
-BASICOS=(ca-certificates curl gnupg git rsync htop tmux unzip jq openssh-server smartmontools age)
+# python3: o commit diário (resumo do relatório do gitleaks) e o lint do vault rodam no host.
+BASICOS=(ca-certificates curl gnupg git rsync htop tmux unzip jq openssh-server smartmontools age python3)
 FALTAM=()
 for p in "${BASICOS[@]}"; do
   dpkg -s "$p" >/dev/null 2>&1 || FALTAM+=("$p")

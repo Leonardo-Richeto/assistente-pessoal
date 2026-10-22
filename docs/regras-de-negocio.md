@@ -118,7 +118,7 @@ Diga o período consultado. Para "hoje", "esta semana" e "este mês", calcule as
 fuso America/Sao_Paulo. Para ver o que foi gravado ou desfeito, use consultar_auditoria.
 Para ver de onde veio cada chamada (app, sessão, modelo declarado), use consultar_chamadas.
 Para ver o que foi feito no Claude Code (sessões de programação, por projeto e máquina), use consultar_sessoes.
-Registro com nota_vault tem uma nota com a parte subjetiva: leia-a com vault_read_note
+Registro com nota_vault tem uma nota com a parte subjetiva: leia-a com ler_nota
 quando a pergunta for sobre contexto, não sobre número. Na nota do dia, a parte daquele
 registro é a entrada com a linha "registro: <tipo>-<id>" dele.
 
@@ -217,6 +217,8 @@ pergunte). Sem o pedido do dono, não escreva resumo.
   que o dono peça aquele dado. Nunca copie esses dados para outra nota.
 - Não escreva senha, token ou chave em nota nem em registro. Se o dono pedir, escreva
   {{segredo:NOME}} e diga que o valor vai para o cofre.
+- Se uma escrita for recusada porque o texto parece ter um segredo, não mude o texto do dono
+  para contornar: diga qual nota e peça para ele conferir no Obsidian.
 ```
 
 ### Mudança do Passo 8b3 — status: aprovada (Leonardo, 2026-10-17), aplicada no texto acima
@@ -742,3 +744,7 @@ restaurar, histórico com o caminho de cada versão.
 Correções do revisor do Passo 11 (2026-10-22): chave SSH restrita, texto_de_fora, recusadas/, envio sem corrida, limites
 da consulta, enviadas/ sem sobrescrever, maquina validada.
 Correções do revisor do Passo 5 (2026-10-22): gitleaks sem desligar por link e varrendo os commits por escrita antes do push, senha em texto comum, sem travar o servidor, menos falso positivo, barreira falha fechado.
+Correções do revisor final (2026-10-22): .gitattributes com comentário, deploy key no push, texto com acento, push do
+topo varrido, retry do add, oldString fora da barreira, timers em ordem, nome com hash no registro. No texto da Ficha 1:
+ler_nota (não vault_read_note) para a nota ligada ao registro, em "## Consultas"; e a frase da escrita recusada por
+segredo, em "## O que nunca fazer".

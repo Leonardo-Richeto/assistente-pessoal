@@ -41,6 +41,8 @@ bloco do passo que precisar. **Esta seção é o único lugar do estado do proje
   a pedido) **aprovados e aplicados**: texto da Ficha 1, exemplo de `nota_vault` em `banco.py`, tag `diario` e formato
   no `_diario` do vault. 262 testes + 1 pulado. **O texto novo da Ficha 1 entra no Projeto no B8, no i7** (o conector do Mac está desligado; teste no B9).
 - **Última atualização:** 2026-10-17, Opus 5.5 (orquestrador, depois do revisor do 8e), MacBook Air.
+- **Sprint 2b (Fase 2b, vault inteligente) em paralelo, 2026-10-21/22:** feita no Mac na branch `fase-2b`; plano,
+  registro e pendências em `SPRINT_2B.md`. Implantação no i7 junto com a Etapa B (`docs/IMPLANTACAO.md`, seção da Fase 2b).
 
 ## Avisos vivos
 

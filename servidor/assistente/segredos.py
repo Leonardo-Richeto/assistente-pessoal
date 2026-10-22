@@ -16,12 +16,13 @@ Dois tipos de padrão:
 - Com grupo nomeado: só o grupo é trocado, e ele precisa passar num teste.
   `(?P<valor>...)` (genéricos: variável, chave de cabeçalho, `--password`, senha na
   URL, `?token=`) exige `parece_segredo(valor)`: 8+ caracteres, 2+ classes (ou 16+
-  caracteres), não é palavra comum, marcador de exemplo, caminho de arquivo, data
-  nem atributo (`config.chave`). `(?P<senha>...)` (contexto que já diz "isto é
+  caracteres), não é palavra comum (com ou sem acento), frase de palavras comuns
+  entre aspas (`"ver no Bitwarden"`; só no `--password` a frase conta), marcador
+  de exemplo, caminho de arquivo, data nem atributo (`config.chave`). `(?P<senha>...)` (contexto que já diz "isto é
   senha": `curl -u`, `sshpass -p`, `docker login -p`) só exige que o valor não seja
   marcador (`$VAR`, `<...>`, `xxx`). `(?P<texto>...)` (senha em texto comum: "a
   senha do banco é X") exige `parece_segredo` ou, depois de "senha"/"pin", só
-  dígitos com 8+. `(?P<aleatorio>...)` (`sk-`) exige minúscula, maiúscula e dígito
+  dígitos com 8+ que não formam data AAAAMMDD (`pin: 20261022` não é PIN). `(?P<aleatorio>...)` (`sk-`) exige minúscula, maiúscula e dígito
   (o `sk-` de verdade é aleatório; `sk-learn-...` não) e troca o achado inteiro.
 
 A referência `{{segredo:NOME}}` nunca conta como segredo; o que sobra do valor
@@ -36,6 +37,7 @@ Só biblioteca padrão; compatível com Python 3.9.
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import List, Optional, Pattern, Tuple
 
 # Referência ao cofre: nunca é segredo e o servidor nunca a resolve.
@@ -143,10 +145,12 @@ PADROES: List[Tuple[str, str]] = [
     ),
     # Campo ou cabecalho de autenticação, qualquer caixa: password=..., X-Api-Key: ...,
     # api_key='...', clientSecret: ..., {"access_token": "..."}, Authorization: Basic ...
-    # A palavra pode estar no fim de um nome maior (x-api-key, aws_secret_access_key, myPassword): sem âncora antes,
-    # que custaria por posição. Depois de `Basic`, só base64 ("Basic usuario:senha em base64" é prosa).
+    # A palavra pode estar no fim de um nome maior depois de não-letra (x-api-key, aws_secret_access_key) ou em
+    # camelCase, maiúscula depois de minúscula (myPassword); depois de outra letra, não ("Resenha: x" é prosa). O limite
+    # é um lookbehind de 1 caractere (custo fixo por posição). Depois de `Basic`, só base64 ("Basic usuario:senha em
+    # base64" é prosa).
     (
-        r"(?i)(?:authorization|credentials?|password|passwd|senha|apikey|"
+        r"(?i)(?:(?<![^\W\d_])|(?-i:(?<=[a-z])(?=[A-Z])))(?:authorization|credentials?|password|passwd|senha|apikey|"
         r"authtoken|authkey|(?:api|auth|access|secret|private|session|refresh|client|app)[_-]?"
         r"(?:key|token|secret))[\"']?[ \t]*[=:][ \t]*"
         r"(?:basic[ \t]+(?=[A-Za-z0-9+/]+={0,2}(?:[\s\"'`;,)]|$))|(?:bearer|token)[ \t]+)?" + _VALOR,
@@ -177,7 +181,8 @@ _GRUPOS = ("valor", "senha", "texto", "aleatorio")
 _PARCIAIS = ("valor", "senha", "texto")
 # Palavras (minúsculas, MAIÚSCULAS, Capitalizada, camelCase) separadas por `. _ - /`:
 # nome de campo, caminho ou frase, não segredo (`renovarAutomatico`, `str/TOKEN`), desde
-# que cada pedaço tenha menos de 16 letras.
+# que cada pedaço tenha menos de 16 letras. Conferidas sem acento (`_sem_acento`):
+# `Atualização` e `Bilhete-Único-Mensal` são palavras.
 _PALAVRAS = re.compile(r"(?:[a-z]+|[A-Z]+|[A-Z]?[a-z]+(?:[A-Z][a-z]+)*)(?:[._/\-](?:[a-z]+|[A-Z]+|[A-Z]?[a-z]+(?:[A-Z][a-z]+)*))*")
 _PEDACO = re.compile(r"[A-Z]?[a-z]+|[A-Z]+")
 # `?` no começo: mensagem de `${VAR:?obrigatorio}` do shell e do docker compose.
@@ -197,6 +202,27 @@ _DATA = re.compile(
     r"|\d{1,2}:\d{2}(?::\d{2})?"
 )
 _DIGITOS = re.compile(r"\d{8,}")
+# Data compacta AAAAMMDD (20261022): depois de "pin"/"senha", é data, não PIN.
+_DATA_COMPACTA = re.compile(r"(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])")
+# Pontuação em volta de cada palavra de uma frase ("Ótimo livro, recomendo").
+_PONTUACAO_DA_FRASE = ",.;:!?()"
+
+
+def _sem_acento(texto: str) -> str:
+    """Tira as marcas (acento, cedilha) depois da decomposição NFKD: `Atualização` vira `Atualizacao`."""
+    return "".join(c for c in unicodedata.normalize("NFKD", texto) if not unicodedata.combining(c))
+
+
+def _so_palavras(texto: str) -> bool:
+    """Palavras de verdade (ver `_PALAVRAS`), cada pedaço com menos de 16 letras. Recebe o texto já sem acento."""
+    return bool(_PALAVRAS.fullmatch(texto)) and max(len(p) for p in _PEDACO.findall(texto)) < 16
+
+
+def _frase_comum(texto: str) -> bool:
+    """Duas ou mais palavras comuns separadas por espaço ("ver no Bitwarden"). Recebe o texto já sem acento."""
+    partes = [p.strip(_PONTUACAO_DA_FRASE) for p in texto.split()]
+    partes = [p for p in partes if p]
+    return len(texto.split()) >= 2 and bool(partes) and all(_so_palavras(p) for p in partes)
 
 
 def _sem_aspas(valor: str) -> str:
@@ -217,11 +243,13 @@ def e_marcador(valor: str) -> bool:
     return bool(_MARCADOR.search(v)) or v.lower() in PALAVRAS_DE_EXEMPLO
 
 
-def parece_segredo(valor: str) -> bool:
+def parece_segredo(valor: str, frase_conta: bool = False) -> bool:
     """O valor de uma atribuição genérica parece segredo de verdade?
 
-    Exige 8+ caracteres, não ser marcador, palavra comum, caminho de arquivo, atributo de código nem data, e
-    misturar 2+ classes (minúscula, maiúscula, dígito, símbolo) ou ter 16+ caracteres.
+    Exige 8+ caracteres, não ser marcador, palavra comum (com ou sem acento), caminho de arquivo, atributo de código
+    nem data, e misturar 2+ classes (minúscula, maiúscula, dígito, símbolo) ou ter 16+ caracteres. Frase de palavras
+    comuns entre aspas (`"ver no Bitwarden"`) não é segredo, a menos que `frase_conta` (o contexto já diz que é
+    senha: `--password 'minha senha com espaco'`).
     """
     if not isinstance(valor, str) or e_marcador(valor):
         return False
@@ -230,8 +258,9 @@ def parece_segredo(valor: str) -> bool:
         return False
     if _CAMINHO.fullmatch(v) or _ATRIBUTO.fullmatch(v) or _DATA.fullmatch(v):
         return False
-    # Palavras de verdade (cada pedaço com menos de 16 letras) não são segredo.
-    if _PALAVRAS.fullmatch(v) and max(len(p) for p in _PEDACO.findall(v)) < 16:
+    # Palavras de verdade (cada pedaço com menos de 16 letras, acento não conta) não são segredo.
+    base = _sem_acento(v)
+    if _so_palavras(base) or (not frase_conta and _frase_comum(base)):
         return False
     classes = (
         any(c.islower() for c in v)
@@ -252,13 +281,14 @@ def _grupo(m: "re.Match[str]") -> Optional[str]:
 
 
 def _senha_no_texto(m: "re.Match[str]") -> bool:
-    """Senha em texto comum: parece segredo, ou só dígitos (8+) depois de "senha"/"pin"."""
+    """Senha em texto comum: parece segredo, ou só dígitos (8+, fora data AAAAMMDD) depois de "senha"/"pin"."""
     valor = m.group("texto")
     if parece_segredo(valor):
         return True
     palavra = m.group("palavra").lower()
+    v = _sem_aspas(valor)
     return palavra in ("senha", "senhas", "pin") and not e_marcador(valor) and bool(
-        _DIGITOS.fullmatch(_sem_aspas(valor)))
+        _DIGITOS.fullmatch(v)) and not _DATA_COMPACTA.fullmatch(v)
 
 
 def _aleatorio(valor: str) -> bool:
@@ -267,11 +297,14 @@ def _aleatorio(valor: str) -> bool:
             and any(c.isdigit() for c in valor))
 
 
-def _vale(regex: Pattern[str], m: "re.Match[str]") -> bool:
-    """O achado é segredo? (testa o grupo; sem grupo, ignora a referência `{{segredo:X}}`)."""
+def _vale(regex: Pattern[str], m: "re.Match[str]", tipo: str = "") -> bool:
+    """O achado é segredo? (testa o grupo; sem grupo, ignora a referência `{{segredo:X}}`).
+
+    Na linha de comando (`senha_cli`), a frase entre aspas conta: `--password 'minha senha com espaco'`.
+    """
     nome = _grupo(m)
     if nome == "valor":
-        return parece_segredo(m.group("valor"))
+        return parece_segredo(m.group("valor"), frase_conta=tipo == "senha_cli")
     if nome == "senha":
         return not e_marcador(m.group("senha"))
     if nome == "texto":
@@ -290,7 +323,7 @@ def achar_segredo(texto: str) -> Optional[str]:
         return None
     for regex, tipo in _COMPILADOS:
         for m in regex.finditer(texto):
-            if _vale(regex, m):
+            if _vale(regex, m, tipo):
                 return tipo
     return None
 
@@ -303,7 +336,7 @@ def tirar_segredos(texto: str) -> str:
     for regex, tipo in _COMPILADOS:
 
         def _troca(m: "re.Match[str]", _regex: Pattern[str] = regex, _tipo: str = tipo) -> str:
-            if not _vale(_regex, m):
+            if not _vale(_regex, m, _tipo):
                 return m.group(0)
             marca = "[segredo:%s]" % _tipo
             nome = _grupo(m)

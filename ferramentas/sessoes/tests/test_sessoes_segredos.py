@@ -94,6 +94,18 @@ POSITIVOS = [
     ("password: {{segredo:a}}Tr0ca-Est@Senha99", "cabecalho_auth"),
     ("senha do banco: {{segredo:a}}Tr0ca-Est@Senha99", "senha"),
     ("postgres://u:{{segredo:a}}S3nhaF0rte@h/banco", "url_com_senha"),
+    # Revisor final da Sprint 2b: o limite à esquerda de cabecalho_auth ainda pega nome composto e camelCase.
+    ("myPassword: Tr0ca-Est@Senha99", "cabecalho_auth"),
+    ("X-Api-Key: 0123456789abcdef", "cabecalho_auth"),
+    ("x-api-key=0123456789abcdef", "cabecalho_auth"),
+    ("Aws_Secret_Access_Key: wJalrXUtnFEMI/K7MDENG", "cabecalho_auth"),
+    ("2password: Tr0ca-Est@Senha99", "cabecalho_auth"),
+    # Entre aspas com espaço, mas não só palavras: continua segredo.
+    ('password: "Tr0ca Est@Senha99"', "cabecalho_auth"),
+    ('senha: "minha senha 4821x!"', "cabecalho_auth"),
+    ('A senha é "minha senha 4821x!"', "senha"),
+    ("PIN: 98213377", "senha"),
+    ("pin: 20261342", "senha"),  # mês 13: não é data
 ]
 
 # Achado 2 do revisor (Passo 5): prefixos de fornecedor, no formato real (montados em partes).
@@ -218,6 +230,21 @@ NEGATIVOS = [
     "JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:?obrigatorio}",
     "token: 2026-10-22T10:30:00",
     "EAAAAAAAAAAAAAAAAAAAAAAAAAAAH grito",
+    # Revisor final da Sprint 2b: texto comum com acento, data no lugar do PIN, "senha" dentro de "resenha" e frase
+    # de palavras comuns entre aspas.
+    "Troquei a senha do Itaú: Atualização feita no app.",
+    "| Banco | Senha | Situação |",
+    "Senha do Netflix: Anotação na agenda",
+    "A senha nova é Provisória até sexta",
+    "Pass: Bilhete-Único-Mensal",
+    "pin: 20261022",
+    "pin: 2026-10-22",
+    "senha: 19991231",
+    "Resenha: Duna-2021",
+    'resenha: "Ótimo livro, recomendo"',
+    'senha: "ver no Bitwarden"',
+    "password: 'ver no cofre, pasta Bancos'",
+    "Senha: Ação-Pública-Ética",
 ]
 
 
@@ -312,9 +339,21 @@ def test_pem_sem_fim_vai_ate_o_fim_do_texto():
     ("wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", True),  # base64 com / não é caminho
     ("Tr0ca.Est@99", True),
     ("{{segredo:a}}Tr0ca-Est@Senha99", True),  # o resto, sem a referência
+    ("Atualização", False),            # palavra com acento
+    ("Bilhete-Único-Mensal", False),
+    ("ÉticaProfissional", False),     # camelCase com acento
+    ('"ver no Bitwarden"', False),      # frase de palavras comuns entre aspas
+    ('"Ótimo livro, recomendo"', False),
+    ('"Tr0ca Est@Senha99"', True),      # frase com dígito e símbolo: segredo
 ])
 def test_parece_segredo(valor, esperado):
     assert segredos.parece_segredo(valor) is esperado
+
+
+def test_frase_entre_aspas_conta_na_linha_de_comando():
+    """`--password 'minha senha com espaco'`: o contexto já diz que é senha; a frase de palavras conta."""
+    assert segredos.parece_segredo("'minha senha com espaco'", frase_conta=True) is True
+    assert segredos.parece_segredo("'minha senha com espaco'") is False
 
 
 def test_vazio():
