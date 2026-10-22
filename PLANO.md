@@ -92,7 +92,8 @@ podem escrever. Itens que mudam o que o Claude do app faz (2b.2, 2b.6, 2b.7, 2b.
   passagem. Ficha: o que a tabela guarda e por quanto tempo
 - [ ] 2b.10 Teste da busca: 20 a 30 perguntas, cada uma com a nota esperada; mede quantas vezes ela vem entre as 5
   primeiras; roda a cada mudança no ranking
-- [ ] 2b.11 O lint avisa quando aparece arquivo `*.sync-conflict-*` no vault
+- [x] 2b.11 O lint avisa quando aparece arquivo `*.sync-conflict-*` no vault (2026-10-21: `deploy/vault/lint-diario.sh`,
+  teste `scripts/testes/test_lint_conflitos.sh`)
 
 **Prioridade 3: só se a necessidade aparecer**
 - 2b.12 Busca por significado (pgvector com modelo local multilíngue), quando a busca por palavra errar com frequência

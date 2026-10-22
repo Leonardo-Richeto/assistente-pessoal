@@ -5,6 +5,7 @@
 # Chamado pelo vault-lint.service; também roda à mão:
 #   VAULT_PATH=/srv/assistente/vault LINT_DIR=/srv/assistente/logs/vault-lint bash deploy/vault/lint-diario.sh
 # O relatório fica FORA do vault, para não virar nota nem entrar no commit diário.
+# Arquivo de conflito do Syncthing (*.sync-conflict-*) vira seção de AVISO no relatório; não muda o código.
 set -u
 
 VAULT_PATH="${VAULT_PATH:-/srv/assistente/vault}"
@@ -24,6 +25,20 @@ if [ "$CODIGO" -gt 1 ]; then
   rm -f "$LINT_DIR/ultimo.md.parcial"
   log "ERRO: o lint quebrou (código $CODIGO); o relatório anterior ficou."
   exit "$CODIGO"
+fi
+
+# Conflitos do Syncthing: aviso, não erro. Sem conflito, o relatório não muda.
+CONFLITOS="$(find "$VAULT_PATH" -name '*.sync-conflict-*' -not -path '*/.git/*' -not -path '*/.stversions/*' | sort)"
+if [ -n "$CONFLITOS" ]; then
+  N="$(printf '%s\n' "$CONFLITOS" | grep -c .)"
+  {
+    echo ""
+    echo "## Conflitos do Syncthing"
+    echo ""
+    echo "AVISO: $N arquivo(s) de conflito. Compare com a nota original, junte à mão e apague a cópia."
+    printf '%s\n' "$CONFLITOS" | head -n 50 | while IFS= read -r f; do echo "- ${f#"$VAULT_PATH"/}"; done
+    [ "$N" -gt 50 ] && echo "- ... e mais $((N - 50))"
+  } >>"$LINT_DIR/ultimo.md.parcial"
 fi
 mv "$LINT_DIR/ultimo.md.parcial" "$LINT_DIR/ultimo.md"
 log "$(sed -n 3p "$LINT_DIR/ultimo.md") Relatório: $LINT_DIR/ultimo.md"

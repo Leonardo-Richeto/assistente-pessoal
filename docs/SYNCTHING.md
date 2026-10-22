@@ -199,7 +199,7 @@ Sem esse arquivo (ou sem o `1`), o serviço só comita localmente. Teste outra v
 `systemctl start` e confira no journal a linha "push feito".
 
 **Lint diário** (`PLANO.md` M3). Roda às 03:40, depois do commit, o `90-meta/lint-do-vault.py` do próprio
-vault. Só lê. O relatório fica em `/srv/assistente/logs/vault-lint/ultimo.md`, fora do vault, para não entrar no commit:
+vault. Só lê. O relatório também lista os arquivos de conflito do Syncthing (`*.sync-conflict-*`) como aviso, sem mudar o código de saída. O relatório fica em `/srv/assistente/logs/vault-lint/ultimo.md`, fora do vault, para não entrar no commit:
 
 ```bash
 sudo install -d -o "$USER" -g "$USER" /srv/assistente/logs/vault-lint
