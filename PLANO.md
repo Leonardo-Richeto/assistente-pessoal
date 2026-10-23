@@ -168,7 +168,7 @@ no i7 (B11 da Sprint 2 e 6.1). Antes de implementar: ficha "proposta" em `docs/r
 ## Fase 7 — Backup e portabilidade
 **Retomada (Leonardo, 2026-10-19, "Plano de Portabilidade do Servidor"):** backup e migração são o mesmo processo.
 Substitui o adiamento de 2026-10-18. Procedimento em `docs/MIGRACAO.md`.
-**Backup desde o início (Leonardo, 2026-10-23; substitui o "sem backup" de 2026-10-21):** o i7 sobe com o 7.1 ligado, destino no HD de 500 GB (`/srv/backup-hd`).
+**Backup desde o início (Leonardo, 2026-10-23; substitui o "sem backup" de 2026-10-21):** o i7 sobe com o 7.1 ligado, destino no HD de 500 GB (`/srv/backup-hd`). O HD tem o atributo SMART 184 (End-to-End) em FAILING_NOW: backup provisório. Disco novo só quando der; se o HD falhar antes, segue sem backup (Leonardo, 2026-10-23).
 - [x] 7.0 Portabilidade (2026-10-19): estado em `ASSISTENTE_HOME` (bind mounts), imagens com digest, Tailscale em
   container com nome fixo, `scripts/{preparar_host,exportar,importar,verificar}.sh`, pacote `.tar.age` com manifesto
   e SHA-256. Ensaio com dados sintéticos passou no Windows (`scripts/testes/ensaio_migracao.sh`)
