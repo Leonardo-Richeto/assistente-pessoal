@@ -21,16 +21,20 @@ A sequência de **teste no MacBook → produção no i7** está em `docs/IMPLANT
 seu próprio projeto Docker Compose; o que hoje está no i5 vem para o i7 (Fase 1c) e o i5 fica desligado. Motivo: conta de luz (as duas ligadas: estimativa
 de R$ 29 a 47/mês). Sem backup do banco por enquanto; o vault tem Syncthing e GitHub (Fase 7). Revisto em 2026-10-19: backup diário
 cifrado e migração pelo mesmo pacote (Fase 7, `docs/MIGRACAO.md`). Em 2026-10-21 (Leonardo): no início, sem backup ligado. **Em 2026-10-23 (Leonardo): backup ligado desde o início**, no HD de 500 GB do i7.
+- [ ] 1.9 `scripts/verificar.sh` testa o Funnel de dentro da tailnet: deu "ok" com o DNS público vazio (2026-10-23).
+  Testar pela internet (DNS público + `curl --resolve` no IP do ingress) e falhar se o nome não existir
+- [ ] 1.10 Conferir se o backup das 03:15 (para e religa o Tailscale) derruba o DNS público do Funnel (~20 min em
+  2026-10-23 depois de um restart). Se derrubar: não parar o container do Tailscale no backup
 - [ ] 1.8 (adiado) Desligar o i7 à noite: decidido em 2026-10-23 (Leonardo) rodar 24/7 e rever só se o consumo (1.7) pesar.
   Se voltar: Scheduled Power-On da BIOS para ligar, timer do systemd para desligar, e os timers das 03:15–03:40 antes do desligamento
-- [ ] 1.0 BIOS do i7 para economia (na instalação): C-states e package C-state no máximo, ASPM ligado, áudio e
+- [x] 1.0 (2026-10-23) BIOS do i7 para economia (na instalação): C-states e package C-state no máximo, ASPM ligado, áudio e
   portas sem uso desligados, "AC power restore" ligado (volta sozinho depois de queda de luz). Lista completa: `docs/IMPLANTACAO.md` B2a
 - [ ] 1.1 Inventário completo de todas as máquinas: especificações, configuração, saúde SMART de cada HD/SSD, VMs → nota no vault + resumo em `docs/inventario.md` (roteiro em `CONTEXTO.md`)
-- [ ] 1.2 Instalar Debian 13 direto no i7, com governador da CPU `powersave` e `powertop --auto-tune` no boot, e
+- [x] 1.2 (2026-10-23) Instalar Debian 13 direto no i7, com governador da CPU `powersave` e `powertop --auto-tune` no boot, e
   Docker (`docs/IMPLANTACAO.md` B2)
 - [x] 1.3 Exposição: Tailscale Funnel (decidido)
-- [ ] 1.3b Instalar Tailscale no i7, habilitar HTTPS + Funnel, `tailscale funnel --bg 8000`
-- [ ] 1.4 Criar o cliente OAuth do Google de produção (decisão de 2026-10-17; GitHub fica como alternativa), preencher `.env`, `docker compose up -d --build`
+- [x] 1.3b (2026-10-23; Funnel no container, nó `assistente`) Instalar Tailscale no i7, habilitar HTTPS + Funnel, `tailscale funnel --bg 8000`
+- [x] 1.4 (2026-10-23; mesmo cliente do Mac, URL nova acrescentada) Criar o cliente OAuth do Google de produção (decisão de 2026-10-17; GitHub fica como alternativa), preencher `.env`, `docker compose up -d --build`
   - Pronto quando: `docker compose ps` tudo saudável e `curl <url>/.well-known/oauth-protected-resource/mcp` responde
 - [ ] 1.5 Adicionar conector personalizado no claude.ai e testar do iPhone: registrar → consultar → desfazer
 - [x] 1.6 Criar um Projeto no claude.ai "Assistente" com instruções de uso (quando registrar, tom das confirmações). Feito 2026-10-17 com o texto da ficha 1; no i7, só trocar o conector

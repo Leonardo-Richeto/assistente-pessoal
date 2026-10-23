@@ -13,7 +13,7 @@ Leitura complementar: `README.md` (arquitetura e princípios), `PLANO.md` (fases
 
 - **Durante uma sprint, o estado vivo fica só em `SPRINT_NOTAS.md` § Onde estamos** (decisão de 2026-10-18,
   `PLANO.md` M4). Esta seção guarda o que vale entre sprints. Sprint 1 aberta (Etapa A, teste no MacBook).
-- **Última atualização:** 2026-10-18, Opus 5.5 (Claude Code, MacBook Air): máquina decidida e melhorias M1–M4.
+- **Última atualização:** 2026-10-23, Opus 5.5 (Claude Code, MacBook Air): **i7 em produção** (falta B8/B9; entrada 2026-10-23).
 - **Máquina (Leonardo, 2026-10-18):** só o i7 fica ligado, com Debian 13 direto (13 no lugar do 12 em 2026-10-23) e cada serviço no seu Docker
   Compose (sem Proxmox); o i5 desliga depois da Fase 1c do `PLANO.md`. Motivo: conta de luz.
 - **Portabilidade (2026-10-19, Opus 5.5 no Kiro, PC Windows):** feita e ensaiada com dados sintéticos
@@ -23,8 +23,8 @@ Leitura complementar: `README.md` (arquitetura e princípios), `PLANO.md` (fases
   completo **sem dados reais**, só sintéticos, sem Tailscale/Funnel e sem credencial real. Produção continua no i7.
 
 - **Fase 2b (vault inteligente, ideias do ai-memory) feita no Mac em 2026-10-21/22** (Opus 5.5 orquestrando
-  subagentes); merge em `main` e push em 2026-10-22 (o GitHub liberou a chave Stripe falsa do teste dos hooks como "usada em testes"). Plano e registro passo a passo em `SPRINT_2B.md`. Falta
-  implantar no i7 (`docs/IMPLANTACAO.md`, seção da Fase 2b). Mac = só desenvolvimento; i7 = hospedeiro (Leonardo, 2026-10-21).
+  subagentes); merge em `main` e push em 2026-10-22 (o GitHub liberou a chave Stripe falsa do teste dos hooks como "usada em testes"). Plano e registro passo a passo em `SPRINT_2B.md`. Implantada no i7 em
+  2026-10-23. Mac = só desenvolvimento; i7 = hospedeiro (Leonardo, 2026-10-21).
 
 ## Histórico
 
@@ -158,6 +158,30 @@ perguntas fora da busca real; `consultar_sessoes` sem `comandos`.
 
 ---
 
+### 2026-10-23 — Implantação no i7 (Opus 5.5, Claude Code no MacBook Air, Leonardo no i7)
+
+- **Máquina:** HP EliteDesk 800 G2 (placa 8054, BIOS 2.60), Windows apagado, **Debian 13**, hostname `i7`, IP
+  192.168.15.200 reservado no roteador, usuário `leonardo` (uid 1000). BIOS para economia (`docs/IMPLANTACAO.md` B2a);
+  `economia.service` (powersave + powertop). Sempre ligado (24/7, PLANO 1.8 adiado).
+- **Discos:** SSD SanDisk 256 GB usável (realocado 1, incorrigível 2: vigiar). HD Seagate 500 GB do i5 (o avulso estava
+  ruim) com SMART 184 em FAILING_NOW (25, parado), teste longo sem erro: **backup provisório** em `/srv/backup-hd`
+  (`nofail`, `chattr +i` no ponto de montagem, para em 10 min). Sem compra de disco agora (Leonardo).
+- **Stack:** `preparar_host.sh`, Tailscale do host (nó `i7`, só SSH) e do container (nó `assistente`, Funnel em
+  `https://assistente.<tailnet>.ts.net`), `.env` com senhas `openssl rand -hex 32`, migração 0006, `verificar.sh` ok.
+  Banco começou limpo (B10: o Mac só tinha teste).
+- **Backup** ligado desde o início: chave do age gerada no Mac pelo Docker, identidade no gerenciador de senhas do
+  Leonardo; primeiro pacote no HD (1 MB). Ensaio de restauração: **pendente**.
+- **Vault:** clone do GitHub em `/srv/assistente/vault` (deploy key com escrita), Syncthing i7 ↔ Mac (pasta `vault`),
+  `.git` do Mac movido para `~/vault-git-mac-parado` (D15). Timers 03:30/03:35/03:40; commit + gitleaks + push testados.
+  `VAULT_PATH=/vault` (116 notas indexadas).
+- **Correção:** `deploy/vault/commit-diario.sh` recusava o `git add` quando o `.gitignore` já ignorava `.stfolder`
+  (pathspec `:!` de caminho ignorado). Passou para `core.excludesFile`, com teste (commit `0e03f9e`).
+- **Sessões:** usuário `sessoes` com chave restrita (`command=`); a chave `~/.ssh/assistente_sessoes` do Mac enviou 2 sessões.
+- **Funnel:** o DNS público só apareceu ~20 min depois de reiniciar o container do Tailscale. O claude.ai recusava a URL
+  antes disso. O `verificar.sh` não percebe isso (PLANO 1.9).
+- **Não verificado:** B8 e B9 (conector novo, Ficha 1 colada, testes pelo iPhone); ensaio de restauração; o HD parar de
+  girar (`hdparm -C`); Pkg C-state no `powertop`; o backup noturno e o DNS do Funnel (PLANO 1.10); iPhone no Syncthing.
+
 ## O que já se sabe (dito pelo Leonardo, ainda não conferido nas máquinas)
 
 **Máquinas**
@@ -229,7 +253,25 @@ Vale para todo projeto longo dividido em fases, executado por modelos diferentes
 
 ## Prompt para a próxima etapa
 
-**Fase 2b no i7 (merge e push feitos em 2026-10-22).** Modelo: Opus 5.5, effort alto (toca login, vault real e SSH).
+**Fechar a implantação no i7 (2026-10-23).** Modelo: Opus 5.5, effort médio. Máquina: Mac guiando, Leonardo no i7.
+
+```
+Leia CONTEXTO.md (entrada 2026-10-23), docs/IMPLANTACAO.md (roteiro e B8/B9) e PLANO.md (1.5, 1.7, 1.9, 1.10, 7.2).
+O i7 está no ar: stack, vault, Syncthing i7↔Mac, timers, backup no HD e sessões. Falta, nesta ordem:
+1. B8: conector https://assistente.<tailnet>.ts.net/mcp no claude.ai, trocar no Projeto "Assistente", colar o texto
+   da Ficha 1 (bloco "Texto proposto" de docs/regras-de-negocio.md com "o dono" → "o Leonardo" e a 1ª frase
+   "Você é o assistente pessoal do Leonardo, dono deste Projeto."), remover o conector do Mac.
+2. B9 pelo iPhone, inclusive os exemplos da Ficha 5; B9b no Mac.
+3. Conferir de manhã: journal do backup e do vault-commit, DNS público do Funnel depois das 03:15 (PLANO 1.10).
+4. Ensaio de restauração do backup (docs/MIGRACAO.md § Ensaio) com a identidade do age do Leonardo.
+5. Inventário B1 no i7 (deploy/inventario.sh) → vault + docs/inventario.md; powertop (Pkg C6+), hdparm -C do HD.
+6. iPhone no Syncthing (Synctrain); decisões do 2b-7; launchd do envio das sessões (decisão do Leonardo).
+7. Corrigir o verificar.sh para testar o Funnel pela internet (PLANO 1.9), com teste.
+Pronto quando: B9 passa pelo app; o ensaio de restauração abre o pacote; PLANO/CONTEXTO/vault atualizados.
+Não commitar sem o ok do Leonardo; o push é ele quem roda. Nada de segredo no repo.
+```
+
+**Etapa anterior (Fase 2b no i7), feita em 2026-10-23.** Modelo: Opus 5.5, effort alto (toca login, vault real e SSH).
 
 ```
 Leia CONTEXTO.md (entrada 2026-10-21/22), SPRINT_2B.md, AGENTS.md, docs/IMPLANTACAO.md (seção da Fase 2b),

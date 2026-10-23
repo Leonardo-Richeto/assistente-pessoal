@@ -52,22 +52,28 @@ ferramentas da 2b).
    `curl -fsI https://raw.githubusercontent.com/Leonardo-Richeto/assistente-pessoal/main/deploy/inventario.sh`
    (deve responder `200`). Se der 404, pare: o push não aconteceu.
 1. [ ] (5 min) Ligue o i7 na tomada medidora. A máquina está decidida: i7 com Debian direto (2026-10-18).
-2. [ ] (10 min) Inventário no host (B1). No i7, **antes** de apagar o sistema atual.
-3. [ ] (40 a 60 min) BIOS, Debian 13 no i7, economia de energia, SMART e HD do backup (B2).
-4. [ ] (10 min) Na máquina nova: clonar em `/srv/assistente/app` e rodar `sudo bash scripts/preparar_host.sh` (B3).
-5. [ ] (10 min) `sudo tailscale up` do host (só SSH), chave de autenticação para o nó `assistente`, HTTPS e Funnel no painel (B4).
-6. [ ] (10 min) Google Cloud Console: acrescentar a URL `https://assistente.<tailnet>.ts.net` ao cliente OAuth (B5).
-7. [ ] (15 min) `/srv/assistente/.env` com senhas novas e a chave pública do age, subir a stack com o perfil `tailscale`, `scripts/verificar.sh` (B6, B7).
-8. [ ] (2 min) No Mac: `docker compose stop servidor`. O Postgres do Mac fica de pé e nada novo é gravado (B7b).
-9. [ ] (30 min) Dados do Mac: backup, `scp`, restaurar em banco novo, conferir, decidir e trocar (B10).
-10. [ ] (40 min) Vault e Syncthing e o timer do commit do vault (B11, `docs/SYNCTHING.md`), com `VAULT_PATH=/vault`.
-11. [ ] (40 min) Fase 2b no i7: código e migrações, gitleaks, `.gitignore` do vault, timers, deploy key, sessões
+2. [ ] (10 min) Inventário no host (B1). No i7, depois do B2d (o SMART não se apaga ao formatar). **Pendente** (2026-10-23).
+3. [x] (40 a 60 min) BIOS, Debian 13 no i7, economia de energia, SMART e HD do backup (B2).
+4. [x] (10 min) Na máquina nova: clonar em `/srv/assistente/app` e rodar `sudo bash scripts/preparar_host.sh` (B3).
+5. [x] (10 min) `sudo tailscale up` do host (só SSH), chave de autenticação para o nó `assistente`, HTTPS e Funnel no painel (B4).
+6. [x] (10 min) Google Cloud Console: acrescentar a URL `https://assistente.<tailnet>.ts.net` ao cliente OAuth (B5).
+7. [x] (15 min) `/srv/assistente/.env` com senhas novas e a chave pública do age, subir a stack com o perfil `tailscale`, `scripts/verificar.sh` (B6, B7).
+8. [x] (2 min) No Mac: `docker compose stop servidor`. O Postgres do Mac fica de pé e nada novo é gravado (B7b).
+9. [x] (30 min) Dados do Mac: backup, `scp`, restaurar em banco novo, conferir, decidir e trocar (B10). Decidido em
+   2026-10-23 (Leonardo): começar limpo; o Mac só tinha teste (7 gastos, 2 pontos). O volume do Mac fica guardado.
+10. [x] (40 min) Vault e Syncthing e o timer do commit do vault (B11, `docs/SYNCTHING.md`), com `VAULT_PATH=/vault`.
+11. [x] (40 min) Fase 2b no i7 (menos o 2b-7, decisões pendentes): código e migrações, gitleaks, `.gitignore` do vault, timers, deploy key, sessões
     do Claude Code (seção "Fase 2b no i7", abaixo).
 12. [ ] (30 min) claude.ai: conector novo, trocar no Projeto "Assistente", colar o texto atual da Ficha 1 (B8) e
     testes, inclusive os da Ficha 5 (B9).
-13. [ ] (5 min) Só agora, no Mac: `tailscale funnel --https=443 off` e `docker compose stop` (B9b).
+13. [ ] (5 min) Só agora, no Mac (o Funnel do Mac já estava sem configuração em 2026-10-23; o servidor do Mac, parado): `tailscale funnel --https=443 off` e `docker compose stop` (B9b).
 14. [ ] (5 min) Anote o consumo parado (lido no B2c) e comece os 7 dias de medição com a stack (`PLANO.md` 1.7).
 
+> **Feito em 2026-10-23 (Opus 5.5 guiando do Mac):** passos 3 a 11. Lições: o Syncthing 2 não cria "Default Folder" nem
+> mostra a aba de ignorar ao criar a pasta (ponha o `.stignore` na raiz antes); no Mac, o caminho da pasta vai completo
+> (`/Users/...`, sem `~`); o primeiro sync gera um `.sync-conflict` do `.gitignore` (fica a versão nova; apague a cópia);
+> o DNS público do Funnel levou ~20 min para aparecer depois de reiniciar o container do Tailscale.
+>
 > **Backup desde o início (Leonardo, 2026-10-23):** o backup diário cifrado vai para o HD de 500 GB (B2d). Gere a chave
 > do age no Mac antes do B6 (`docs/MIGRACAO.md` § Chave do age). O HD fica na mesma máquina: não protege de roubo,
 > raio ou fonte queimada.

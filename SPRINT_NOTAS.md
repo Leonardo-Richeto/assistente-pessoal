@@ -5,6 +5,9 @@
 
 ## Onde estamos
 
+**2026-10-23: i7 em produção** (stack, vault, Syncthing, timers, backup, sessões); falta B8/B9. Estado e prompt em
+`CONTEXTO.md` (entrada 2026-10-23 e "Prompt para a próxima etapa").
+
 **Passagem de chat em 2026-10-17 (Opus 5.5 orquestrador, MacBook Air).** Leia esta seção, "Avisos
 vivos" e "Prompt do próximo passo". O histórico de cada passo está em `SPRINT_HISTORICO.md`: abra só o
 bloco do passo que precisar. **Esta seção é o único lugar do estado do projeto durante a sprint.**
