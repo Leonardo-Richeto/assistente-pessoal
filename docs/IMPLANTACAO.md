@@ -29,7 +29,7 @@ Observações do teste:
 ## Etapa B — Produção
 
 Só começa com a Etapa A estável. **Máquina decidida (Leonardo, 2026-10-18):** só o i7-6700 fica ligado, com
-Debian 12 direto, sem Proxmox; cada serviço roda no seu projeto Docker Compose. O i5 desliga depois que os
+Debian 13 direto (hoje com Windows, que será apagado; o 12 saiu do suporte normal em 2026-06), sem Proxmox; cada serviço roda no seu projeto Docker Compose. O i5 desliga depois que os
 serviços dele vierem para o i7 (`PLANO.md` Fase 1c). Backup diário do banco, vault e sessões desde 2026-10-19 (`docs/MIGRACAO.md`). Troque `<usuario>` pelo seu usuário Linux e
 `assistente.<tailnet>.ts.net` pelo endereço real (nunca grave o real no repo, que é público).
 Scripts: `deploy/inventario.sh`, `scripts/preparar_host.sh`, `scripts/exportar.sh`, `scripts/importar.sh`,
@@ -53,7 +53,7 @@ ferramentas da 2b).
    (deve responder `200`). Se der 404, pare: o push não aconteceu.
 1. [ ] (5 min) Ligue o i7 na tomada medidora. A máquina está decidida: i7 com Debian direto (2026-10-18).
 2. [ ] (10 min) Inventário no host (B1). No i7, **antes** de apagar o sistema atual.
-3. [ ] (40 a 60 min) BIOS, Debian 12 no i7 e economia de energia (B2).
+3. [ ] (40 a 60 min) BIOS, Debian 13 no i7, economia de energia, SMART e HD do backup (B2).
 4. [ ] (10 min) Na máquina nova: clonar em `/srv/assistente/app` e rodar `sudo bash scripts/preparar_host.sh` (B3).
 5. [ ] (10 min) `sudo tailscale up` do host (só SSH), chave de autenticação para o nó `assistente`, HTTPS e Funnel no painel (B4).
 6. [ ] (10 min) Google Cloud Console: acrescentar a URL `https://assistente.<tailnet>.ts.net` ao cliente OAuth (B5).
@@ -79,18 +79,29 @@ ferramentas da 2b).
       - **Host Proxmox do i5** (o repo não está lá e o Proxmox não tem sudo): entre como root e rode
         `apt-get install -y smartmontools` e depois
         `curl -fsSLO https://raw.githubusercontent.com/Leonardo-Richeto/assistente-pessoal/main/deploy/inventario.sh && bash inventario.sh`.
-      - **i7**: rode **antes de apagar o sistema atual** (se não houver Linux nele, use um pendrive live
-        do Debian, instale `smartmontools` e rode o mesmo comando).
+      - **i7** (hoje com Windows): o SMART não se apaga ao formatar, então rode no Debian já instalado, depois
+        do B2d. Antes de formatar, confira o SSD no CrystalDiskInfo (B2a, item 0).
       - O arquivo tem hostname e IP: guarde no vault, não no git. Resumo sem dados reais vai para
         `docs/inventario.md` (roteiro em `CONTEXTO.md`).
 
-#### B2. BIOS e Debian 12 no i7
+#### B2. BIOS e Debian 13 no i7
 
-- [ ] B2a. BIOS (`PLANO.md` 1.0): ligue os C-states com o package C-state no máximo e o ASPM. Desligue áudio,
-      porta serial e controladoras sem uso. Ligue o "AC power restore", para a máquina voltar sozinha depois
-      de queda de luz. Anote o que mudou na nota `maquinas-do-assistente-pessoal` do vault.
-- [ ] B2b. Instale Debian 12 direto no i7 (netinst por pendrive): sem ambiente gráfico, "servidor SSH" e
-      "utilitários padrão". Disco inteiro no SSD, usuário comum `<usuario>`. **Deixe a senha de root em branco**
+- [ ] B2a. BIOS (`PLANO.md` 1.0). Os nomes mudam conforme o fabricante; procure pelo sentido.
+      0. Ainda no Windows: se o fabricante tiver BIOS mais nova, atualize agora (o atualizador costuma ser só
+         para Windows). Confira o SSD no CrystalDiskInfo; se aparecer "Ruim", pare.
+      1. Ligue: C-states, C1E, package C-state no máximo (C8 ou "No limit"), SpeedStep (EIST), Speed Shift,
+         ASPM (PCIe, PCH, DMI), SATA em **AHCI** e o link power management do SATA, se existir.
+      2. Desligue: áudio, porta serial e paralela, Wi-Fi e Bluetooth (se houver), LEDs, XMP da RAM.
+      3. Deixe ligados: o vídeo da CPU (a instalação precisa dele uma vez), VT-x, boot UEFI.
+      4. "Restore on AC power loss" em **Power On**: a máquina volta sozinha depois de queda de luz.
+      5. "Halt on" em "No errors" (ou desligue o erro de teclado ausente): o i7 vai ligar sem teclado e sem monitor.
+      6. Se ligar ErP/EuP (espera profunda): tire o i7 da tomada e ponha de volta; ele tem de ligar sozinho.
+      No i7 (HP EliteDesk 800 G2, placa 8054, BIOS 2.60): F10 no boot; quase tudo em Advanced → Power Management
+      Options (Runtime Power Management, Extended Idle Power States, SATA e PCI Express Power Management),
+      Built-In Device Options (áudio, vídeo) e Boot Options (After Power Loss).
+      Anote o que mudou na nota `maquinas-do-assistente-pessoal` do vault.
+- [ ] B2b. Instale Debian 13 direto no i7 (netinst amd64 por pendrive): sem ambiente gráfico, "servidor SSH" e
+      "utilitários padrão". Disco inteiro no SSD (escolha pelo modelo; **não** o HD), usuário comum `<usuario>`. **Deixe a senha de root em branco**
       (o instalador instala o `sudo` e põe o usuário no grupo). Se já definiu: `su -`,
       `apt install sudo && usermod -aG sudo <usuario>`, saia e entre de novo. IP fixo, reservado no roteador.
 - [ ] B2c. Economia de energia. Por SSH, como `<usuario>`:
@@ -116,8 +127,39 @@ cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor   # depois: powersave
       Se a rede cair ou ficar instável depois disso, apague a linha do `powertop` no serviço e reinicie: o
       `--auto-tune` liga economia na placa de rede, e algumas placas não aguentam. Deixe o i7 parado e anote
       o consumo da tomada (`PLANO.md` 1.7).
-      Documentos do Paperless (Fase 2): quando o HD de 500 GB for para o i7 (`PLANO.md` 1c.3), monte-o em
-      `/srv/paperless`. O sistema e o Postgres ficam no SSD.
+      Confira se o processador desce a estados fundos: `sudo powertop`, aba "Idle stats", deve chegar a Pkg C6
+      ou mais. Se parar em C2 ou C3, alguma peça está sem ASPM (a placa de rede é a suspeita comum).
+- [ ] B2d. SMART e HD do backup (2026-10-23: o HD de 500 GB do i5 foi para o i7; o HD avulso estava ruim). O
+      sistema, o Postgres, o vault e o Paperless ficam no SSD; o HD guarda só o backup (`BACKUP_DESTINO`).
+      O SMART não se apaga ao formatar, então o teste roda aqui. Troque `sdX` pelo nome que o `lsblk` mostrar.
+
+```bash
+sudo apt-get install -y smartmontools parted hdparm
+lsblk -o NAME,SIZE,MODEL,ROTA,MOUNTPOINT        # SSD: ROTA=0, com o sistema; HD: ROTA=1, ~465G, sem uso
+sudo smartctl -t long /dev/sdX                  # nos dois discos; SSD ~10 min, HD 80 a 120 min
+sudo smartctl -a /dev/sdX                       # depois do tempo: "Completed without error" e os atributos
+```
+
+      Descarte o disco se: HD com atributo 5, 197 ou 198 acima de 0; SSD com 5 ou 187 acima de 0 ou vida restante
+      abaixo de ~20% (177, 231 ou 233, conforme a marca); teste longo com erro. Atributo 199 subindo é cabo SATA.
+      Depois rode o inventário (B1) no i7.
+
+      **Aviso:** os comandos abaixo apagam o HD inteiro. Antes, confira que nada do i5 (VMs, banco do
+      agente-whatsapp) existe só nesse HD, e que `/dev/sdX` é o HD (ROTA=1), não o SSD do sistema.
+
+```bash
+sudo parted -s /dev/sdX mklabel gpt mkpart backup ext4 0% 100%
+sudo mkfs.ext4 -L backup /dev/sdX1
+sudo install -d /srv/backup-hd && sudo chattr +i /srv/backup-hd   # sem o HD montado, ninguém grava no SSD
+echo 'LABEL=backup /srv/backup-hd ext4 defaults,nofail,noatime,x-systemd.device-timeout=10s 0 2' | sudo tee -a /etc/fstab
+sudo systemctl daemon-reload && sudo mount /srv/backup-hd
+sudo chown "$USER": /srv/backup-hd && df -h /srv/backup-hd
+ls /dev/disk/by-id/ | grep -v -- -part          # ache o ata-... do HD
+printf '/dev/disk/by-id/<ata-do-HD> {\n    spindown_time = 120\n}\n' | sudo tee -a /etc/hdparm.conf   # para em 10 min
+```
+
+      `nofail`: o servidor liga mesmo se o HD morrer. **Não verificado:** se o HD obedece o `spindown_time`
+      (confira com `sudo hdparm -C /dev/sdX` depois de 10 min parado: `standby`); se não obedecer, use o `hd-idle`.
 
 #### Depois do Debian instalado
 
@@ -156,7 +198,7 @@ cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor   # depois: powersave
       - `PUBLIC_BASE_URL=https://assistente.<tailnet>.ts.net`, `AUTH_PROVEDOR=google`, credenciais do Google,
         `GOOGLE_EMAILS_PERMITIDOS=<seu e-mail>`. Sem `AUTH_DESATIVADA`.
       - Chave do age (`docs/MIGRACAO.md` § Chave do age), gerada **fora** do i7: `AGE_DESTINATARIO=age1...`.
-        `BACKUP_DESTINO` = pasta do HD externo montado (vazio = mesmo disco).
+        `BACKUP_DESTINO=/srv/backup-hd` (o HD do B2d; vazio = mesmo disco).
       - `VAULT_PATH` vazio por enquanto (entra no B11 como `/vault`).
       Proteja o arquivo: `chmod 600 /srv/assistente/.env`. Rode `sudo bash scripts/preparar_host.sh` de novo para
       ligar o timer do backup.

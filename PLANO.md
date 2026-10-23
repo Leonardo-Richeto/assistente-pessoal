@@ -17,14 +17,14 @@ A sequência de **teste no MacBook → produção no i7** está em `docs/IMPLANT
 - [x] docker-compose (Postgres, migração, servidor, cloudflared opcional)
 
 ## Fase 1 — Colocar no ar (Leonardo) — passo a passo em `docs/IMPLANTACAO.md`
-**Máquina (Leonardo, 2026-10-18):** só o i7 fica ligado, com Debian 12 direto, sem Proxmox. Cada serviço roda no
+**Máquina (Leonardo, 2026-10-18):** só o i7 fica ligado, com Debian 13 direto, sem Proxmox (o i7 está com Windows; 13 no lugar do 12, que saiu do suporte normal em 2026-06: 2026-10-23). Cada serviço roda no
 seu próprio projeto Docker Compose; o que hoje está no i5 vem para o i7 (Fase 1c) e o i5 fica desligado. Motivo: conta de luz (as duas ligadas: estimativa
 de R$ 29 a 47/mês). Sem backup do banco por enquanto; o vault tem Syncthing e GitHub (Fase 7). Revisto em 2026-10-19: backup diário
 cifrado e migração pelo mesmo pacote (Fase 7, `docs/MIGRACAO.md`). Em 2026-10-21 (Leonardo): no início, sem backup ligado.
 - [ ] 1.0 BIOS do i7 para economia (na instalação): C-states e package C-state no máximo, ASPM ligado, áudio e
-  portas sem uso desligados, "AC power restore" ligado (volta sozinho depois de queda de luz)
+  portas sem uso desligados, "AC power restore" ligado (volta sozinho depois de queda de luz). Lista completa: `docs/IMPLANTACAO.md` B2a
 - [ ] 1.1 Inventário completo de todas as máquinas: especificações, configuração, saúde SMART de cada HD/SSD, VMs → nota no vault + resumo em `docs/inventario.md` (roteiro em `CONTEXTO.md`)
-- [ ] 1.2 Instalar Debian 12 direto no i7, com governador da CPU `powersave` e `powertop --auto-tune` no boot, e
+- [ ] 1.2 Instalar Debian 13 direto no i7, com governador da CPU `powersave` e `powertop --auto-tune` no boot, e
   Docker (`docs/IMPLANTACAO.md` B2)
 - [x] 1.3 Exposição: Tailscale Funnel (decidido)
 - [ ] 1.3b Instalar Tailscale no i7, habilitar HTTPS + Funnel, `tailscale funnel --bg 8000`
@@ -43,7 +43,7 @@ cifrado e migração pelo mesmo pacote (Fase 7, `docs/MIGRACAO.md`). Em 2026-10-
 - [ ] 1c.1 Inventário do i5 (B1): o que roda em cada VM, RAM e disco de cada serviço; conferir se cabe nos 16 GB do i7
 - [ ] 1c.2 Subir no i7 cada serviço do i5 como projeto Docker Compose próprio, com rede e `.env` separados:
   agente-whatsapp (`-p agentewhatsapp`, dados por dump do banco dele) e os serviços de rede (AdGuard, WireGuard)
-- [ ] 1c.3 Desligar o i5. O HD de 500 GB livre pode ir para o i7 (documentos do Paperless, Fase 2)
+- [ ] 1c.3 Desligar o i5. O HD de 500 GB dele já foi para o i7 em 2026-10-23, como destino do backup (o HD avulso estava ruim); o i5 ficou só com o SSD
 - [ ] 1c.4 Medir de novo (1.7) com tudo no i7
 
 ## Fase 2 — Documentos e vault
@@ -171,7 +171,7 @@ Substitui o adiamento de 2026-10-18. Procedimento em `docs/MIGRACAO.md`.
   container com nome fixo, `scripts/{preparar_host,exportar,importar,verificar}.sh`, pacote `.tar.age` com manifesto
   e SHA-256. Ensaio com dados sintéticos passou no Windows (`scripts/testes/ensaio_migracao.sh`)
 - [x] 7.1 Backup diário: `assistente-backup.timer` (03:15), 7 diários e 4 semanais. Falta no i7: ligar com
-  `AGE_DESTINATARIO` e apontar `BACKUP_DESTINO` para o HD externo (fora do SSD)
+  `AGE_DESTINATARIO` e apontar `BACKUP_DESTINO` para o HD de 500 GB do i7 (`/srv/backup-hd`, `docs/IMPLANTACAO.md` B2d)
 - [ ] 7.2 Ensaio de restauração mensal numa máquina ou VM descartável (o i5 vai ser desligado: rever onde)
 - [ ] 7.3 Paperless no pacote (`document_exporter`/`document_importer`), junto com a Fase 2.1. Até lá os scripts
   param com erro se o compose tiver `paperless`

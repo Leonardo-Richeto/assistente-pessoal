@@ -84,7 +84,7 @@ Se este arquivo divergir de uma fonte acima, vale a fonte. Corrija este arquivo.
 | Passo | O que é | Tier | Modelo | Effort |
 |---|---|---|---|---|
 | B1 | Inventário de todas as máquinas, com SMART → vault + `docs/inventario.md` | C | Haiku 5.5 | baixo |
-| B2–B4 | BIOS e Debian 12 direto no i7, economia de energia, Docker, Git, clone, Tailscale Funnel | D | Leonardo (Sonnet 5.5 guia) | baixo |
+| B2–B4 | BIOS e Debian 13 direto no i7, economia de energia, Docker, Git, clone, Tailscale Funnel | D | Leonardo (Sonnet 5.5 guia) | baixo |
 | B5–B7 | OAuth App de produção, `.env` com senhas novas, subir a stack | A | Opus 5.5 | alto |
 | B8–B9 | Conector de produção no claude.ai e testes do A10 | C | Haiku 5.5 | baixo |
 | B10 | Levar os registros do teste ou começar limpo | D | Leonardo | — |

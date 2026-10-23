@@ -14,7 +14,7 @@ Leitura complementar: `README.md` (arquitetura e princípios), `PLANO.md` (fases
 - **Durante uma sprint, o estado vivo fica só em `SPRINT_NOTAS.md` § Onde estamos** (decisão de 2026-10-18,
   `PLANO.md` M4). Esta seção guarda o que vale entre sprints. Sprint 1 aberta (Etapa A, teste no MacBook).
 - **Última atualização:** 2026-10-18, Opus 5.5 (Claude Code, MacBook Air): máquina decidida e melhorias M1–M4.
-- **Máquina (Leonardo, 2026-10-18):** só o i7 fica ligado, com Debian 12 direto e cada serviço no seu Docker
+- **Máquina (Leonardo, 2026-10-18):** só o i7 fica ligado, com Debian 13 direto (13 no lugar do 12 em 2026-10-23) e cada serviço no seu Docker
   Compose (sem Proxmox); o i5 desliga depois da Fase 1c do `PLANO.md`. Motivo: conta de luz.
 - **Portabilidade (2026-10-19, Opus 5.5 no Kiro, PC Windows):** feita e ensaiada com dados sintéticos
   (`docs/MIGRACAO.md`, `PLANO.md` Fase 7). Backup diário cifrado volta a existir (substitui o "sem backup" de 10-18);
@@ -161,12 +161,13 @@ perguntas fora da busca real; `consultar_sessoes` sem `comandos`.
 ## O que já se sabe (dito pelo Leonardo, ainda não conferido nas máquinas)
 
 **Máquinas**
-- **i7-6700**, 16 GB DDR4, SSD SATA 240 GB, sem GPU → produção, Debian 12 direto (decisão de 2026-10-18): o
+- **i7-6700**, 16 GB DDR4, SSD SATA 240 GB + HD 500 GB (veio do i5 em 2026-10-23, só para o backup), sem GPU,
+  hoje com Windows → produção, Debian 13 direto (decisão de 2026-10-18; versão trocada em 2026-10-23): o
   assistente e, depois, os serviços que vêm do i5, cada um no seu Docker Compose.
-- **i5-3330**, 16 GB, SSD SATA 240 GB + HD 500 GB, sem GPU → roda Proxmox com a VM do atendente de
+- **i5-3330**, 16 GB, SSD SATA 240 GB (o HD foi para o i7 em 2026-10-23), sem GPU → roda Proxmox com a VM do atendente de
   WhatsApp (projeto comercial à parte, em Python) e uma VM de serviços de rede. WireGuard já
   configurado ali, parado desde a mudança de casa. Vai ser desligado (2026-10-18): os serviços vão para o i7.
-- Um segundo HD de 500 GB está livre. Compra armazenamento se precisar.
+- O HD de 500 GB avulso estava ruim no teste do Leonardo (2026-10-23): fora de uso. Compra armazenamento se precisar.
 - **MacBook**: ambiente de teste (Etapa A).
 
 **Premissas que guiam as decisões**
