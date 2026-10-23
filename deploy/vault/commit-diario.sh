@@ -44,7 +44,13 @@ log() { echo "vault-commit: $*"; }
 erro() { log "ERRO: $*"; ERROS=1; }
 
 # Container que ficou para trás (timeout mata o `docker run`, não o container): remove ao sair.
-trap 'command -v docker >/dev/null 2>&1 && docker rm -f "$CONTEINER-stage" "$CONTEINER-commits" >/dev/null 2>&1' EXIT
+trap 'command -v docker >/dev/null 2>&1 && docker rm -f "$CONTEINER-stage" "$CONTEINER-commits" >/dev/null 2>&1; rm -f "$IGNORAR_SEMPRE"' EXIT
+
+# Fora do commit mesmo sem linha no .gitignore do vault: o que o Syncthing deixa na pasta e um .git guardado por
+# engano. Vai por core.excludesFile, não por pathspec `:!`: o git recusa o add inteiro quando um pathspec nomeia um
+# caminho que o .gitignore já ignora ("paths are ignored", visto no i7 em 2026-10-23 com o .stfolder).
+IGNORAR_SEMPRE="$(mktemp)"
+printf '%s\n' '/.stversions' '/.stfolder' '*.syncthing.*.tmp' '/.git-mac-parado' >"$IGNORAR_SEMPRE"
 
 [ -d "$VAULT_PATH/.git" ] || { log "ERRO: $VAULT_PATH não é um repositório git."; exit 1; }
 cd "$VAULT_PATH" || exit 1
@@ -256,7 +262,7 @@ varrer_commits() {
 adicionar() {
   local tentativa saida
   for tentativa in 1 2 3; do
-    if saida="$("${GIT[@]}" add -A -- . ':!.stversions' ':!.stfolder' ':!*.syncthing.*.tmp' ':!.git-mac-parado' 2>&1)"; then
+    if saida="$("${GIT[@]}" -c core.excludesFile="$IGNORAR_SEMPRE" add -A -- . 2>&1)"; then
       [ -z "$saida" ] || printf '%s\n' "$saida"
       return 0
     fi

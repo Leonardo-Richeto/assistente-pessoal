@@ -359,6 +359,25 @@ for caso in ignora link; do
   fi
 done
 
+# (f2) Pastas do Syncthing: ficam fora do commit com ou sem linha no .gitignore do vault, e o add não falha
+# quando o .gitignore já as ignora (o git recusava o pathspec `:!.stfolder` de caminho ignorado; i7, 2026-10-23).
+for com_gitignore in sim nao; do
+  v="$(novo_vault "syncthing-$com_gitignore")"
+  [ "$com_gitignore" = sim ] && printf '.stfolder/\n.stversions/\n' >"$v/.gitignore"
+  mkdir -p "$v/.stfolder" "$v/.stversions" "$v/.git-mac-parado"
+  : >"$v/.stfolder/marca"; : >"$v/.stversions/a~20261023.md"; : >"$v/.git-mac-parado/HEAD"
+  : >"$v/00-inbox/.syncthing.a.md.tmp"; : >"$v/00-inbox/x.syncthing.1.tmp"
+  echo "texto comum" >"$v/b.md"
+  rodar "$v" limpo
+  rastreados="$(git -C "$v" ls-files)"
+  if [ "$codigo" -eq 0 ] && [ "$(git -C "$v" rev-list --count HEAD)" -eq 2 ] && printf '%s\n' "$rastreados" | grep -qx b.md \
+    && ! printf '%s\n' "$rastreados" | grep -qE '^\.stfolder/|^\.stversions/|^\.git-mac-parado/|\.syncthing\..*\.tmp$'; then
+    ok "pastas do Syncthing fora do commit (.gitignore com elas: $com_gitignore)"
+  else
+    falhou "pastas do Syncthing (.gitignore com elas: $com_gitignore), código $codigo"
+  fi
+done
+
 # (g) limpo: comita, varre o histórico inteiro na primeira vez e guarda o último commit varrido; na segunda, sem
 # commit novo, não varre; depois de um commit por escrita (outro autor), varre só o intervalo novo.
 v="$(novo_vault limpo)"
