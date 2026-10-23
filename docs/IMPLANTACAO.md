@@ -68,8 +68,9 @@ ferramentas da 2b).
 13. [ ] (5 min) Só agora, no Mac: `tailscale funnel --https=443 off` e `docker compose stop` (B9b).
 14. [ ] (5 min) Anote o consumo parado (lido no B2c) e comece os 7 dias de medição com a stack (`PLANO.md` 1.7).
 
-> **Aviso:** sem backup do banco (decisão de 2026-10-18), uma falha do SSD do i7 perde todos os
-> registros. Olhe a saúde do SSD no inventário (B1) antes de apagar o sistema atual.
+> **Backup desde o início (Leonardo, 2026-10-23):** o backup diário cifrado vai para o HD de 500 GB (B2d). Gere a chave
+> do age no Mac antes do B6 (`docs/MIGRACAO.md` § Chave do age). O HD fica na mesma máquina: não protege de roubo,
+> raio ou fonte queimada.
 
 ### Passos
 

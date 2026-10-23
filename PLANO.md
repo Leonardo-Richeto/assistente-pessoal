@@ -20,7 +20,9 @@ A sequência de **teste no MacBook → produção no i7** está em `docs/IMPLANT
 **Máquina (Leonardo, 2026-10-18):** só o i7 fica ligado, com Debian 13 direto, sem Proxmox (o i7 está com Windows; 13 no lugar do 12, que saiu do suporte normal em 2026-06: 2026-10-23). Cada serviço roda no
 seu próprio projeto Docker Compose; o que hoje está no i5 vem para o i7 (Fase 1c) e o i5 fica desligado. Motivo: conta de luz (as duas ligadas: estimativa
 de R$ 29 a 47/mês). Sem backup do banco por enquanto; o vault tem Syncthing e GitHub (Fase 7). Revisto em 2026-10-19: backup diário
-cifrado e migração pelo mesmo pacote (Fase 7, `docs/MIGRACAO.md`). Em 2026-10-21 (Leonardo): no início, sem backup ligado.
+cifrado e migração pelo mesmo pacote (Fase 7, `docs/MIGRACAO.md`). Em 2026-10-21 (Leonardo): no início, sem backup ligado. **Em 2026-10-23 (Leonardo): backup ligado desde o início**, no HD de 500 GB do i7.
+- [ ] 1.8 (adiado) Desligar o i7 à noite: decidido em 2026-10-23 (Leonardo) rodar 24/7 e rever só se o consumo (1.7) pesar.
+  Se voltar: Scheduled Power-On da BIOS para ligar, timer do systemd para desligar, e os timers das 03:15–03:40 antes do desligamento
 - [ ] 1.0 BIOS do i7 para economia (na instalação): C-states e package C-state no máximo, ASPM ligado, áudio e
   portas sem uso desligados, "AC power restore" ligado (volta sozinho depois de queda de luz). Lista completa: `docs/IMPLANTACAO.md` B2a
 - [ ] 1.1 Inventário completo de todas as máquinas: especificações, configuração, saúde SMART de cada HD/SSD, VMs → nota no vault + resumo em `docs/inventario.md` (roteiro em `CONTEXTO.md`)
@@ -166,7 +168,7 @@ no i7 (B11 da Sprint 2 e 6.1). Antes de implementar: ficha "proposta" em `docs/r
 ## Fase 7 — Backup e portabilidade
 **Retomada (Leonardo, 2026-10-19, "Plano de Portabilidade do Servidor"):** backup e migração são o mesmo processo.
 Substitui o adiamento de 2026-10-18. Procedimento em `docs/MIGRACAO.md`.
-**No início, sem backup (Leonardo, 2026-10-21):** o i7 sobe sem ligar o 7.1, só uma máquina; o pacote continua servindo à migração.
+**Backup desde o início (Leonardo, 2026-10-23; substitui o "sem backup" de 2026-10-21):** o i7 sobe com o 7.1 ligado, destino no HD de 500 GB (`/srv/backup-hd`).
 - [x] 7.0 Portabilidade (2026-10-19): estado em `ASSISTENTE_HOME` (bind mounts), imagens com digest, Tailscale em
   container com nome fixo, `scripts/{preparar_host,exportar,importar,verificar}.sh`, pacote `.tar.age` com manifesto
   e SHA-256. Ensaio com dados sintéticos passou no Windows (`scripts/testes/ensaio_migracao.sh`)

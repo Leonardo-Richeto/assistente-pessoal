@@ -18,7 +18,7 @@ Leitura complementar: `README.md` (arquitetura e princípios), `PLANO.md` (fases
   Compose (sem Proxmox); o i5 desliga depois da Fase 1c do `PLANO.md`. Motivo: conta de luz.
 - **Portabilidade (2026-10-19, Opus 5.5 no Kiro, PC Windows):** feita e ensaiada com dados sintéticos
   (`docs/MIGRACAO.md`, `PLANO.md` Fase 7). Backup diário cifrado volta a existir (substitui o "sem backup" de 10-18);
-  no início fica desligado no i7, só uma máquina (Leonardo, 2026-10-21).
+  no início ficaria desligado (Leonardo, 2026-10-21); ligado desde o início no HD de 500 GB do i7 (Leonardo, 2026-10-23).
 - **PC Windows (2026-10-19, Leonardo):** é a máquina do trabalho (domínio corporativo). Uso: testar o sistema
   completo **sem dados reais**, só sintéticos, sem Tailscale/Funnel e sem credencial real. Produção continua no i7.
 
