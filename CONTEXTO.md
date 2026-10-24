@@ -13,7 +13,7 @@ Leitura complementar: `README.md` (arquitetura e princípios), `PLANO.md` (fases
 
 - **Durante uma sprint, o estado vivo fica só em `SPRINT_NOTAS.md` § Onde estamos** (decisão de 2026-10-18,
   `PLANO.md` M4). Esta seção guarda o que vale entre sprints. Sprint 1 aberta (Etapa A, teste no MacBook).
-- **Última atualização:** 2026-10-23, Opus 5.5 (Claude Code, MacBook Air): **i7 em produção** (falta B8/B9; entrada 2026-10-23).
+- **Última atualização:** 2026-10-24, Opus 5.5 (Claude Code, MacBook Air): **B8 feito, B9 quase todo** (entrada 2026-10-24).
 - **Máquina (Leonardo, 2026-10-18):** só o i7 fica ligado, com Debian 13 direto (13 no lugar do 12 em 2026-10-23) e cada serviço no seu Docker
   Compose (sem Proxmox); o i5 desliga depois da Fase 1c do `PLANO.md`. Motivo: conta de luz.
 - **Portabilidade (2026-10-19, Opus 5.5 no Kiro, PC Windows):** feita e ensaiada com dados sintéticos
@@ -182,6 +182,26 @@ perguntas fora da busca real; `consultar_sessoes` sem `comandos`.
 - **Não verificado:** B8 e B9 (conector novo, Ficha 1 colada, testes pelo iPhone); ensaio de restauração; o HD parar de
   girar (`hdparm -C`); Pkg C-state no `powertop`; o backup noturno e o DNS do Funnel (PLANO 1.10); iPhone no Syncthing.
 
+### 2026-10-24 — B8 e B9 (Opus 5.5, Claude Code no MacBook Air, Leonardo no app)
+
+- **Projeto do claude.ai mudou:** o Projeto "Assistente" de 2026-10-17 não existia mais. Projeto novo agora abre em
+  `claude.ai/code/project/...` e roda no **Claude Code na nuvem**: na tabela `chamadas` chega como cliente
+  `claude-code` (2.1.310) e modelo Opus 5.5. O chat comum (sem Projeto) chega como `Anthropic/ClaudeAI` e **não** tem a
+  Ficha 1. O conector aparece no "+" do chat comum; no Projeto, o Leonardo escolhe "Projeto → Assistente" em
+  `claude.ai/new`. Texto da Ficha 1 colado no Projeto novo (B8).
+- **B9 passou:** `contexto_inicial`, gasto → desfazer (com checagem de duplicata), gasto sem valor pergunta, busca
+  (carro: o vault não tem decisão, "não achei" é certo), reescrever, segredo (`{{segredo:...}}`, `grep` limpo),
+  restaurar, desatualizada → desfazer, resumo da conversa no diário (Ficha 4, com `registro: atividade-1`).
+- **B9 falhou:** "o que eu fiz no Claude Code esta semana?" foi respondido pelo histórico do próprio ambiente, sem
+  `consultar_sessoes`. Correção na Ficha 1 aprovada (Leonardo, 2026-10-24; `docs/regras-de-negocio.md`, "Mudança do
+  B9"); **falta colar o texto novo no Projeto** e repetir a pergunta.
+- **Sessões:** a sessão de 2026-10-23 estava na fila do Mac; enviada à mão. Envio automático ligado no Mac (launchd,
+  a cada hora). O launchd não lê o Desktop (TCC): roda uma cópia de `enviar.py` e `fila.py` em
+  `~/.local/share/assistente/sessoes/` (recopiar quando mudarem; `ferramentas/sessoes/README.md`).
+- **Registros reais:** atividade 1 (2026-10-23, dia de implantação no i7) e a nota `50-diario/2026/2026-10-24.md`.
+- **Não verificado:** teste do ponto (o Leonardo vai ajustar antes); "nota que mudou no meio"; lint do vault no i7;
+  o launchd enviando de fato (só rodou com a fila vazia); B9b (desligar o Funnel e a stack do Mac).
+
 ## O que já se sabe (dito pelo Leonardo, ainda não conferido nas máquinas)
 
 **Máquinas**
@@ -258,10 +278,9 @@ Vale para todo projeto longo dividido em fases, executado por modelos diferentes
 ```
 Leia CONTEXTO.md (entrada 2026-10-23), docs/IMPLANTACAO.md (roteiro e B8/B9) e PLANO.md (1.5, 1.7, 1.9, 1.10, 7.2).
 O i7 está no ar: stack, vault, Syncthing i7↔Mac, timers, backup no HD e sessões. Falta, nesta ordem:
-1. B8: conector https://assistente.<tailnet>.ts.net/mcp no claude.ai, trocar no Projeto "Assistente", colar o texto
-   da Ficha 1 (bloco "Texto proposto" de docs/regras-de-negocio.md com "o dono" → "o Leonardo" e a 1ª frase
-   "Você é o assistente pessoal do Leonardo, dono deste Projeto."), remover o conector do Mac.
-2. B9 pelo iPhone, inclusive os exemplos da Ficha 5; B9b no Mac.
+1. B8 feito em 2026-10-24. Colar o texto novo da Ficha 1 (mudança do B9) no Projeto e repetir "o que eu fiz no
+   Claude Code esta semana?": deve chamar consultar_sessoes.
+2. Resto do B9 (ponto, quando o Leonardo ajustar; nota que mudou no meio; lint) e B9b no Mac.
 3. Conferir de manhã: journal do backup e do vault-commit, DNS público do Funnel depois das 03:15 (PLANO 1.10).
 4. Ensaio de restauração do backup (docs/MIGRACAO.md § Ensaio) com a identidade do age do Leonardo.
 5. Inventário B1 no i7 (deploy/inventario.sh) → vault + docs/inventario.md; powertop (Pkg C6+), hdparm -C do HD.

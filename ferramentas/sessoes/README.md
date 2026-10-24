@@ -244,6 +244,11 @@ Sem `ASSISTENTE_SSH`, sai com 1 e não toca na fila. `--comando "..."` troca o c
 
 Antes, faça os passos de "Chave SSH só para o envio", inclusive aceitar a host key.
 
+O macOS não deixa o launchd ler o Desktop ("Operation not permitted"). Se o repositório está no
+Desktop, rode uma cópia de `enviar.py` e `fila.py` fora dele e aponte o plist para ela. Copie de novo
+quando esses dois arquivos mudarem (Mac do Leonardo, desde 2026-10-24):
+`mkdir -p ~/.local/share/assistente/sessoes && cp ferramentas/sessoes/{enviar,fila}.py ~/.local/share/assistente/sessoes/`
+
 1. Copie o exemplo e troque `USUARIO` e `usuario@i7`:
    `cp ferramentas/sessoes/exemplos/local.assistente.sessoes-enviar.plist ~/Library/LaunchAgents/`
 2. Confira o arquivo: `plutil -lint ~/Library/LaunchAgents/local.assistente.sessoes-enviar.plist`.

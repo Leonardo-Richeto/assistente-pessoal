@@ -64,7 +64,7 @@ ferramentas da 2b).
 10. [x] (40 min) Vault e Syncthing e o timer do commit do vault (B11, `docs/SYNCTHING.md`), com `VAULT_PATH=/vault`.
 11. [x] (40 min) Fase 2b no i7 (menos o 2b-7, decisões pendentes): código e migrações, gitleaks, `.gitignore` do vault, timers, deploy key, sessões
     do Claude Code (seção "Fase 2b no i7", abaixo).
-12. [ ] (30 min) claude.ai: conector novo, trocar no Projeto "Assistente", colar o texto atual da Ficha 1 (B8) e
+12. [ ] (B8 feito em 2026-10-24; falta o B9) (30 min) claude.ai: conector novo, trocar no Projeto "Assistente", colar o texto atual da Ficha 1 (B8) e
     testes, inclusive os da Ficha 5 (B9).
 13. [ ] (5 min) Só agora, no Mac (o Funnel do Mac já estava sem configuração em 2026-10-23; o servidor do Mac, parado): `tailscale funnel --https=443 off` e `docker compose stop` (B9b).
 14. [ ] (5 min) Anote o consumo parado (lido no B2c) e comece os 7 dias de medição com a stack (`PLANO.md` 1.7).
@@ -246,7 +246,7 @@ printf '/dev/disk/by-id/<ata-do-HD> {\n    spindown_time = 120\n}\n' | sudo tee 
          Depois `docker compose up -d`.
       5. Para começar limpo: apague o banco de conferência com
          `docker compose exec -T postgres sh -c 'dropdb -U "$POSTGRES_USER" assistente_mac'`.
-- [ ] B8. **Antes:** B11 feito (vault ligado, `VAULT_PATH=/vault`) e a seção "Fase 2b no i7" feita (servidor da 2b
+- [x] B8. (2026-10-24: Projeto recriado; no claude.ai novo ele roda no Claude Code, ver `CONTEXTO.md`.) **Antes:** B11 feito (vault ligado, `VAULT_PATH=/vault`) e a seção "Fase 2b no i7" feita (servidor da 2b
       de pé). No claude.ai: Configurações → Conectores → adicionar conector personalizado `https://assistente.<tailnet>.ts.net/mcp`
       e entrar com o Google. No Projeto "Assistente": trocar o conector do Mac pelo novo. Depois remova o conector
       de teste. **Nas instruções do Projeto, troque o texto inteiro** pelo texto atual da Ficha 1 (com a Ficha 5):

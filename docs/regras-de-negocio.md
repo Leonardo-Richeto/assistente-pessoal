@@ -118,6 +118,8 @@ Diga o período consultado. Para "hoje", "esta semana" e "este mês", calcule as
 fuso America/Sao_Paulo. Para ver o que foi gravado ou desfeito, use consultar_auditoria.
 Para ver de onde veio cada chamada (app, sessão, modelo declarado), use consultar_chamadas.
 Para ver o que foi feito no Claude Code (sessões de programação, por projeto e máquina), use consultar_sessoes.
+Use só consultar_sessoes, do conector Assistente: não responda por outro histórico de sessões ou
+conversas que você tenha. Se ela não trouxer a sessão, diga que não está lá.
 Registro com nota_vault tem uma nota com a parte subjetiva: leia-a com ler_nota
 quando a pergunta for sobre contexto, não sobre número. Na nota do dia, a parte daquele
 registro é a entrada com a linha "registro: <tipo>-<id>" dele.
@@ -283,6 +285,19 @@ cria a nota sem perguntar e diz onde a criou. A linha "Nota nova" do texto foi a
 
 Cenário de teste: `servidor/tests/test_nota_vault.py`. O texto no app fica **Pendente** até o Projeto
 ser criado no claude.ai.
+
+### Mudança do B9 — status: aprovada (Leonardo, 2026-10-24), aplicada no texto acima
+
+No B9 (2026-10-24), "O que eu fiz no Claude Code esta semana?" foi respondido sem chamar
+`consultar_sessoes`. O Projeto do claude.ai agora roda no Claude Code (cliente `claude-code` na tabela
+`chamadas`), que tem histórico próprio de sessões; o modelo usou esse histórico e citou sessões que não
+estão na tabela `sessoes`.
+
+O que mudou no texto do Projeto: depois da linha de `consultar_sessoes` em "Consultas", duas linhas
+mandam usar só `consultar_sessoes` e dizer quando a sessão não está lá.
+
+Cenário de teste: repetir no app a pergunta do B9 e conferir em `consultar_chamadas` uma chamada de
+`consultar_sessoes`. O texto no app fica **Pendente** até o Leonardo colar a versão nova.
 
 ### Exemplos
 
