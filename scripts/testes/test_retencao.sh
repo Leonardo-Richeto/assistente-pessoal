@@ -32,4 +32,9 @@ confere "ficam 7 diários (o mais novo de cada dia) e as 4 semanas" "$esperado" 
 confere "nome fora do padrão não entra na lista" "" "$(printf '%s\n' "$apagar" | grep -v '^assistente-2026' || true)"
 confere "total apagado" "34" "$(printf '%s\n' "$apagar" | grep -c .)"
 
+# Duas instâncias na mesma pasta: a primeira marca a pasta, a segunda é recusada (sem apagar nada).
+confere "primeira instância marca a pasta" "assistente" "$(conferir_instancia_da_pasta "$PASTA" assistente && cat "$PASTA/.instancia")"
+confere "a mesma instância passa de novo" "0" "$( (conferir_instancia_da_pasta "$PASTA" assistente) >/dev/null 2>&1; echo $?)"
+confere "outra instância é recusada" "1" "$( (conferir_instancia_da_pasta "$PASTA" assistente-nathalia) >/dev/null 2>&1; echo $?)"
+
 [ "$falhas" -eq 0 ] && echo "test_retencao: ok" || { echo "test_retencao: $falhas falha(s)"; exit 1; }

@@ -940,3 +940,64 @@ token da Nathalia deu 0 na busca e 404 no id direto); Ficha 1 colada no Projeto.
 3. O PC Windows do trabalho é de acesso só do Leonardo e recebe a pasta de entrada, igual ao Mac.
 4. A pasta do Mac fica dentro de Documentos (`~/Documents/Paperless-entrada`); a do PC Windows, igual.
 5. Nada de "esposa": usuário, pasta, rede e instância dela são `nathalia`, no modelo do Leonardo (Ficha 6, decisão 4).
+
+---
+
+## Ficha 8 — Instância da Nathalia
+
+- **Status:** proposta (Opus 5.5, 2026-10-24). Falta o ok do Leonardo. Origem: `PLANO.md` 1b.1, D21 do vault e Ficha 6.
+- **Onde vive:** segunda instância no i7 (`/srv/assistente-nathalia`, projeto `assistente-nathalia`), roteiro em
+  `docs/IMPLANTACAO.md` P8, `scripts/preparar_host.sh` (timer de backup por instância), `scripts/exportar.sh` (trava da
+  pasta de backup) e `servidor/assistente/vault.py` (perfil pelo `NOME_USUARIO`).
+- **Ensaiado em 2026-10-24** no Mac, com segredos falsos e sem Tailscale: a instância sobe com projeto e porta próprios,
+  o `verificar.sh` passa, o `contexto_inicial` lê o perfil dela e o backup vai para pasta própria (a pasta do backup do
+  Leonardo recusa).
+
+### Regra
+
+1. **Tudo separado, menos o Paperless.** Banco, vault, login, segredos, nó Tailscale (`assistente-nathalia`, URL
+   própria) e backup próprios. O Paperless é o único da casa, com o token do usuário `nathalia` (Ficha 6).
+2. **Só a Nathalia entra.** Login Google com só o e-mail dela em `GOOGLE_EMAILS_PERMITIDOS`. O Leonardo não conecta o
+   app dele à instância dela, e ela não conecta à dele.
+3. **O assistente dela fala com ela pelo nome.** `NOME_USUARIO=Nathalia`: as instruções do servidor dizem "Assistente
+   pessoal de Nathalia" e o `contexto_inicial` lê `20-areas/perfil-do-nathalia.md`.
+4. **O vault dela começa quase vazio**: `00-inbox/onde-parei.md`, `20-areas/perfil-do-nathalia.md` e `50-diario/`, com
+   git local (cada escrita do assistente vira commit). Sem Syncthing e sem commit diário até ela usar o Obsidian; sem
+   push para GitHub. O conteúdo vem da 1b.2 (o que o GPT sabe dela).
+5. **Projeto "Assistente" dela** no Claude dela, com o texto da Ficha 1, sem a linha da pasta de entrada do Paperless
+   (ela ainda não tem a pasta no Syncthing).
+6. **Backup** às 03:15, cifrado com a chave pública do age (a mesma do Leonardo), em `/srv/backup-hd/assistente-nathalia`.
+   A pasta guarda o nome da instância; o backup de uma instância recusa a pasta da outra.
+7. **O Leonardo administra o i7.** Como dono da máquina, ele tem acesso técnico ao banco, ao vault e ao backup dela. O
+   assistente não esconde isso; a Nathalia sabe antes de começar.
+
+### Exemplos
+
+| Ação | Resultado |
+|---|---|
+| Nathalia, no app dela: "gastei 30 no mercado" | gasto no banco dela; o Leonardo não vê pelo assistente dele |
+| Nathalia: "qual foi meu último documento?" | o último documento do usuário `nathalia` no Paperless |
+| Leonardo tenta logar na URL da Nathalia | login recusado (e-mail fora da lista) |
+| Backup dela apontado para `/srv/backup-hd` | `exportar.sh` recusa: a pasta é da instância `assistente` |
+
+### Não faz
+
+- Não junta dados dos dois (gastos da casa, agenda comum): fica para ficha própria.
+- Não sincroniza o vault dela com aparelho nenhum nem cria pasta de entrada do Paperless para ela (depois, com os
+  aparelhos dela).
+- Não usa as sessões do Claude Code (`consultar_sessoes` fica vazia na instância dela).
+
+### Cenário de teste
+
+1. `test_instancia_de_outro_dono_le_o_perfil_dele` e `test_caminho_do_perfil_vem_do_nome_do_dono`.
+2. `scripts/testes/test_retencao.sh`: a segunda instância é recusada na pasta da primeira.
+3. No i7 (P8): `verificar.sh` da instância dela sem FALHA; pelo app dela, um gasto registrado e consultado; a busca
+   pelo `entrada-teste` (documento do Leonardo) dá "Não achei"; o Leonardo, pelo app dele, não vê o gasto dela.
+
+### Decisão sua (Leonardo)
+
+1. Regras 1 a 7. Recomendação: aprovar.
+2. Item 7 (acesso técnico do administrador). Recomendação: aprovar e contar à Nathalia antes de ela usar.
+3. Login: cliente OAuth novo ("assistente nathalia") no mesmo projeto do Google Cloud, com ela como usuária de teste.
+   Recomendação: cliente novo, para cada instância ter o próprio segredo.
+4. Vault sem Syncthing por enquanto (item 4). Recomendação: aprovar; o Syncthing entra quando ela quiser o Obsidian.

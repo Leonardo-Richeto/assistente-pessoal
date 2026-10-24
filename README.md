@@ -90,8 +90,10 @@ docker compose --env-file ../.env up -d --build   # URL: https://assistente-nath
 ```
 Documentos: o Paperless é um só para a casa (`paperless/`, Ficha 6). Na instância nova, `COMPOSE_FILE` e
 `PAPERLESS_URL` como no `.env.example`, e o token de `paperless/scripts/token.sh nathalia` (`docs/IMPLANTACAO.md` P8).
-O backup diário instalado pelo `preparar_host.sh` é da instância principal; para esta, rode
-`ASSISTENTE_HOME=/srv/assistente-nathalia bash scripts/exportar.sh --retencao` num timer próprio.
+O `preparar_host.sh` instala um timer de backup por instância, com o nome da pasta (`assistente-nathalia-backup`).
+Cada instância precisa de um `BACKUP_DESTINO` próprio: a pasta guarda o nome da instância (`.instancia`) e o
+backup de outra é recusado. `NOME_USUARIO` define o perfil que o `contexto_inicial` lê
+(`20-areas/perfil-do-nathalia.md`). Roteiro completo: `docs/IMPLANTACAO.md` P8.
 
 ## Desenvolvimento
 

@@ -194,13 +194,16 @@ fi
 
 # --- 6. Backup diário ------------------------------------------------------------------------
 
-info "Timer do backup diário (03:15, scripts/exportar.sh --retencao)"
+# Uma unidade por instância, com o nome da pasta: /srv/assistente -> assistente-backup (a de sempre),
+# /srv/assistente-nathalia -> assistente-nathalia-backup. Nome fixo faria a segunda instância tomar o backup da primeira.
+UNIDADE="$(basename "$HOME_DIR")-backup"
+info "Timer do backup diário ${UNIDADE} (03:15, scripts/exportar.sh --retencao)"
 UNIDADE_SRV="$(sed -e "s#<usuario>#${USUARIO}#g" -e "s#<home>#${HOME_DIR}#g" "$APP/deploy/systemd/assistente-backup.service")"
-gravar_arquivo /etc/systemd/system/assistente-backup.service "$UNIDADE_SRV"
-gravar_arquivo /etc/systemd/system/assistente-backup.timer "$(cat "$APP/deploy/systemd/assistente-backup.timer")"
+gravar_arquivo "/etc/systemd/system/${UNIDADE}.service" "$UNIDADE_SRV"
+gravar_arquivo "/etc/systemd/system/${UNIDADE}.timer" "$(cat "$APP/deploy/systemd/assistente-backup.timer")"
 run systemctl daemon-reload
 if [ -f "$HOME_DIR/.env" ] && grep -Eq '^AGE_DESTINATARIO=age1' "$HOME_DIR/.env"; then
-  run systemctl enable --now assistente-backup.timer
+  run systemctl enable --now "${UNIDADE}.timer"
 else
   echo "Timer instalado mas DESLIGADO: falta AGE_DESTINATARIO no $HOME_DIR/.env. Depois de preencher, rode este script de novo."
 fi

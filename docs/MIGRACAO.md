@@ -52,7 +52,7 @@ pacote abre: se ela se perder, os backups viram lixo.
 
 ## Backup diário
 
-`preparar_host.sh` instala `assistente-backup.timer` (03:15) rodando `scripts/exportar.sh --retencao`.
+`preparar_host.sh` instala `assistente-backup.timer` (03:15) rodando `scripts/exportar.sh --retencao` (segunda instância: `<pasta>-backup.timer`, com `BACKUP_DESTINO` próprio).
 O timer só é ligado com `AGE_DESTINATARIO` preenchido; preencha e rode o script de novo.
 
 - Destino: `BACKUP_DESTINO` no `.env` (vazio = `<home>/backups`, mesmo disco: não protege contra perda

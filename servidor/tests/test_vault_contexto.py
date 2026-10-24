@@ -198,3 +198,22 @@ async def test_perfil_so_as_12_primeiras_linhas_depois_do_frontmatter(raiz, tmp_
     app, _ = _app(raiz, tmp_path, monkeypatch)
     _escrever(raiz, vault.PERFIL_CAMINHO, "---\ntitulo: x\n---\n" + "\n".join(f"linha {i}" for i in range(1, 30)))
     assert (await _contexto(app))["perfil"].splitlines() == [f"linha {i}" for i in range(1, 13)]
+
+
+def test_caminho_do_perfil_vem_do_nome_do_dono():
+    assert vault.caminho_do_perfil("Leonardo") == vault.PERFIL_CAMINHO
+    assert vault.caminho_do_perfil("Nathália Souza") == "20-areas/perfil-do-nathalia-souza.md"
+    assert vault.caminho_do_perfil("!!") == "20-areas/perfil-do-dono.md"
+
+
+async def test_instancia_de_outro_dono_le_o_perfil_dele(raiz, tmp_path, monkeypatch):
+    # Segunda instância (PLANO 1b.1): NOME_USUARIO=Nathalia lê o perfil dela, nunca o do Leonardo.
+    monkeypatch.setattr(servidor, "create_proxy", _proxy_falso)
+    url = f"sqlite:///{tmp_path / 'teste.db'}"
+    Base.metadata.create_all(create_engine(url))
+    cfg = Config(_env_file=None, database_url_leitura=url, database_url_escrita=url, auth_desativada=True,
+                 vault_path=str(raiz), nome_usuario="Nathalia")
+    app = servidor.criar_app(cfg)
+    assert (await _contexto(app))["perfil"] is None  # o vault só tem o perfil do Leonardo
+    _escrever(raiz, "20-areas/perfil-do-nathalia.md", "---\ntitulo: x\n---\n# Perfil da Nathalia\n")
+    assert (await _contexto(app))["perfil"] == "# Perfil da Nathalia"

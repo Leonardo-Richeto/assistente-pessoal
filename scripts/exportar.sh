@@ -51,6 +51,7 @@ fi
 DESTINO="$(absoluto "$DESTINO")"
 umask 077
 mkdir -p "$DESTINO" "$HOME_DIR/backups" || falha "não consegui criar $DESTINO."
+[ "$RETENCAO" -eq 0 ] || conferir_instancia_da_pasta "$DESTINO" "$(valor_env COMPOSE_PROJECT_NAME)"
 
 # Texto aberto só aqui, no mesmo disco dos dados, e apagado no fim (sucesso ou erro).
 TMP="$HOME_DIR/backups/.tmp-exportar-$$"

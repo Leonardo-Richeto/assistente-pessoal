@@ -296,6 +296,20 @@ semana_iso() {  # AAAAMMDD -> AAAA-SS
   date -d "$1" +%G-%V 2>/dev/null || date -j -f %Y%m%d "$1" +%G-%V
 }
 
+# Duas instâncias (ex.: a da Nathalia) com o mesmo BACKUP_DESTINO: a retenção de uma apagaria os pacotes da
+# outra, que têm o mesmo nome. A pasta guarda em .instancia o COMPOSE_PROJECT_NAME de quem a usa e recusa outro.
+conferir_instancia_da_pasta() {  # <pasta> <instancia>
+  local pasta="$1" instancia="$2" marca="$1/.instancia" dona
+  [ -n "$instancia" ] || falha "COMPOSE_PROJECT_NAME vazio: não sei de que instância é o backup."
+  if [ -f "$marca" ]; then
+    dona="$(tr -d '\r\n' <"$marca")"
+    [ "$dona" = "$instancia" ] \
+      || falha "a pasta $pasta é do backup da instância '$dona', não de '$instancia'. Use outro BACKUP_DESTINO (ex.: $pasta/$instancia)."
+  else
+    printf '%s\n' "$instancia" >"$marca" || falha "não gravei $marca."
+  fi
+}
+
 pacotes_a_apagar() {  # <pasta> [diarios] [semanais] -> nomes, um por linha
   local pasta="$1" diarios="${2:-7}" semanais="${3:-4}" nome dia semana
   local dias_vistos="" semanas_vistas="" n_dias=0 n_semanas=0 fica

@@ -488,9 +488,61 @@ Tika 0,3 GB, Gotenberg 0,15 GB). **Antes:** a chave pública do age (a mesma do 
 - [ ] P7. Interface web, quando precisar (do Mac): `ssh -L 8010:127.0.0.1:8010 <usuario>@i7` (o usuário do i7, não o do Mac) e abra `http://127.0.0.1:8010`
       como `admin`. Para a Nathalia entrar na web, defina a senha dela ali (Usuários). Nunca dê permissão a um
       documento para o outro usuário, nem crie grupo: a conferência diária acusa (Ficha 6, decisão 3).
-- [ ] P8. Instância da Nathalia (PLANO 1b.1, depois do P9): `COMPOSE_PROJECT_NAME=assistente-nathalia` na instância dela
-      já casa com a rede `assistente-nathalia-paperless`; o token dela sai de `token.sh nathalia`, e o P3 vale igual com
-      a pasta dela.
+- [ ] P8. Instância da Nathalia (PLANO 1b.1, Ficha 8; só com a ficha aprovada). ~1 h. Ensaiada no Mac em 2026-10-24
+      (sem Tailscale e com segredos falsos). `COMPOSE_PROJECT_NAME=assistente-nathalia` já casa com a rede
+      `assistente-nathalia-paperless` do Paperless único.
+      **Antes, fora do i7 (Leonardo):**
+      1. Tailscale (painel): uma chave de autenticação de uso único para o nó `assistente-nathalia`. O Funnel precisa
+         valer para ele na política de acesso, como para o `assistente` (B4).
+      2. Google Cloud, projeto `assistente-pessoal`: cliente OAuth novo "assistente nathalia" (Aplicativo da Web), com
+         origem `https://assistente-nathalia.<tailnet>.ts.net` e callback `https://assistente-nathalia.<tailnet>.ts.net/auth/callback`.
+         Na tela de consentimento (em teste), a Nathalia entra como usuária de teste.
+      3. O e-mail Google da Nathalia.
+      **No i7.** Antes do primeiro backup dela, marque a pasta do seu: sem a marca, a instância que fizer backup
+      primeiro fica com a pasta.
+      ```bash
+      cd /srv/assistente/app && git pull
+      echo assistente > /srv/backup-hd/.instancia      # a pasta do backup é da sua instância
+      sudo ASSISTENTE_HOME=/srv/assistente-nathalia bash scripts/preparar_host.sh   # árvore e timer próprios
+      git clone https://github.com/Leonardo-Richeto/assistente-pessoal /srv/assistente-nathalia/app
+      cp /srv/assistente-nathalia/app/.env.example /srv/assistente-nathalia/.env && chmod 600 /srv/assistente-nathalia/.env
+      ```
+      No `.env` dela (`nano /srv/assistente-nathalia/.env`): `ASSISTENTE_HOME=/srv/assistente-nathalia`,
+      `COMPOSE_PROJECT_NAME=assistente-nathalia`, `COMPOSE_PROFILES=tailscale`, `NOME_USUARIO=Nathalia`, `PORTA_HOST=8001`,
+      `TS_NOME=assistente-nathalia`, `TS_AUTHKEY` do item 1, `PUBLIC_BASE_URL=https://assistente-nathalia.<tailnet>.ts.net`,
+      credenciais do item 2, `GOOGLE_EMAILS_PERMITIDOS=<e-mail dela>`, `VAULT_PATH=/vault`,
+      `COMPOSE_FILE=docker-compose.yml:deploy/paperless/rede.yml`, `PAPERLESS_URL=http://paperless:8000`, a mesma
+      `AGE_DESTINATARIO` do seu `.env` e `BACKUP_DESTINO=/srv/backup-hd/assistente-nathalia`. Senhas novas, uma por vez
+      (`openssl rand -base64 48`), direto no arquivo, para `SENHA_DONO`, `SENHA_LEITURA`, `SENHA_ESCRITA` e
+      `JWT_SIGNING_KEY`. O token do Paperless entra sem aparecer na tela:
+      ```bash
+      cd /srv/assistente/app
+      T="$(PAPERLESS_HOME=/srv/paperless bash paperless/scripts/token.sh nathalia)"
+      sed -i "s|^PAPERLESS_API_KEY=.*|PAPERLESS_API_KEY=$T|" /srv/assistente-nathalia/.env; unset T
+      ```
+      Vault inicial (perfil, onde parei e diário; git local, sem push):
+      ```bash
+      V=/srv/assistente-nathalia/vault; cd "$V"
+      mkdir -p 00-inbox 20-areas 50-diario
+      printf -- '---\ntitulo: Onde parei\ntipo: plano\n---\n\n# Onde parei\n\n## Trabalho em andamento\n\n' > 00-inbox/onde-parei.md
+      printf -- '---\ntitulo: Perfil da Nathalia\ntipo: area\n---\n\n# Perfil da Nathalia\n\n' > 20-areas/perfil-do-nathalia.md
+      cp /srv/assistente-nathalia/app/deploy/vault/gitignore-do-vault .gitignore
+      git init -q && git add -A && git -c user.name=Leonardo -c user.email=<seu e-mail> commit -qm "Vault inicial da Nathalia"
+      ```
+      Subir e conferir (o Paperless de pé antes: a rede é dele):
+      ```bash
+      sudo ASSISTENTE_HOME=/srv/assistente-nathalia bash /srv/assistente-nathalia/app/scripts/preparar_host.sh  # liga app/.env e o timer
+      cd /srv/assistente-nathalia/app && docker compose up -d --build
+      bash scripts/verificar.sh             # esperado: sem FALHA, Paperless pelo token de nathalia, Funnel = 401
+      systemctl list-timers 'assistente*'   # assistente-backup e assistente-nathalia-backup
+      ```
+      Se o Funnel ainda não responder, espere até ~20 min sem recriar (P3 da Fase 2.1). Depois que o nó entrar, apague
+      o valor de `TS_AUTHKEY` do `.env` dela. Rode o backup dela uma vez: `sudo systemctl start assistente-nathalia-backup`
+      e `ls /srv/backup-hd/assistente-nathalia`.
+      **No Claude da Nathalia:** Configurações → Conectores → conector personalizado →
+      `https://assistente-nathalia.<tailnet>.ts.net/mcp` → login Google dela. Projeto "Assistente" com o texto da Ficha 1
+      sem a linha da pasta de entrada (Ficha 8, item 5). Teste: ela registra e consulta um gasto; pergunta por
+      `entrada-teste` e recebe "Não achei"; você, pelo seu app, não vê o gasto dela.
 - [x] P9. Trocar `esposa` por `nathalia` (Leonardo, 2026-10-24), depois do commit e do push. Documentos, token e
       permissões ficam com o mesmo usuário; o script não apaga nada e pode rodar de novo. ~5 min.
       **Rode o bloco inteiro de uma vez:** depois do `git pull`, sem o `sed`, o backup das 03:45, a conferência e o
