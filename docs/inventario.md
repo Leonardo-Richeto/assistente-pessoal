@@ -38,6 +38,6 @@ e a leitura do SMART ficam no vault, na nota `maquinas-do-assistente-pessoal`. R
 
 ### Pontos abertos
 
-- Microcódigo da CPU ausente (`lscpu`: "Gather data sampling: Vulnerable: No microcode"). Corrige com o
-  pacote `intel-microcode` (componente `non-free-firmware` do Debian).
+- Microcódigo: `intel-microcode` instalado, revisão `0xf0` (a última para o i7-6700). O `lscpu` continua com
+  "Gather data sampling: Vulnerable: No microcode" porque a Intel não corrigiu o GDS para esse processador.
 - Upgrade possível de RAM: só trocando módulos, porque os 4 slots estão ocupados.

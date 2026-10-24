@@ -10,8 +10,8 @@
 # Última execução limpa do commit diário (carimbo $CARIMBO_COMMIT, que o commit-diario.sh grava mesmo sem mudança)
 # com mais de 2 dias também vira AVISO; sem o carimbo, nada.
 # As notas marcadas como desatualizadas no banco viram seção de AVISO, lidas de $LINT_DIR/marcas.md, que o
-# vault-marcas.service (marcas-desatualizadas.sh, 03:35) grava. O lint não chama docker: o código dele vem do
-# vault, e o usuário dele não deve estar no grupo docker.
+# vault-marcas.service (marcas-desatualizadas.sh, 03:35) grava. O lint não chama docker nem usa rede: o código
+# dele vem do vault, e o vault-lint.service o roda numa caixa fechada (sem rede, sem docker, disco só leitura).
 set -u
 
 VAULT_PATH="${VAULT_PATH:-/srv/assistente/vault}"

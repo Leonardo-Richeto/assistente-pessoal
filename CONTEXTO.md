@@ -13,7 +13,7 @@ Leitura complementar: `README.md` (arquitetura e princípios), `PLANO.md` (fases
 
 - **Durante uma sprint, o estado vivo fica só em `SPRINT_NOTAS.md` § Onde estamos** (decisão de 2026-10-18,
   `PLANO.md` M4). Esta seção guarda o que vale entre sprints. Sprint 1 aberta (Etapa A, teste no MacBook).
-- **Última atualização:** 2026-10-24, Opus 5.5 (Claude Code, MacBook Air): **B8 feito, B9 quase todo** (entrada 2026-10-24).
+- **Última atualização:** 2026-10-24, Opus 5.5 (Claude Code, MacBook Air): **implantação no i7 fechada** (menos o teste do ponto); próximo: Paperless único (Fase 2.1, prompt no fim). Entrada 2026-10-24.
 - **Máquina (Leonardo, 2026-10-18):** só o i7 fica ligado, com Debian 13 direto (13 no lugar do 12 em 2026-10-23) e cada serviço no seu Docker
   Compose (sem Proxmox); o i5 desliga depois da Fase 1c do `PLANO.md`. Motivo: conta de luz.
 - **Portabilidade (2026-10-19, Opus 5.5 no Kiro, PC Windows):** feita e ensaiada com dados sintéticos
@@ -222,12 +222,26 @@ perguntas fora da busca real; `consultar_sessoes` sem `comandos`.
   `restart servidor` consertou o DNS, mas derrubou o Funnel: o Tailscale usa a rede do servidor e ficou na rede
   velha; `up -d --force-recreate tailscale` religou. Correção de vez: `dns: [1.1.1.1, 8.8.8.8]` no `servidor`
   e o `verificar.sh` resolve `claude.ai` e `oauth2.googleapis.com` de dentro do container (`checar_dns`).
-  Regra nova em `docs/IMPLANTACAO.md` B7: nunca reiniciar só o `servidor`. O "Gather data sampling: No
-  microcode" do `lscpu` continua sem explicação (pacote instalado; falta ver o journal do kernel).
+  Regra nova em `docs/IMPLANTACAO.md` B7: nunca reiniciar só o `servidor`. Aplicado no i7 às ~12:28; Funnel pela
+  internet = 401 e o conector do claude.ai respondendo às 12:29.
+- **Microcódigo:** o kernel carrega a revisão `0xf0`, a última da Intel para o i7-6700, e ainda diz "GDS: Vulnerable:
+  No microcode": a Intel não corrigiu o GDS para esse processador. Fica assim (só containers próprios no i7). A
+  alternativa, `gather_data_sampling=force` no kernel, desliga o AVX; rever só na Fase 1c, com serviços de terceiros.
+- **Lint isolado (2b-7):** em vez de usuário novo, o `vault-lint.service` roda numa caixa do systemd (sem rede, sem
+  socket nenhum, sem o socket do docker, sem sudo, disco só leitura, grava só o `LINT_DIR`). Motivo: o código do lint
+  vem do vault pelo Syncthing e o `leonardo` está no grupo `docker`; um usuário novo exigiria mudar as permissões do
+  vault. Passos e prova no i7: `docs/IMPLANTACAO.md` 2b-7. **Não verificado** até rodar no i7.
+- **Decisões (2026-10-24):** Paperless único para o Leonardo e a esposa (PLANO 2.1 e 1b.1); rever o mover nota em
+  2026-11-07; Vaultwarden depois do Paperless; iPhone no Syncthing fica para depois; commit só no fim do trabalho
+  (`AGENTS.md`).
 - **Mac:** o `pytest` parou de achar o pacote `assistente` porque o macOS pôs a flag `hidden` no `.pth` do
   `.venv` e o Python 3.14 ignora `.pth` oculto. Correção: `chflags nohidden servidor/.venv/lib/python3.14/site-packages/*.pth`.
 - **Registros reais:** atividade 1 (2026-10-23, dia de implantação no i7) e a nota `50-diario/2026/2026-10-24.md`.
-- **Não verificado:** teste do ponto (o Leonardo vai ajustar antes); "nota que mudou no meio"; lint do vault no i7;
+- **Nota que mudou no meio (12:37):** pedido de troca depois de mudar a nota no Obsidian; o Claude releu (`ler_nota`),
+  disse que a nota tinha mudado e perguntou antes de gravar; nenhum `escrever_nota`. A barreira do servidor (`versao`
+  do `escrever_nota`) não chegou a ser acionada pelo app; ela tem teste próprio. Syncthing Mac → i7 em ~10 s.
+- **Lint do vault no i7:** a rodada da noite de 2026-10-24 deu 0 erros e 20 avisos.
+- **Não verificado:** teste do ponto (o Leonardo vai ajustar antes);
   o launchd enviando de fato (só rodou com a fila vazia); B9b (desligar o Funnel e a stack do Mac).
 
 ## O que já se sabe (dito pelo Leonardo, ainda não conferido nas máquinas)
@@ -301,22 +315,41 @@ Vale para todo projeto longo dividido em fases, executado por modelos diferentes
 
 ## Prompt para a próxima etapa
 
-**Fechar a implantação no i7 (2026-10-23).** Modelo: Opus 5.5, effort médio. Máquina: Mac guiando, Leonardo no i7.
+**Fase 2.1: Paperless único (2026-10-24).** Modelo: Opus 5.5, effort alto (desenho novo, documentos reais depois).
+Máquina: Mac para desenhar e testar com dados sintéticos; i7 só quando o Leonardo disser.
 
 ```
-Leia CONTEXTO.md (entrada 2026-10-23), docs/IMPLANTACAO.md (roteiro e B8/B9) e PLANO.md (1.5, 1.7, 1.9, 1.10, 7.2).
-O i7 está no ar: stack, vault, Syncthing i7↔Mac, timers, backup no HD e sessões. Falta, nesta ordem:
-1. B8 feito em 2026-10-24, com a mudança do B9 colada e testada.
-2. Resto do B9 (ponto, quando o Leonardo ajustar; nota que mudou no meio; lint) e B9b no Mac.
-3. Feito em 2026-10-24: journal do backup e do vault-commit, Funnel depois das 03:15 (PLANO 1.10).
-4. Ensaio de restauração feito em 2026-10-24. Falta guardar a identidade do age fora do Mac (só existe em ~/identidade-assistente.txt).
-5. Feito em 2026-10-24: inventário B1 do i7 e powertop. Falta o intel-microcode no i7 e conferir o HD parado: o hdparm -C
-   deu active/idle logo depois do smartctl do inventário, que acorda o disco; repetir depois de 15 min sem uso.
-6. iPhone no Syncthing (Synctrain); decisões do 2b-7; launchd do envio das sessões (decisão do Leonardo).
-7. Feito em 2026-10-24: verificar.sh testa o Funnel pela internet (PLANO 1.9), rodado no i7.
-Pronto quando: B9 passa pelo app; o ensaio de restauração abre o pacote; PLANO/CONTEXTO/vault atualizados.
-Não commitar sem o ok do Leonardo; o push é ele quem roda. Nada de segredo no repo.
+Leia CONTEXTO.md (entrada 2026-10-24), AGENTS.md, README.md (§ Segunda instância), docs/MIGRACAO.md,
+docs/regras-de-negocio.md (fichas que citam o Paperless) e PLANO.md (1b.1, 2.1, 7.3).
+Decisão do Leonardo (2026-10-24): um Paperless-ngx só, para ele e para a esposa (instância 1b, ainda não existe),
+com um usuário e um token por pessoa; cada assistente só vê os documentos do próprio dono.
+Objetivo, nesta ordem:
+1. Conferir na documentação do Paperless-ngx (versão fixa) se o isolamento por dono funciona pela API com token
+   (permissões de objeto, owner, documentos sem dono). Se não for seguro, pare e diga ao Leonardo.
+2. Escrever a ficha em docs/regras-de-negocio.md (status "proposta"): o que o assistente faz com documentos
+   (buscar, ler, trocar campos, o que nunca faz), o que acontece com documento sem dono e o que a esposa vê.
+   Pedir aprovação antes de implementar.
+3. Desenhar o Paperless como projeto Docker Compose próprio (fora do compose do assistente), com pasta própria,
+   versão e digest fixos, rede compartilhada com as instâncias do assistente, sem porta fora de 127.0.0.1 e sem
+   Funnel. Backup próprio cifrado com age (document_exporter) e ensaio de restauração, como o do assistente.
+   Revisar a 7.3 e a trava do exportar/importar (hoje param se houver serviço paperless no compose).
+4. Testar com documentos sintéticos no Mac: uv run pytest, ensaio de restauração do Paperless e, pelo app,
+   "me mostra o último documento que entrou".
+Pronto quando: ficha aprovada; Paperless sobe e restaura no Mac com dados sintéticos; roteiro do i7 escrito em
+docs/IMPLANTACAO.md; PLANO e CONTEXTO atualizados; prompt seguinte escrito.
+Commit um só, no fim do trabalho, com o ok do Leonardo; o push é ele quem roda. Nada de segredo no repo.
 ```
+
+**Pendências da implantação no i7 que continuam** (não bloqueiam a 2.1):
+1. Teste do ponto no B9, quando o Leonardo terminar os ajustes (ficha antes, se o comportamento mudar).
+2. Guardar a identidade do age fora do Mac (só existe em `~/identidade-assistente.txt`).
+3. Lint isolado: rodar no i7 os passos do 2b-7 em `docs/IMPLANTACAO.md`, se ainda não rodou.
+4. HD do backup: `sudo hdparm -C /dev/sdb` depois de 15 min sem uso (esperado `standby`; senão, `hd-idle`).
+5. Confirmar que o launchd do Mac enviou uma sessão real (`consultar_sessoes`).
+6. iPhone no Syncthing (Synctrain), depois; inventário do i5 (PLANO 1c.1); consumo (PLANO 1.7).
+
+**Etapa anterior (fechar a implantação no i7), feita em 2026-10-24:** B8, B9 (menos o ponto), ensaio de restauração,
+inventário B1 do i7, PLANO 1.9, DNS fixo do servidor depois do reboot; lint isolado no código (falta rodar no i7).
 
 **Etapa anterior (Fase 2b no i7), feita em 2026-10-23.** Modelo: Opus 5.5, effort alto (toca login, vault real e SSH).
 

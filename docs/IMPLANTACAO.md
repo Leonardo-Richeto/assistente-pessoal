@@ -268,7 +268,7 @@ printf '/dev/disk/by-id/<ata-do-HD> {\n    spindown_time = 120\n}\n' | sudo tee 
       - [ ] Reescrever com versão: "Reescreve a nota 00-inbox/teste-2b.md com o texto: linha nova". Responde
             "Reescrevi 00-inbox/teste-2b.md." No i7: `git -C /srv/assistente/vault log --oneline -3 -- 00-inbox/teste-2b.md`
             mostra um commit `claude-app`.
-      - [ ] Nota que mudou no meio: peça "Lê a nota 00-inbox/teste-2b.md". Mude uma linha dela no Obsidian do Mac e
+      - [x] (2026-10-24: releu, viu "Segunda mudança." e perguntou; nada gravado) Nota que mudou no meio: peça "Lê a nota 00-inbox/teste-2b.md". Mude uma linha dela no Obsidian do Mac e
             espere o Syncthing. Peça "Reescreve essa nota com o texto: outra linha". Ele lê de novo e pergunta: "A nota
             mudou no meio. Quer que eu aplique sobre a versão nova?"
       - [ ] Segredo recusado: "Anota na nota do dia que a senha do roteador é Casa-Teste-2026x". Nada é gravado com o
@@ -396,10 +396,23 @@ no B8).
       7. Opcional: envio a cada hora pelo launchd (plist em `ferramentas/sessoes/exemplos/`, passos em "Agendar no
          Mac" do README). Sem ele, rode o passo 5 à mão.
 - [ ] 2b-7. Pendências que são decisão sua (anote a decisão aqui):
-      - Usuário próprio para o lint, fora do grupo `docker`. Hoje o `vault-lint.service` usa o mesmo `<usuario>` do
-        commit e das marcas, que está no grupo `docker`; o código do lint vem do vault, pelo Syncthing.
-      - Rever o bloqueio de `vault_move_note` e `vault_move_file`, depois de usar o histórico (2b.4) alguns dias.
-      - Vaultwarden (2b.3a), depois do backup ligado (B12).
+      - [ ] Lint isolado (Leonardo, 2026-10-24: fazer já). Em vez de um usuário novo, o `vault-lint.service` roda numa
+        caixa do systemd: sem rede, sem socket, sem o socket do docker, sem sudo, disco só leitura, grava só o
+        `LINT_DIR`. No i7, depois do `git pull`:
+        ```bash
+        cd /srv/assistente/app/deploy/vault
+        sudo cp vault-lint.service /etc/systemd/system/ && sudo sed -i "s/<usuario>/$USER/" /etc/systemd/system/vault-lint.service
+        sudo systemctl daemon-reload && sudo systemctl start vault-lint.service
+        systemctl status vault-lint.service --no-pager | head -5; head -3 /srv/assistente/logs/vault-lint/ultimo.md
+        systemd-analyze security vault-lint.service | tail -1          # nota baixa = bem fechado
+        # Prova: o mesmo usuário, com as mesmas travas, não fala com o docker nem com a internet.
+        sudo systemd-run --wait --pipe -q -p User=$USER -p PrivateNetwork=yes -p RestrictAddressFamilies=none \
+          -p InaccessiblePaths=-/run/docker.sock docker ps; echo "docker: código $?"   # esperado: diferente de 0
+        ```
+      - Rever o bloqueio de `vault_move_note` e `vault_move_file` em 2026-11-07, depois de duas semanas de histórico
+        (recomendação aceita sem objeção pelo Leonardo, 2026-10-24).
+      - Vaultwarden (2b.3a): depois do Paperless (recomendação aceita sem objeção, 2026-10-24). Ele não guarda a identidade do age: o backup
+        dele sai cifrado com ela.
 - [x] B12. (2026-10-24: timer rodou às 03:18, ensaio ok com `scripts/ensaiar_restauracao.sh`; identidade só no Mac, cópia fora pendente.) Backup diário (2026-10-19, portabilidade; substitui o adiamento de 2026-10-18): o `preparar_host.sh` já
       instalou o `assistente-backup.timer`. Confira `systemctl list-timers assistente-backup.timer`, rode uma vez à mão
       (`sudo systemctl start assistente-backup.service`, `journalctl -u assistente-backup -n 30`) e faça um ensaio de

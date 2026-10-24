@@ -7,9 +7,28 @@ After=vault-commit.service vault-marcas.service
 [Service]
 Type=oneshot
 # Troque <usuario> pelo usuario dono de /srv/assistente/vault (o mesmo do Syncthing).
-# Este usuario NAO deve estar no grupo docker: o codigo do lint (90-meta/lint-do-vault.py) vem do vault,
-# pelo Syncthing. A lista das notas desatualizadas vem do vault-marcas.service (marcas.md no LINT_DIR); a hora da
-# ultima execucao limpa do commit diario, de /srv/assistente/logs/vault-commit/ultima-execucao-ok (CARIMBO_COMMIT).
+# A lista das notas desatualizadas vem do vault-marcas.service (marcas.md no LINT_DIR); a hora da ultima execucao
+# limpa do commit diario, de /srv/assistente/logs/vault-commit/ultima-execucao-ok (CARIMBO_COMMIT).
 User=<usuario>
 Environment=VAULT_PATH=/srv/assistente/vault LINT_DIR=/srv/assistente/logs/vault-lint
 ExecStart=/bin/bash /srv/assistente/app/deploy/vault/lint-diario.sh
+
+# Caixa fechada (2026-10-24, 2b-7): o codigo do lint (90-meta/lint-do-vault.py) vem do vault, pelo Syncthing, e o
+# <usuario> esta no grupo docker (= root no host). Em vez de um usuario novo (que exigiria mexer nas permissoes do
+# vault), o lint roda sem rede, sem o socket do docker, sem sudo e so le o disco; grava apenas o relatorio.
+# Um lint adulterado ainda le o que o <usuario> le fora das pastas fechadas, mas so escreve no LINT_DIR e nao tem
+# como mandar nada para fora.
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+PrivateNetwork=yes
+RestrictAddressFamilies=none
+# O "-" pula caminho que nao existe nesta maquina; sem socket nenhum, o docker ja nao conectaria.
+InaccessiblePaths=-/run/docker.sock -/run/containerd -/srv/assistente/.env -/srv/assistente/data -/srv/assistente/backups -/srv/backup-hd
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ReadWritePaths=/srv/assistente/logs/vault-lint

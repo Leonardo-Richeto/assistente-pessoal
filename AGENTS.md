@@ -3,7 +3,8 @@
 **Durante uma sprint, leia antes `SPRINT.md` e `SPRINT_NOTAS.md`** (plano, passo atual, modelo por passo e passagem entre sessões; arquivos temporários). O histórico
 dos passos fica em `SPRINT_HISTORICO.md`: não leia no começo, só o bloco de que precisar. Depois **leia `CONTEXTO.md`** (estado atual, histórico, pendências e o prompt da próxima etapa).
 Depois `README.md` (arquitetura e princípios) e a próxima tarefa aberta em `PLANO.md`.
-Uma tarefa por vez; ao terminar, testes passando, `[x]` no plano e commit.
+Uma tarefa por vez; ao terminar, testes passando e `[x]` no plano. O commit é um só, no fim do trabalho
+(Leonardo, 2026-10-24); antes disso, só quando o i7 precisa do código (`git pull` exige commit e push).
 
 ## Passagem entre modelos (obrigatório)
 Ao terminar uma tarefa ou fase, atualize `CONTEXTO.md`: o que foi feito, o que mudou e por quê,

@@ -46,7 +46,11 @@ cifrado e migração pelo mesmo pacote (Fase 7, `docs/MIGRACAO.md`). Em 2026-10-
   W médio e R$/mês na nota `maquinas-do-assistente-pessoal` do vault. Pronto quando: os dois números estão lá
 
 ## Fase 1b — Instância da esposa (opcional, depois da sua estar estável)
-- [ ] 1b.1 Segunda instância (README → "Segunda instância"), login Google, porta 8001 / Funnel 8443
+- [ ] 1b.1 Segunda instância (README → "Segunda instância"), login Google, porta 8001 no host e nó Tailscale próprio
+  (`TS_NOME=assistente-esposa`, URL própria na 443; a ideia antiga de Funnel na 8443 do mesmo nó ficou para trás com o
+  Tailscale em container). Banco, vault, login e servidor separados: estimativa de ~300–400 MB de RAM por instância e quase nada de CPU (o i7 inteiro, com a stack, usava 1,0 GB de 15 GB em 2026-10-24).
+  Decidido (Leonardo, 2026-10-24): **Paperless único**, com um usuário e um token por pessoa (cada token só vê os
+  documentos do dono), se o Paperless permitir isso com segurança; senão, um por pessoa. Ver 2.1.
 - [ ] 1b.2 Ela pede ao GPT para despejar no vault tudo o que ele sabe dela; depois conecta o Claude dela e confirma que ele usa esse contexto
 
 ## Fase 1c — Desligar o i5 (depois da Fase 1 estável)
@@ -58,6 +62,10 @@ cifrado e migração pelo mesmo pacote (Fase 7, `docs/MIGRACAO.md`). Em 2026-10-
 
 ## Fase 2 — Documentos e vault
 - [ ] 2.1 Subir Paperless-ngx com o compose oficial (rede Docker compartilhada com este stack); gerar token; preencher `PAPERLESS_URL`/`PAPERLESS_API_KEY`
+  - Decisão de 2026-10-24 (Leonardo): um Paperless só para o Leonardo e a esposa (1b), um usuário e um token por
+    pessoa. Por isso ele fica fora do compose do assistente, como projeto próprio, com backup próprio. Isso
+    substitui a ideia de "Paperless no mesmo compose" do prompt antigo do PC Windows e muda a 7.3: o
+    `exportar.sh` do assistente não leva os documentos.
   - Pronto quando: "me mostra o último documento que entrou" funciona pelo app
 - [ ] 2.2 Migrar o vault para `/srv/assistente/vault` no i7, Syncthing com todos os aparelhos (Mac, iPhone, PC Windows) e GitHub privado mantido por enquanto (decisão de 2026-10-17); preencher `VAULT_PATH`. Detalhe: `SPRINT.md` B12
 - [ ] 2.2b Levar para o vault a "Regra de passagem" (`CONTEXTO.md`) e a nota de inventário das máquinas
