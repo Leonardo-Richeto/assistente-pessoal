@@ -504,6 +504,7 @@ Tika 0,3 GB, Gotenberg 0,15 GB). **Antes:** a chave pública do age (a mesma do 
       cd /srv/assistente/app && git pull
       echo assistente > /srv/backup-hd/.instancia      # a pasta do backup é da sua instância
       sudo ASSISTENTE_HOME=/srv/assistente-nathalia bash scripts/preparar_host.sh   # árvore e timer próprios
+      # esperados nesta primeira rodada: "o repositório não está em .../app" e "Timer instalado mas DESLIGADO"
       git clone https://github.com/Leonardo-Richeto/assistente-pessoal /srv/assistente-nathalia/app
       cp /srv/assistente-nathalia/app/.env.example /srv/assistente-nathalia/.env && chmod 600 /srv/assistente-nathalia/.env
       ```
@@ -512,13 +513,16 @@ Tika 0,3 GB, Gotenberg 0,15 GB). **Antes:** a chave pública do age (a mesma do 
       `TS_NOME=assistente-nathalia`, `TS_AUTHKEY` do item 1, `PUBLIC_BASE_URL=https://assistente-nathalia.<tailnet>.ts.net`,
       credenciais do item 2, `GOOGLE_EMAILS_PERMITIDOS=<e-mail dela>`, `VAULT_PATH=/vault`,
       `COMPOSE_FILE=docker-compose.yml:deploy/paperless/rede.yml`, `PAPERLESS_URL=http://paperless:8000`, a mesma
-      `AGE_DESTINATARIO` do seu `.env` e `BACKUP_DESTINO=/srv/backup-hd/assistente-nathalia`. Senhas novas, uma por vez
-      (`openssl rand -base64 48`), direto no arquivo, para `SENHA_DONO`, `SENHA_LEITURA`, `SENHA_ESCRITA` e
-      `JWT_SIGNING_KEY`. O token do Paperless entra sem aparecer na tela:
+      `AGE_DESTINATARIO` do seu `.env` e `BACKUP_DESTINO=/srv/backup-hd/assistente-nathalia`. As senhas novas e o token
+      do Paperless entram direto no arquivo, sem aparecer na tela (hex: sem `/` nem `+` na URL do banco e no `sed`):
       ```bash
+      for k in SENHA_DONO SENHA_LEITURA SENHA_ESCRITA JWT_SIGNING_KEY; do
+        v="$(openssl rand -hex 32)"; sed -i "s|^$k=.*|$k=$v|" /srv/assistente-nathalia/.env
+      done; unset v
       cd /srv/assistente/app
       T="$(PAPERLESS_HOME=/srv/paperless bash paperless/scripts/token.sh nathalia)"
-      sed -i "s|^PAPERLESS_API_KEY=.*|PAPERLESS_API_KEY=$T|" /srv/assistente-nathalia/.env; unset T
+      [ -n "$T" ] && sed -i "s|^PAPERLESS_API_KEY=.*|PAPERLESS_API_KEY=$T|" /srv/assistente-nathalia/.env || echo "token.sh falhou: pare"
+      unset T
       ```
       Vault inicial (perfil, onde parei e diário; git local, sem push):
       ```bash
@@ -534,7 +538,7 @@ Tika 0,3 GB, Gotenberg 0,15 GB). **Antes:** a chave pública do age (a mesma do 
       sudo ASSISTENTE_HOME=/srv/assistente-nathalia bash /srv/assistente-nathalia/app/scripts/preparar_host.sh  # liga app/.env e o timer
       cd /srv/assistente-nathalia/app && docker compose up -d --build
       bash scripts/verificar.sh             # esperado: sem FALHA, Paperless pelo token de nathalia, Funnel = 401
-      systemctl list-timers 'assistente*'   # assistente-backup e assistente-nathalia-backup
+      systemctl list-timers 'assistente*'   # assistente-backup (03:15) e assistente-nathalia-backup (03:25)
       ```
       Se o Funnel ainda não responder, espere até ~20 min sem recriar (P3 da Fase 2.1). Depois que o nó entrar, apague
       o valor de `TS_AUTHKEY` do `.env` dela. Rode o backup dela uma vez: `sudo systemctl start assistente-nathalia-backup`

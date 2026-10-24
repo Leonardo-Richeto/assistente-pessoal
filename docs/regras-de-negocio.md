@@ -945,7 +945,7 @@ token da Nathalia deu 0 na busca e 404 no id direto); Ficha 1 colada no Projeto.
 
 ## Ficha 8 — Instância da Nathalia
 
-- **Status:** proposta (Opus 5.5, 2026-10-24). Falta o ok do Leonardo. Origem: `PLANO.md` 1b.1, D21 do vault e Ficha 6.
+- **Status:** aprovada (Leonardo, 2026-10-24), com as decisões abaixo. Proposta do Opus 5.5. Origem: `PLANO.md` 1b.1, D21 do vault e Ficha 6.
 - **Onde vive:** segunda instância no i7 (`/srv/assistente-nathalia`, projeto `assistente-nathalia`), roteiro em
   `docs/IMPLANTACAO.md` P8, `scripts/preparar_host.sh` (timer de backup por instância), `scripts/exportar.sh` (trava da
   pasta de backup) e `servidor/assistente/vault.py` (perfil pelo `NOME_USUARIO`).
@@ -966,7 +966,7 @@ token da Nathalia deu 0 na busca e 404 no id direto); Ficha 1 colada no Projeto.
    push para GitHub. O conteúdo vem da 1b.2 (o que o GPT sabe dela).
 5. **Projeto "Assistente" dela** no Claude dela, com o texto da Ficha 1, sem a linha da pasta de entrada do Paperless
    (ela ainda não tem a pasta no Syncthing).
-6. **Backup** às 03:15, cifrado com a chave pública do age (a mesma do Leonardo), em `/srv/backup-hd/assistente-nathalia`.
+6. **Backup** às 03:25, cifrado com a chave pública do age (a mesma do Leonardo), em `/srv/backup-hd/assistente-nathalia`.
    A pasta guarda o nome da instância; o backup de uma instância recusa a pasta da outra.
 7. **O Leonardo administra o i7.** Como dono da máquina, ele tem acesso técnico ao banco, ao vault e ao backup dela. O
    assistente não esconde isso; a Nathalia sabe antes de começar.
@@ -994,10 +994,9 @@ token da Nathalia deu 0 na busca e 404 no id direto); Ficha 1 colada no Projeto.
 3. No i7 (P8): `verificar.sh` da instância dela sem FALHA; pelo app dela, um gasto registrado e consultado; a busca
    pelo `entrada-teste` (documento do Leonardo) dá "Não achei"; o Leonardo, pelo app dele, não vê o gasto dela.
 
-### Decisão sua (Leonardo)
+### Decisões do Leonardo (2026-10-24)
 
-1. Regras 1 a 7. Recomendação: aprovar.
-2. Item 7 (acesso técnico do administrador). Recomendação: aprovar e contar à Nathalia antes de ela usar.
-3. Login: cliente OAuth novo ("assistente nathalia") no mesmo projeto do Google Cloud, com ela como usuária de teste.
-   Recomendação: cliente novo, para cada instância ter o próprio segredo.
-4. Vault sem Syncthing por enquanto (item 4). Recomendação: aprovar; o Syncthing entra quando ela quiser o Obsidian.
+1. Regras 1 a 7: aprovadas.
+2. Item 7: aprovado; a Nathalia já sabe que o Leonardo administra o i7.
+3. Login: cliente OAuth novo ("assistente nathalia") no mesmo projeto do Google Cloud.
+4. Vault sem Syncthing por enquanto: aprovado (veio com o "sim" às regras 1 a 7).

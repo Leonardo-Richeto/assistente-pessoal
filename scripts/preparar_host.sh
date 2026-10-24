@@ -199,8 +199,14 @@ fi
 UNIDADE="$(basename "$HOME_DIR")-backup"
 info "Timer do backup diário ${UNIDADE} (03:15, scripts/exportar.sh --retencao)"
 UNIDADE_SRV="$(sed -e "s#<usuario>#${USUARIO}#g" -e "s#<home>#${HOME_DIR}#g" "$APP/deploy/systemd/assistente-backup.service")"
+UNIDADE_TIMER="$(cat "$APP/deploy/systemd/assistente-backup.timer")"
+if [ "$UNIDADE" != "assistente-backup" ]; then
+  # Outra instância: 10 min depois, para os dois dumps não pararem os servidores e o HD ao mesmo tempo.
+  UNIDADE_SRV="$(printf '%s\n' "$UNIDADE_SRV" | sed "s#^Description=.*#Description=Backup diario de $(basename "$HOME_DIR")#")"
+  UNIDADE_TIMER="$(printf '%s\n' "$UNIDADE_TIMER" | sed -e "s#03:15#03:25#g" -e "s#do assistente#de $(basename "$HOME_DIR")#")"
+fi
 gravar_arquivo "/etc/systemd/system/${UNIDADE}.service" "$UNIDADE_SRV"
-gravar_arquivo "/etc/systemd/system/${UNIDADE}.timer" "$(cat "$APP/deploy/systemd/assistente-backup.timer")"
+gravar_arquivo "/etc/systemd/system/${UNIDADE}.timer" "$UNIDADE_TIMER"
 run systemctl daemon-reload
 if [ -f "$HOME_DIR/.env" ] && grep -Eq '^AGE_DESTINATARIO=age1' "$HOME_DIR/.env"; then
   run systemctl enable --now "${UNIDADE}.timer"

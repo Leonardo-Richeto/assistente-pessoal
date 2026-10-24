@@ -36,5 +36,9 @@ confere "total apagado" "34" "$(printf '%s\n' "$apagar" | grep -c .)"
 confere "primeira instância marca a pasta" "assistente" "$(conferir_instancia_da_pasta "$PASTA" assistente && cat "$PASTA/.instancia")"
 confere "a mesma instância passa de novo" "0" "$( (conferir_instancia_da_pasta "$PASTA" assistente) >/dev/null 2>&1; echo $?)"
 confere "outra instância é recusada" "1" "$( (conferir_instancia_da_pasta "$PASTA" assistente-nathalia) >/dev/null 2>&1; echo $?)"
+confere "outra instância é recusada também sem retenção" "1" "$( (conferir_instancia_da_pasta "$PASTA" assistente-nathalia 0) >/dev/null 2>&1; echo $?)"
+NOVA="$PASTA/sem-marca"; mkdir -p "$NOVA"
+conferir_instancia_da_pasta "$NOVA" assistente-nathalia 0
+confere "sem retenção, pasta nova não ganha marca" "não" "$([ -e "$NOVA/.instancia" ] && echo sim || echo não)"
 
 [ "$falhas" -eq 0 ] && echo "test_retencao: ok" || { echo "test_retencao: $falhas falha(s)"; exit 1; }
