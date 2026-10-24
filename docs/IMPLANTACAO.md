@@ -282,7 +282,7 @@ printf '/dev/disk/by-id/<ata-do-HD> {\n    spindown_time = 120\n}\n' | sudo tee 
       - [ ] `consultar_sessoes` (depois do primeiro envio das sessões, seção "Fase 2b no i7"): "O que eu fiz no Claude
             Code esta semana?". Responde com projeto, máquina e horário das sessões.
       No fim, apague a nota de teste no Obsidian do Mac (o histórico fica no git).
-- [ ] B9b. Só depois de B8 e B9 funcionarem, desligue o Mac:
+- [x] B9b. (2026-10-24: nenhum container no Mac; o Funnel do Mac já estava sem configuração em 2026-10-23.) Só depois de B8 e B9 funcionarem, desligue o Mac:
       ```bash
       tailscale funnel --https=443 off                                  # no Mac (sudo, se pedir)
       cd ~/Desktop/Projetos/assistente-pessoal && docker compose stop   # sem -v, os dados do Mac ficam
@@ -396,7 +396,7 @@ no B8).
         commit e das marcas, que está no grupo `docker`; o código do lint vem do vault, pelo Syncthing.
       - Rever o bloqueio de `vault_move_note` e `vault_move_file`, depois de usar o histórico (2b.4) alguns dias.
       - Vaultwarden (2b.3a), depois do backup ligado (B12).
-- [ ] B12. Backup diário (2026-10-19, portabilidade; substitui o adiamento de 2026-10-18): o `preparar_host.sh` já
+- [x] B12. (2026-10-24: timer rodou às 03:18, ensaio ok com `scripts/ensaiar_restauracao.sh`; identidade só no Mac, cópia fora pendente.) Backup diário (2026-10-19, portabilidade; substitui o adiamento de 2026-10-18): o `preparar_host.sh` já
       instalou o `assistente-backup.timer`. Confira `systemctl list-timers assistente-backup.timer`, rode uma vez à mão
       (`sudo systemctl start assistente-backup.service`, `journalctl -u assistente-backup -n 30`) e faça um ensaio de
       restauração (`docs/MIGRACAO.md` § Ensaio). Guarde a identidade do age fora do i7.
