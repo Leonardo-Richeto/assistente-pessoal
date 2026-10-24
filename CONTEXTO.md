@@ -169,8 +169,8 @@ perguntas fora da busca real; `consultar_sessoes` sem `comandos`.
 - **Stack:** `preparar_host.sh`, Tailscale do host (nó `i7`, só SSH) e do container (nó `assistente`, Funnel em
   `https://assistente.<tailnet>.ts.net`), `.env` com senhas `openssl rand -hex 32`, migração 0006, `verificar.sh` ok.
   Banco começou limpo (B10: o Mac só tinha teste).
-- **Backup** ligado desde o início: chave do age gerada no Mac pelo Docker, identidade no gerenciador de senhas do
-  Leonardo; primeiro pacote no HD (1 MB). Ensaio de restauração: **pendente**.
+- **Backup** ligado desde o início: chave do age gerada no Mac pelo Docker, identidade só em `~/identidade-assistente.txt`
+  no Mac (corrigido em 2026-10-24); primeiro pacote no HD (1 MB). Ensaio de restauração: feito em 2026-10-24.
 - **Vault:** clone do GitHub em `/srv/assistente/vault` (deploy key com escrita), Syncthing i7 ↔ Mac (pasta `vault`),
   `.git` do Mac movido para `~/vault-git-mac-parado` (D15). Timers 03:30/03:35/03:40; commit + gitleaks + push testados.
   `VAULT_PATH=/vault` (116 notas indexadas).
