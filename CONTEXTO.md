@@ -198,6 +198,9 @@ perguntas fora da busca real; `consultar_sessoes` sem `comandos`.
 - **Sessões:** a sessão de 2026-10-23 estava na fila do Mac; enviada à mão. Envio automático ligado no Mac (launchd,
   a cada hora). O launchd não lê o Desktop (TCC): roda uma cópia de `enviar.py` e `fila.py` em
   `~/.local/share/assistente/sessoes/` (recopiar quando mudarem; `ferramentas/sessoes/README.md`).
+- **Noite de 2026-10-24 conferida (journal do i7):** backup às 03:18 (1,1 MB, schema 0006, servidor e Tailscale
+  religados), vault-commit às 03:30 (1 arquivo, gitleaks limpo, push feito), marcas 0, lint 0 erro e 20 avisos. O
+  Funnel respondeu ao claude.ai às 06:34 (PLANO 1.10 feito). O usuário `leonardo` não está em `adm`/`systemd-journal`.
 - **Registros reais:** atividade 1 (2026-10-23, dia de implantação no i7) e a nota `50-diario/2026/2026-10-24.md`.
 - **Não verificado:** teste do ponto (o Leonardo vai ajustar antes); "nota que mudou no meio"; lint do vault no i7;
   o launchd enviando de fato (só rodou com a fila vazia); B9b (desligar o Funnel e a stack do Mac).
@@ -280,7 +283,7 @@ Leia CONTEXTO.md (entrada 2026-10-23), docs/IMPLANTACAO.md (roteiro e B8/B9) e P
 O i7 está no ar: stack, vault, Syncthing i7↔Mac, timers, backup no HD e sessões. Falta, nesta ordem:
 1. B8 feito em 2026-10-24, com a mudança do B9 colada e testada.
 2. Resto do B9 (ponto, quando o Leonardo ajustar; nota que mudou no meio; lint) e B9b no Mac.
-3. Conferir de manhã: journal do backup e do vault-commit, DNS público do Funnel depois das 03:15 (PLANO 1.10).
+3. Feito em 2026-10-24: journal do backup e do vault-commit, Funnel depois das 03:15 (PLANO 1.10).
 4. Ensaio de restauração do backup (docs/MIGRACAO.md § Ensaio) com a identidade do age do Leonardo.
 5. Inventário B1 no i7 (deploy/inventario.sh) → vault + docs/inventario.md; powertop (Pkg C6+), hdparm -C do HD.
 6. iPhone no Syncthing (Synctrain); decisões do 2b-7; launchd do envio das sessões (decisão do Leonardo).

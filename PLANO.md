@@ -23,8 +23,10 @@ de R$ 29 a 47/mês). Sem backup do banco por enquanto; o vault tem Syncthing e G
 cifrado e migração pelo mesmo pacote (Fase 7, `docs/MIGRACAO.md`). Em 2026-10-21 (Leonardo): no início, sem backup ligado. **Em 2026-10-23 (Leonardo): backup ligado desde o início**, no HD de 500 GB do i7.
 - [ ] 1.9 `scripts/verificar.sh` testa o Funnel de dentro da tailnet: deu "ok" com o DNS público vazio (2026-10-23).
   Testar pela internet (DNS público + `curl --resolve` no IP do ingress) e falhar se o nome não existir
-- [ ] 1.10 Conferir se o backup das 03:15 (para e religa o Tailscale) derruba o DNS público do Funnel (~20 min em
+- [x] 1.10 Conferir se o backup das 03:15 (para e religa o Tailscale) derruba o DNS público do Funnel (~20 min em
   2026-10-23 depois de um restart). Se derrubar: não parar o container do Tailscale no backup
+  (2026-10-24: backup parou e religou às 03:18; o claude.ai chamou pelo Funnel às 06:34 sem falha. Uma falha curta logo
+  depois das 03:18 não foi medida; de madrugada não pesa.)
 - [ ] 1.8 (adiado) Desligar o i7 à noite: decidido em 2026-10-23 (Leonardo) rodar 24/7 e rever só se o consumo (1.7) pesar.
   Se voltar: Scheduled Power-On da BIOS para ligar, timer do systemd para desligar, e os timers das 03:15–03:40 antes do desligamento
 - [x] 1.0 (2026-10-23) BIOS do i7 para economia (na instalação): C-states e package C-state no máximo, ASPM ligado, áudio e
