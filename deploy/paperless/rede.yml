@@ -4,9 +4,16 @@
 #
 # Ligar: no .env da instância, COMPOSE_FILE=docker-compose.yml:deploy/paperless/rede.yml e
 # PAPERLESS_URL=http://paperless:8000. O Paperless precisa estar de pé antes (a rede é dele).
+#
+# gw_priority (Docker 28+): a rota padrão fica na rede do assistente. Sem ele, o Docker escolheu a rede do
+# Paperless ("assistente-paperless" vem antes de "assistente_default"), e o Funnel parou de responder no
+# i7 em 2026-10-24, ~20 min depois da subida (o Tailscale divide a rede com o servidor).
 services:
   servidor:
-    networks: [default, paperless]
+    networks:
+      default:
+        gw_priority: 1
+      paperless: {}
 
 networks:
   paperless:

@@ -430,7 +430,7 @@ Lê PDF, imagem, Word, Excel, PowerPoint, OpenDocument e e-mail (`.eml`): o Tika
 Gotenberg gera o PDF de visualização; o original fica guardado. Gasta ~1,5 GB de RAM (medido no Mac: webserver 1 GB,
 Tika 0,3 GB, Gotenberg 0,15 GB). **Antes:** a chave pública do age (a mesma do assistente) e ~15 min.
 
-- [ ] P1. Estado e `.env` (senhas novas; nunca as do Mac):
+- [x] P1 (2026-10-24). Estado e `.env` (senhas novas; nunca as do Mac):
       ```bash
       sudo mkdir -p /srv/paperless && sudo chown <usuario>: /srv/paperless && chmod 700 /srv/paperless
       cp /srv/assistente/app/paperless/.env.example /srv/paperless/.env && chmod 600 /srv/paperless/.env
@@ -438,24 +438,27 @@ Tika 0,3 GB, Gotenberg 0,15 GB). **Antes:** a chave pública do age (a mesma do 
                                  # AGE_DESTINATARIO e BACKUP_DESTINO=/srv/backup-hd/paperless
       ```
       Guarde a senha do admin no gerenciador de senhas. `PAPERLESS_CONSUMER_POLLING` fica 0 no Linux.
-- [ ] P2. Subir e preparar (baixa ~2 GB de imagens e o idioma `por` na primeira vez):
+- [x] P2 (2026-10-24). Subir e preparar (baixa ~2 GB de imagens e o idioma `por` na primeira vez):
       ```bash
       cd /srv/assistente/app && PAPERLESS_HOME=/srv/paperless bash paperless/scripts/preparar.sh
       ```
       Esperado no fim: `conferir: ok`, `porta: 127.0.0.1:8010 (só loopback)` e `preparar: pronto`. Se a conferência
       achar problema, o script para; leia as linhas `PROBLEMA`.
-- [ ] P3. Ligar o assistente do Leonardo. O token é segredo: vai direto do comando para o `.env`, sem aparecer na tela:
+- [x] P3 (2026-10-24). Ligar o assistente do Leonardo. O token é segredo: vai direto do comando para o `.env`, sem aparecer na tela:
       ```bash
       T="$(PAPERLESS_HOME=/srv/paperless bash paperless/scripts/token.sh leonardo)"
       sed -i "s|^PAPERLESS_API_KEY=.*|PAPERLESS_API_KEY=$T|; s|^PAPERLESS_URL=.*|PAPERLESS_URL=http://paperless:8000|" /srv/assistente/.env
       unset T
       grep -q '^COMPOSE_FILE=' /srv/assistente/.env \
         || echo 'COMPOSE_FILE=docker-compose.yml:deploy/paperless/rede.yml' >> /srv/assistente/.env
-      cd /srv/assistente/app && docker compose up -d --force-recreate servidor tailscale && bash scripts/verificar.sh
+      cd /srv/assistente/app && docker compose up -d --build --force-recreate servidor tailscale && bash scripts/verificar.sh
+      docker compose exec servidor grep -c 'Ficha 6, item 8' assistente/servidor.py
       ```
-      Esperado: `ok    Paperless: http://paperless:8000 responde, token do usuário comum leonardo, nenhum documento sem dono`. Recrie o
+      Esperado: `ok    Paperless: http://paperless:8000 responde, token do usuário comum leonardo, nenhum documento sem dono`
+      e `1` no `grep` (a imagem tem as bloqueadas da Ficha 6). O `--build` é obrigatório: o código entra na imagem, e
+      sem ele o servidor sobe com a lista antiga, que deixa criar tag sem dono e ler tarefas do outro. Recrie o
       `tailscale` junto (ele usa a rede do servidor; veja o aviso do B7).
-- [ ] P4. Timers (backup às 03:45 e conferência às 07:00):
+- [x] P4 (2026-10-24). Timers (backup às 03:45 e conferência às 07:00):
       ```bash
       cd /srv/assistente/app/paperless/deploy/systemd
       for f in paperless-*.service; do
@@ -467,7 +470,7 @@ Tika 0,3 GB, Gotenberg 0,15 GB). **Antes:** a chave pública do age (a mesma do 
       sudo systemctl start paperless-backup.service && journalctl -u paperless-backup -n 5 --no-pager
       ```
       Esperado: `exportar: feito: /srv/backup-hd/paperless/paperless-AAAAMMDD-HHMM.tar.age`.
-- [ ] P5. Ensaio de restauração, no Mac, com a identidade do age (o i7 nunca tem a chave privada):
+- [x] P5 (2026-10-24). Ensaio de restauração, no Mac, com a identidade do age (o i7 nunca tem a chave privada):
       ```bash
       scp i7:/srv/backup-hd/paperless/paperless-<data>.tar.age ~/Downloads/
       cd ~/Desktop/Projetos/assistente-pessoal
