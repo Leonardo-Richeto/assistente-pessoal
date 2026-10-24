@@ -201,6 +201,11 @@ perguntas fora da busca real; `consultar_sessoes` sem `comandos`.
 - **Noite de 2026-10-24 conferida (journal do i7):** backup às 03:18 (1,1 MB, schema 0006, servidor e Tailscale
   religados), vault-commit às 03:30 (1 arquivo, gitleaks limpo, push feito), marcas 0, lint 0 erro e 20 avisos. O
   Funnel respondeu ao claude.ai às 06:34 (PLANO 1.10 feito). O usuário `leonardo` não está em `adm`/`systemd-journal`.
+- **Ensaio de restauração ok (2026-10-24, Mac):** `scripts/ensaiar_restauracao.sh` (novo) com o pacote das 03:18:
+  SHA256SUMS confere, banco restaurado com as 8 tabelas iguais ao `contagens.tsv`, vault com 128 notas e git íntegro.
+- **Correção:** a identidade do age **não** está no gerenciador de senhas. A única cópia é `~/identidade-assistente.txt`
+  no Mac (2026-10-23 16:09, permissão 600). O `.env` do Mac tem só a chave pública. Se o Mac se perder, os backups
+  não abrem: guardar a identidade em outro lugar é pendência (decisão do Leonardo).
 - **Registros reais:** atividade 1 (2026-10-23, dia de implantação no i7) e a nota `50-diario/2026/2026-10-24.md`.
 - **Não verificado:** teste do ponto (o Leonardo vai ajustar antes); "nota que mudou no meio"; lint do vault no i7;
   o launchd enviando de fato (só rodou com a fila vazia); B9b (desligar o Funnel e a stack do Mac).
@@ -284,7 +289,7 @@ O i7 está no ar: stack, vault, Syncthing i7↔Mac, timers, backup no HD e sess�
 1. B8 feito em 2026-10-24, com a mudança do B9 colada e testada.
 2. Resto do B9 (ponto, quando o Leonardo ajustar; nota que mudou no meio; lint) e B9b no Mac.
 3. Feito em 2026-10-24: journal do backup e do vault-commit, Funnel depois das 03:15 (PLANO 1.10).
-4. Ensaio de restauração do backup (docs/MIGRACAO.md § Ensaio) com a identidade do age do Leonardo.
+4. Ensaio de restauração feito em 2026-10-24. Falta guardar a identidade do age fora do Mac (só existe em ~/identidade-assistente.txt).
 5. Inventário B1 no i7 (deploy/inventario.sh) → vault + docs/inventario.md; powertop (Pkg C6+), hdparm -C do HD.
 6. iPhone no Syncthing (Synctrain); decisões do 2b-7; launchd do envio das sessões (decisão do Leonardo).
 7. Corrigir o verificar.sh para testar o Funnel pela internet (PLANO 1.9), com teste.

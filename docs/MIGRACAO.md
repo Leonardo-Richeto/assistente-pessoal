@@ -114,6 +114,11 @@ importar (com o verificar) passar e o vault e as contagens forem iguais. `bash s
 testa a retenção sem Docker. Ensaio mensal de restauração: rodar o `importar.sh` com o último pacote numa
 máquina ou VM descartável.
 
+Ensaio rápido, sem instalação nenhuma (desde 2026-10-24): `scripts/ensaiar_restauracao.sh <pacote.tar.age>
+--chave <identidade>`. Decifra, confere o `SHA256SUMS`, restaura o banco num Postgres descartável (sem dono
+nem GRANTs), compara as linhas com o `contagens.tsv` e confere o git do vault. Apaga tudo no fim. Roda em
+qualquer máquina com docker, inclusive o Mac.
+
 ## Limites conhecidos
 
 - **Paperless:** a exportação e a importação (`document_exporter`/`document_importer`) ainda não existem. Os

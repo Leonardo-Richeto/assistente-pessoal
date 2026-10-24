@@ -180,7 +180,8 @@ Substitui o adiamento de 2026-10-18. Procedimento em `docs/MIGRACAO.md`.
   e SHA-256. Ensaio com dados sintéticos passou no Windows (`scripts/testes/ensaio_migracao.sh`)
 - [x] 7.1 Backup diário: `assistente-backup.timer` (03:15), 7 diários e 4 semanais. Falta no i7: ligar com
   `AGE_DESTINATARIO` e apontar `BACKUP_DESTINO` para o HD de 500 GB do i7 (`/srv/backup-hd`, `docs/IMPLANTACAO.md` B2d)
-- [ ] 7.2 Ensaio de restauração mensal numa máquina ou VM descartável (o i5 vai ser desligado: rever onde)
+- [ ] 7.2 Ensaio de restauração mensal numa máquina ou VM descartável (o i5 vai ser desligado: rever onde). Primeiro
+  ensaio em 2026-10-24 no Mac com `scripts/ensaiar_restauracao.sh` (pacote das 03:18): ok, 8 tabelas e 128 notas.
 - [ ] 7.3 Paperless no pacote (`document_exporter`/`document_importer`), junto com a Fase 2.1. Até lá os scripts
   param com erro se o compose tiver `paperless`
 - [ ] 7.4 Migração Mac → i7 com `verificar.sh` sem erro e teste com o i7 em outra rede (4G do celular)
