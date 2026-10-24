@@ -185,6 +185,45 @@ decifrar() {  # <arquivo de identidade>  < entrada > saída
   fi
 }
 
+# --- Funnel pela internet ---------------------------------------------------------------------
+# O host com Tailscale e MagicDNS resolve o nome .ts.net para o IP da tailnet: o curl nunca passa
+# pela internet e dá 401 mesmo com o DNS público vazio (2026-10-23). Por isso o nome é resolvido num
+# DNS público (DoH, pelo IP, sem depender do DNS local) e o curl vai ao IP público do Funnel.
+DOH_URLS="${VERIFICAR_DOH:-https://1.1.1.1/dns-query https://8.8.8.8/resolve}"
+
+# <host> -> primeiro IPv4 no DNS público. Código 1: o nome não existe; 2: nenhum DoH respondeu.
+ip_publico() {
+  local host="$1" url resp respondeu=0 ip
+  for url in $DOH_URLS; do
+    resp="$(curl -s -m 10 -H 'accept: application/dns-json' "$url?name=$host&type=A" | tr -d '\r\n')" || continue
+    printf '%s' "$resp" | grep -q '"Status"' || continue
+    respondeu=1
+    ip="$(printf '%s' "$resp" | grep -oE '"data": ?"[0-9]{1,3}(\.[0-9]{1,3}){3}"' | head -n 1 | grep -oE '[0-9.]{7,15}')"
+    [ -n "$ip" ] && { printf '%s\n' "$ip"; return 0; }
+  done
+  [ "$respondeu" = 1 ] && return 1
+  return 2
+}
+
+# <url base> -> uma linha para o relatório; código 0 só se <url>/mcp sem token der 401 pela internet.
+conferir_funnel_publico() {
+  local url="${1%/}" host ip codigo rc
+  host="${url#https://}"; host="${host%%/*}"
+  ip="$(ip_publico "$host")"; rc=$?
+  case "$rc" in
+    0) ;;
+    1) echo "Funnel: $host não existe no DNS público (depois de reiniciar o Tailscale, pode levar ~20 min)"; return 1 ;;
+    *) echo "Funnel: nenhum DNS público respondeu ($DOH_URLS); sem internet?"; return 1 ;;
+  esac
+  codigo="$(curl -s -o /dev/null -m 20 -w '%{http_code}' --resolve "$host:443:$ip" "$url/mcp" || true)"
+  if [ "$codigo" = 401 ]; then
+    echo "Funnel pela internet: $url/mcp ($ip) sem token = 401"
+  else
+    echo "Funnel pela internet: $url/mcp ($ip) sem token = ${codigo:-sem resposta} (esperado 401)"
+    return 1
+  fi
+}
+
 # --- Postgres ---------------------------------------------------------------------------------
 
 esperar_saudavel() {  # <serviço> [segundos]

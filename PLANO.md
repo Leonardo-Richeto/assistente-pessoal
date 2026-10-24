@@ -22,7 +22,9 @@ seu próprio projeto Docker Compose; o que hoje está no i5 vem para o i7 (Fase 
 de R$ 29 a 47/mês). Sem backup do banco por enquanto; o vault tem Syncthing e GitHub (Fase 7). Revisto em 2026-10-19: backup diário
 cifrado e migração pelo mesmo pacote (Fase 7, `docs/MIGRACAO.md`). Em 2026-10-21 (Leonardo): no início, sem backup ligado. **Em 2026-10-23 (Leonardo): backup ligado desde o início**, no HD de 500 GB do i7.
 - [ ] 1.9 `scripts/verificar.sh` testa o Funnel de dentro da tailnet: deu "ok" com o DNS público vazio (2026-10-23).
-  Testar pela internet (DNS público + `curl --resolve` no IP do ingress) e falhar se o nome não existir
+  Testar pela internet (DNS público + `curl --resolve` no IP do ingress) e falhar se o nome não existir.
+  Feito no código em 2026-10-24 (`conferir_funnel_publico` no `lib.sh`, DoH no 1.1.1.1 e no 8.8.8.8;
+  `scripts/testes/test_funnel_publico.sh`). Falta rodar o `verificar.sh` no i7.
 - [x] 1.10 Conferir se o backup das 03:15 (para e religa o Tailscale) derruba o DNS público do Funnel (~20 min em
   2026-10-23 depois de um restart). Se derrubar: não parar o container do Tailscale no backup
   (2026-10-24: backup parou e religou às 03:18; o claude.ai chamou pelo Funnel às 06:34 sem falha. Uma falha curta logo

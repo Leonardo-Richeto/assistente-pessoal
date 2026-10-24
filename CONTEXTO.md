@@ -206,6 +206,10 @@ perguntas fora da busca real; `consultar_sessoes` sem `comandos`.
 - **Correção:** a identidade do age **não** está no gerenciador de senhas. A única cópia é `~/identidade-assistente.txt`
   no Mac (2026-10-23 16:09, permissão 600). O `.env` do Mac tem só a chave pública. Se o Mac se perder, os backups
   não abrem: guardar a identidade em outro lugar é pendência (decisão do Leonardo).
+- **PLANO 1.9 no código:** o `verificar.sh` resolve o nome do Funnel num DNS público (DoH em 1.1.1.1 e 8.8.8.8, pelo
+  IP) e chama o `/mcp` no IP público com `curl --resolve`; falha se o nome não existir. Motivo: o MagicDNS do host
+  resolve o nome para a tailnet e o teste antigo passava com o DNS público vazio. O nome do Funnel vai para o
+  Cloudflare/Google na consulta (ele já é público: DNS e certificado). Falta rodar no i7.
 - **Registros reais:** atividade 1 (2026-10-23, dia de implantação no i7) e a nota `50-diario/2026/2026-10-24.md`.
 - **Não verificado:** teste do ponto (o Leonardo vai ajustar antes); "nota que mudou no meio"; lint do vault no i7;
   o launchd enviando de fato (só rodou com a fila vazia); B9b (desligar o Funnel e a stack do Mac).

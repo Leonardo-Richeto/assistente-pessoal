@@ -54,9 +54,7 @@ fi
 
 # --- Funnel (só com o perfil tailscale) --------------------------------------------------------
 if dc config --services | tr -d '\r' | grep -qx tailscale; then
-  URL="$(valor_env PUBLIC_BASE_URL)"
-  CODIGO="$(curl -s -o /dev/null -m 20 -w '%{http_code}' "$URL/mcp" || true)"
-  [ "$CODIGO" = 401 ] && ok "Funnel: $URL/mcp sem token = 401" || ruim "Funnel: $URL/mcp sem token = ${CODIGO:-sem resposta} (esperado 401)"
+  if LINHA="$(conferir_funnel_publico "$(valor_env PUBLIC_BASE_URL)")"; then ok "$LINHA"; else ruim "$LINHA"; fi
 else
   echo "pulado Funnel (perfil tailscale desligado)"
 fi
