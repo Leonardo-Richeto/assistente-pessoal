@@ -21,10 +21,10 @@ A sequência de **teste no MacBook → produção no i7** está em `docs/IMPLANT
 seu próprio projeto Docker Compose; o que hoje está no i5 vem para o i7 (Fase 1c) e o i5 fica desligado. Motivo: conta de luz (as duas ligadas: estimativa
 de R$ 29 a 47/mês). Sem backup do banco por enquanto; o vault tem Syncthing e GitHub (Fase 7). Revisto em 2026-10-19: backup diário
 cifrado e migração pelo mesmo pacote (Fase 7, `docs/MIGRACAO.md`). Em 2026-10-21 (Leonardo): no início, sem backup ligado. **Em 2026-10-23 (Leonardo): backup ligado desde o início**, no HD de 500 GB do i7.
-- [ ] 1.9 `scripts/verificar.sh` testa o Funnel de dentro da tailnet: deu "ok" com o DNS público vazio (2026-10-23).
+- [x] 1.9 `scripts/verificar.sh` testa o Funnel de dentro da tailnet: deu "ok" com o DNS público vazio (2026-10-23).
   Testar pela internet (DNS público + `curl --resolve` no IP do ingress) e falhar se o nome não existir.
   Feito no código em 2026-10-24 (`conferir_funnel_publico` no `lib.sh`, DoH no 1.1.1.1 e no 8.8.8.8;
-  `scripts/testes/test_funnel_publico.sh`). Falta rodar o `verificar.sh` no i7.
+  `scripts/testes/test_funnel_publico.sh`). No i7 em 2026-10-24: "Funnel pela internet ... sem token = 401", tudo ok.
 - [x] 1.10 Conferir se o backup das 03:15 (para e religa o Tailscale) derruba o DNS público do Funnel (~20 min em
   2026-10-23 depois de um restart). Se derrubar: não parar o container do Tailscale no backup
   (2026-10-24: backup parou e religou às 03:18; o claude.ai chamou pelo Funnel às 06:34 sem falha. Uma falha curta logo
@@ -33,7 +33,7 @@ cifrado e migração pelo mesmo pacote (Fase 7, `docs/MIGRACAO.md`). Em 2026-10-
   Se voltar: Scheduled Power-On da BIOS para ligar, timer do systemd para desligar, e os timers das 03:15–03:40 antes do desligamento
 - [x] 1.0 (2026-10-23) BIOS do i7 para economia (na instalação): C-states e package C-state no máximo, ASPM ligado, áudio e
   portas sem uso desligados, "AC power restore" ligado (volta sozinho depois de queda de luz). Lista completa: `docs/IMPLANTACAO.md` B2a
-- [ ] 1.1 Inventário completo de todas as máquinas: especificações, configuração, saúde SMART de cada HD/SSD, VMs → nota no vault + resumo em `docs/inventario.md` (roteiro em `CONTEXTO.md`)
+- [ ] 1.1 Inventário completo de todas as máquinas: especificações, configuração, saúde SMART de cada HD/SSD, VMs → nota no vault + resumo em `docs/inventario.md` (roteiro em `CONTEXTO.md`). i7 feito em 2026-10-24; falta o i5 (1c.1)
 - [x] 1.2 (2026-10-23) Instalar Debian 13 direto no i7, com governador da CPU `powersave` e `powertop --auto-tune` no boot, e
   Docker (`docs/IMPLANTACAO.md` B2)
 - [x] 1.3 Exposição: Tailscale Funnel (decidido)

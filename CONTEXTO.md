@@ -209,7 +209,12 @@ perguntas fora da busca real; `consultar_sessoes` sem `comandos`.
 - **PLANO 1.9 no código:** o `verificar.sh` resolve o nome do Funnel num DNS público (DoH em 1.1.1.1 e 8.8.8.8, pelo
   IP) e chama o `/mcp` no IP público com `curl --resolve`; falha se o nome não existir. Motivo: o MagicDNS do host
   resolve o nome para a tailnet e o teste antigo passava com o DNS público vazio. O nome do Funnel vai para o
-  Cloudflare/Google na consulta (ele já é público: DNS e certificado). Falta rodar no i7.
+  Cloudflare/Google na consulta (ele já é público: DNS e certificado). No i7 (2026-10-24): `verificar.sh` tudo ok,
+  com o Funnel pela internet = 401.
+- **Inventário B1 do i7** (`deploy/inventario.sh`, powertop de 30 s): 16 GB em 4 × 4 GB DDR4-2133, sem slot livre.
+  SMART igual ao de 2026-10-23 (HD: 184 = 25 FAILING_NOW, CRC 13155 parado; teste longo sem erro). Package em
+  pc7/pc8 ~86% do tempo ocioso. Falta o microcódigo da CPU (`intel-microcode`). Resumo em `docs/inventario.md`;
+  detalhe na nota `maquinas-do-assistente-pessoal` do vault. O i5 continua pendente (PLANO 1c.1).
 - **Registros reais:** atividade 1 (2026-10-23, dia de implantação no i7) e a nota `50-diario/2026/2026-10-24.md`.
 - **Não verificado:** teste do ponto (o Leonardo vai ajustar antes); "nota que mudou no meio"; lint do vault no i7;
   o launchd enviando de fato (só rodou com a fila vazia); B9b (desligar o Funnel e a stack do Mac).
@@ -294,9 +299,10 @@ O i7 está no ar: stack, vault, Syncthing i7↔Mac, timers, backup no HD e sess�
 2. Resto do B9 (ponto, quando o Leonardo ajustar; nota que mudou no meio; lint) e B9b no Mac.
 3. Feito em 2026-10-24: journal do backup e do vault-commit, Funnel depois das 03:15 (PLANO 1.10).
 4. Ensaio de restauração feito em 2026-10-24. Falta guardar a identidade do age fora do Mac (só existe em ~/identidade-assistente.txt).
-5. Inventário B1 no i7 (deploy/inventario.sh) → vault + docs/inventario.md; powertop (Pkg C6+), hdparm -C do HD.
+5. Feito em 2026-10-24: inventário B1 do i7 e powertop. Falta o intel-microcode no i7 e conferir o HD parado: o hdparm -C
+   deu active/idle logo depois do smartctl do inventário, que acorda o disco; repetir depois de 15 min sem uso.
 6. iPhone no Syncthing (Synctrain); decisões do 2b-7; launchd do envio das sessões (decisão do Leonardo).
-7. Corrigir o verificar.sh para testar o Funnel pela internet (PLANO 1.9), com teste.
+7. Feito em 2026-10-24: verificar.sh testa o Funnel pela internet (PLANO 1.9), rodado no i7.
 Pronto quando: B9 passa pelo app; o ensaio de restauração abre o pacote; PLANO/CONTEXTO/vault atualizados.
 Não commitar sem o ok do Leonardo; o push é ele quem roda. Nada de segredo no repo.
 ```

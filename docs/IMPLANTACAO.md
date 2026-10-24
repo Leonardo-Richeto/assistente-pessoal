@@ -52,7 +52,7 @@ ferramentas da 2b).
    `curl -fsI https://raw.githubusercontent.com/Leonardo-Richeto/assistente-pessoal/main/deploy/inventario.sh`
    (deve responder `200`). Se der 404, pare: o push não aconteceu.
 1. [ ] (5 min) Ligue o i7 na tomada medidora. A máquina está decidida: i7 com Debian direto (2026-10-18).
-2. [ ] (10 min) Inventário no host (B1). No i7, depois do B2d (o SMART não se apaga ao formatar). **Pendente** (2026-10-23).
+2. [x] (10 min) Inventário no host (B1). No i7, depois do B2d (o SMART não se apaga ao formatar). Feito em 2026-10-24 (`docs/inventario.md`).
 3. [x] (40 a 60 min) BIOS, Debian 13 no i7, economia de energia, SMART e HD do backup (B2).
 4. [x] (10 min) Na máquina nova: clonar em `/srv/assistente/app` e rodar `sudo bash scripts/preparar_host.sh` (B3).
 5. [x] (10 min) `sudo tailscale up` do host (só SSH), chave de autenticação para o nó `assistente`, HTTPS e Funnel no painel (B4).
