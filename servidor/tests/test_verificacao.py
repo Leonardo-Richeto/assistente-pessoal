@@ -3,6 +3,7 @@
 import http.server
 import os
 import shutil
+import socket
 import subprocess
 import threading
 import time
@@ -87,6 +88,7 @@ class _Respostas(http.server.BaseHTTPRequestHandler):
 
 @pytest.fixture
 def http_local(monkeypatch):
+    monkeypatch.setattr(verificacao, "_resolver", lambda nome, porta: [])  # sem rede de verdade
     servidor = http.server.HTTPServer(("127.0.0.1", 0), _Respostas)
     threading.Thread(target=servidor.serve_forever, daemon=True).start()
     monkeypatch.setenv("PORTA", str(servidor.server_port))
@@ -108,6 +110,42 @@ def test_http_sem_login_falha(ambiente, http_local, capsys):
     assert verificacao.main([]) == 1
     saida = capsys.readouterr().out
     assert "FALHA GET /mcp sem token = 200 (esperado 401)" in saida
+
+
+def _sem_dns_para(*nomes):
+    def resolver(nome, porta):
+        if nome in nomes:
+            raise socket.gaierror(-3, "Temporary failure in name resolution")
+        return []
+    return resolver
+
+
+def test_dns_resolve_os_nomes_do_login(monkeypatch):
+    monkeypatch.setattr(verificacao, "_resolver", _sem_dns_para())
+    assert verificacao.checar_dns() == [("ok", "DNS do servidor resolve claude.ai, oauth2.googleapis.com")]
+
+
+def test_dns_sem_um_nome_falha_e_diz_qual(monkeypatch):
+    """O caso de 2026-10-24: o container sem DNS depois do reboot; o /token dava 401."""
+    monkeypatch.setattr(verificacao, "_resolver", _sem_dns_para("claude.ai"))
+    [(nivel, texto)] = verificacao.checar_dns()
+    assert nivel == "FALHA"
+    assert "não resolve claude.ai" in texto and "oauth2.googleapis.com" not in texto
+
+
+def test_main_sem_dns_sai_1(ambiente, http_local, monkeypatch, capsys):
+    http_local.codigos = {"/mcp": 401, "/.well-known/oauth-protected-resource/mcp": 200}
+    monkeypatch.setattr(verificacao, "_resolver", _sem_dns_para("claude.ai", "oauth2.googleapis.com"))
+    config.cache_clear()
+    assert verificacao.main([]) == 1
+    assert "FALHA DNS do servidor não resolve claude.ai" in capsys.readouterr().out
+
+
+def test_main_sem_http_nao_resolve_nada(ambiente, monkeypatch):
+    def proibido(nome, porta):
+        raise AssertionError("--sem-http não usa a rede")
+    monkeypatch.setattr(verificacao, "_resolver", proibido)
+    assert verificacao.main(["--sem-http"]) == 0
 
 
 # ---------------- migração e tabelas novas ----------------

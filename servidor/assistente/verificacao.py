@@ -2,7 +2,8 @@
 
 Só lê. A consulta passa pelas ferramentas MCP do banco (cliente em memória) com o usuário de
 LEITURA nos dois papéis, sem o middleware de registro: nada é gravado, nem em `chamadas`.
-O HTTP local confere que o login está ligado (/mcp sem token = 401).
+O HTTP local confere que o login está ligado (/mcp sem token = 401) e que o servidor resolve os
+nomes de que o login depende.
 
     python -m assistente.verificacao            # consulta + HTTP
     python -m assistente.verificacao --sem-http # só a consulta
@@ -13,6 +14,7 @@ Cada linha começa com `ok`, `AVISO` ou `FALHA`. Sai com 0 se nada falhou (AVISO
 import argparse
 import asyncio
 import os
+import socket
 import sys
 import time
 import urllib.error
@@ -52,9 +54,31 @@ def status_http(url: str, timeout: float = 10) -> int:
         return e.code
 
 
+Linha = tuple[str, str]  # (nível, texto): nível é "ok", "AVISO" ou "FALHA"
+
+# Nomes que o login resolve a cada renovação: o cadastro do cliente do claude.ai (CIMD) e o token
+# do Google. Sem DNS, o /token responde 401 e o claude.ai mostra "sign-in server unavailable"
+# (2026-10-24, depois de um reboot: o Docker subiu antes do Tailscale do host escrever o resolv.conf).
+NOMES_DO_LOGIN = ("claude.ai", "oauth2.googleapis.com")
+_resolver = socket.getaddrinfo
+
+
+def checar_dns(nomes: tuple[str, ...] = NOMES_DO_LOGIN) -> list[Linha]:
+    """Resolve cada nome de que o login depende, de dentro do container."""
+    falharam = []
+    for nome in nomes:
+        try:
+            _resolver(nome, 443)
+        except OSError as e:
+            falharam.append(f"{nome} ({e})")
+    if falharam:
+        return [("FALHA", "DNS do servidor não resolve " + ", ".join(falharam)
+                 + ": o login pelo claude.ai falha; veja `dns:` no docker-compose.yml")]
+    return [("ok", "DNS do servidor resolve " + ", ".join(nomes))]
+
+
 LOCK_VELHO_S = 600
 TABELAS_NOVAS = ("notas_desatualizadas", "sessoes")
-Linha = tuple[str, str]  # (nível, texto): nível é "ok", "AVISO" ou "FALHA"
 
 
 def cabeca_das_migracoes() -> str:
@@ -189,6 +213,7 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 print(f"FALHA GET {caminho} sem token = {obtido} (esperado {esperado})")
                 falhas += 1
+        falhas += imprimir(checar_dns())
 
     return 1 if falhas else 0
 

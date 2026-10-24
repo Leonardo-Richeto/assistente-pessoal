@@ -215,6 +215,17 @@ perguntas fora da busca real; `consultar_sessoes` sem `comandos`.
   SMART igual ao de 2026-10-23 (HD: 184 = 25 FAILING_NOW, CRC 13155 parado; teste longo sem erro). Package em
   pc7/pc8 ~86% do tempo ocioso. Falta o microcódigo da CPU (`intel-microcode`). Resumo em `docs/inventario.md`;
   detalhe na nota `maquinas-do-assistente-pessoal` do vault. O i5 continua pendente (PLANO 1c.1).
+- **Queda depois do reboot (12:00–12:23):** o `intel-microcode` já estava instalado; o reboot derrubou o login do
+  claude.ai ("sign-in server temporarily unavailable"). Causa: o `/etc/resolv.conf` do i7 é do Tailscale do host
+  (`100.100.100.100`); no boot o Docker subiu antes dele e o container ficou com "NO EXTERNAL NAMESERVERS DEFINED".
+  Sem DNS, o servidor não baixa o cadastro do cliente do claude.ai (CIMD) e o `/token` responde 401. O
+  `restart servidor` consertou o DNS, mas derrubou o Funnel: o Tailscale usa a rede do servidor e ficou na rede
+  velha; `up -d --force-recreate tailscale` religou. Correção de vez: `dns: [1.1.1.1, 8.8.8.8]` no `servidor`
+  e o `verificar.sh` resolve `claude.ai` e `oauth2.googleapis.com` de dentro do container (`checar_dns`).
+  Regra nova em `docs/IMPLANTACAO.md` B7: nunca reiniciar só o `servidor`. O "Gather data sampling: No
+  microcode" do `lscpu` continua sem explicação (pacote instalado; falta ver o journal do kernel).
+- **Mac:** o `pytest` parou de achar o pacote `assistente` porque o macOS pôs a flag `hidden` no `.pth` do
+  `.venv` e o Python 3.14 ignora `.pth` oculto. Correção: `chflags nohidden servidor/.venv/lib/python3.14/site-packages/*.pth`.
 - **Registros reais:** atividade 1 (2026-10-23, dia de implantação no i7) e a nota `50-diario/2026/2026-10-24.md`.
 - **Não verificado:** teste do ponto (o Leonardo vai ajustar antes); "nota que mudou no meio"; lint do vault no i7;
   o launchd enviando de fato (só rodou com a fila vazia); B9b (desligar o Funnel e a stack do Mac).

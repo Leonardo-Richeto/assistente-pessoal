@@ -91,6 +91,11 @@ services:
       - ${ASSISTENTE_HOME}/data/sessoes/oauth:/home/assistente/.local/share/fastmcp
     ports:
       - "127.0.0.1:${PORTA_HOST:-8000}:8000"
+    # DNS fixo: o login resolve claude.ai e o Google a cada renovação. Sem isto, o container herda o
+    # resolv.conf do host no boot; no i7 (Tailscale do host com MagicDNS), o Docker subiu antes de o
+    # arquivo existir e o servidor ficou sem DNS (2026-10-24). Os nomes do compose (postgres) continuam
+    # resolvidos pelo Docker. O Tailscale divide esta rede e usa o mesmo DNS.
+    dns: [1.1.1.1, 8.8.8.8]
     # Saudável só se /mcp sem token responde 401. 200 sem token (login desligado) conta como doente.
     healthcheck:
       test:

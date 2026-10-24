@@ -217,6 +217,10 @@ printf '/dev/disk/by-id/<ata-do-HD> {\n    spindown_time = 120\n}\n' | sudo tee 
       ```
       Se o `/mcp` responder 200 sem token: **pare**, `docker compose stop tailscale` e investigue. Depois que o nó
       entrar, apague o valor de `TS_AUTHKEY` do `.env` (a identidade fica em `data/tailscale`).
+      **Nunca reinicie só o `servidor`** (`docker compose restart servidor`): o Tailscale usa a rede dele
+      (`network_mode: service:servidor`) e fica preso na rede velha; o Funnel cai (2026-10-24). Para reiniciar:
+      `docker compose up -d --force-recreate servidor tailscale`. Depois de recriar o Tailscale, o nome do Funnel
+      pode sumir do DNS público por alguns minutos.
 - [ ] B7b. No Mac, pare só o servidor: `cd ~/Desktop/Projetos/assistente-pessoal && docker compose stop servidor`.
       O Postgres do Mac continua de pé (o backup do B10 precisa dele) e nada novo é gravado.
 - [ ] B10. Decidir se os registros do Mac vão para a produção ou se começa limpo. Para levar:
