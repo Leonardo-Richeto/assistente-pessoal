@@ -485,13 +485,13 @@ Tika 0,3 GB, Gotenberg 0,15 GB). **Antes:** a chave pública do age (a mesma do 
       Ponha um PDF em `/srv/paperless/consumir/leonardo/` (ou suba pela interface) e peça "me mostra o último
       documento que entrou". Peça também "compartilha esse documento com a Nathalia": a resposta deve ser
       "Não consigo compartilhar: os documentos de cada um ficam separados."
-- [ ] P7. Interface web, quando precisar (do Mac): `ssh -L 8010:127.0.0.1:8010 i7` e abra `http://127.0.0.1:8010`
+- [ ] P7. Interface web, quando precisar (do Mac): `ssh -L 8010:127.0.0.1:8010 <usuario>@i7` (o usuário do i7, não o do Mac) e abra `http://127.0.0.1:8010`
       como `admin`. Para a Nathalia entrar na web, defina a senha dela ali (Usuários). Nunca dê permissão a um
       documento para o outro usuário, nem crie grupo: a conferência diária acusa (Ficha 6, decisão 3).
 - [ ] P8. Instância da Nathalia (PLANO 1b.1, depois do P9): `COMPOSE_PROJECT_NAME=assistente-nathalia` na instância dela
       já casa com a rede `assistente-nathalia-paperless`; o token dela sai de `token.sh nathalia`, e o P3 vale igual com
       a pasta dela.
-- [ ] P9. Trocar `esposa` por `nathalia` (Leonardo, 2026-10-24), depois do commit e do push. Documentos, token e
+- [x] P9. Trocar `esposa` por `nathalia` (Leonardo, 2026-10-24), depois do commit e do push. Documentos, token e
       permissões ficam com o mesmo usuário; o script não apaga nada e pode rodar de novo. ~5 min.
       **Rode o bloco inteiro de uma vez:** depois do `git pull`, sem o `sed`, o backup das 03:45, a conferência e o
       `token.sh` param (falta `REDE_NATHALIA` no `.env`). Se `consumir/esposa` tiver arquivo, o script para antes de mudar
@@ -506,7 +506,7 @@ Tika 0,3 GB, Gotenberg 0,15 GB). **Antes:** a chave pública do age (a mesma do 
       ```
       Esperado: `usuário esposa -> nathalia; workflows renomeados: 1`, `pasta: consumir/esposa -> consumir/nathalia`,
       `conferir: ok` e o `verificar.sh` sem FALHA. Ensaiado no Paperless de teste do Mac em 2026-10-24.
-- [ ] P10. Pasta de entrada pelo Syncthing (Ficha 7): siga a seção 8 de `docs/SYNCTHING.md`, agora no i7 e no Mac.
+- [x] P10. Pasta de entrada pelo Syncthing (Ficha 7): siga a seção 8 de `docs/SYNCTHING.md`, agora no i7 e no Mac.
       iPhone e PC Windows entram depois, junto com o vault (PLANO 2.2). Teste de isolamento no i7, com o token da Nathalia direto na variável, sem aparecer na tela:
       ```bash
       # no Mac: copie um PDF chamado entrada-teste.pdf para ~/Documents/Paperless-entrada; ele some em ~1 min

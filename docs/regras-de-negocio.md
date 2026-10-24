@@ -930,6 +930,8 @@ item 2 iguais à ficha; conferência confere o conteúdo dos workflows; `verific
 2026-10-24 (Opus 5.5): padrões ignorados e duplicata desligada em `paperless/docker-compose.yml`; aviso de arquivo
 parado em `paperless/deploy/gestao.py` e no `verificar.sh`; `.stignore` em `paperless/deploy/syncthing/`; roteiro em
 `docs/SYNCTHING.md` (seção 8) e `docs/IMPLANTACAO.md` (P9 e P10); linha nova no § Paperless da Ficha 1.
+No i7 em 2026-10-24: P9 e P10 feitos; cenário 3 verificado (o PDF sumiu do Mac em 29 s, entrou como do Leonardo, e o
+token da Nathalia deu 0 na busca e 404 no id direto); Ficha 1 colada no Projeto.
 
 ### Decisões do Leonardo (2026-10-24)
 

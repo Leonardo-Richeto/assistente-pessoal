@@ -77,7 +77,7 @@ cifrado e migração pelo mesmo pacote (Fase 7, `docs/MIGRACAO.md`). Em 2026-10-
 - [ ] 2.2 (2026-10-24: feito i7 ↔ Mac; falta iPhone e PC Windows, a fazer no trabalho) Migrar o vault para `/srv/assistente/vault` no i7, Syncthing com todos os aparelhos (Mac, iPhone, PC Windows) e GitHub privado mantido por enquanto (decisão de 2026-10-17); preencher `VAULT_PATH`. Detalhe: `docs/SYNCTHING.md`
 - [x] 2.2b (regra em 2026-10-16, `registro-temporario-de-sprint-na-raiz`; inventário em `maquinas-do-assistente-pessoal`) Levar para o vault a "Regra de passagem" e a nota de inventário das máquinas
 - [x] 2.3 (2026-10-23, `vault-commit.timer` às 03:30 no i7; registro do vault de 2026-10-23) Job diário de commit do vault (`git add -A && git commit`) para ter histórico de tudo que a IA escrever
-- [ ] ⚑ 2.4 (2026-10-24: Ficha 7 aprovada, código e teste no Mac; falta P9 e P10 de `docs/IMPLANTACAO.md` no i7) Definir o envio de arquivos para o servidor (pasta "consumir" do Paperless sincronizada pelo Syncthing é o caminho mais simples)
+- [x] ⚑ 2.4 (2026-10-24: Ficha 7; P9 e P10 no i7 testados com o Syncthing de verdade; iPhone e PC Windows na 2.2) Definir o envio de arquivos para o servidor (pasta "consumir" do Paperless sincronizada pelo Syncthing é o caminho mais simples)
 - [ ] 2.5 Compartilhar documento entre o Leonardo e a Nathalia (Leonardo, 2026-10-24: "para implementação futura").
   Hoje a Ficha 6 (decisão 3) proíbe. Antes do código, ficha nova: quem compartilha, só ver ou editar, confirmação e
   desfazer. Depois, ferramenta própria (a `paperless-mcp` não muda permissões) com o token do dono e linha em
