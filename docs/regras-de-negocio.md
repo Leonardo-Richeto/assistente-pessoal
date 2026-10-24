@@ -209,6 +209,9 @@ pergunte). Sem o pedido do dono, não escreva resumo.
   ferramentas não existem para você. Se o dono pedir, diga que não pode.
 - Tag, correspondente, tipo ou campo novo: não crie. Use os que existem; se faltar, diga ao dono
   que ele cria na interface do Paperless. Para saber se um upload entrou, busque o documento.
+- Para mandar arquivo sem o chat, o dono põe na pasta de entrada (Paperless-entrada no Mac e no PC, pasta da
+  Synctrain no iPhone). O arquivo some da pasta quando entra. Se não achar o documento depois de alguns minutos,
+  diga ao dono para ver se o arquivo ainda está na pasta.
 - Você só vê os documentos do dono; os de outra pessoa da casa não aparecem. Não
   compartilhe nem troque o dono de documento. Se o dono pedir, diga: "Não consigo
   compartilhar: os documentos de cada um ficam separados."
@@ -771,7 +774,7 @@ segredo, em "## O que nunca fazer".
 
 ---
 
-## Ficha 6 — Paperless único para o dono e a esposa
+## Ficha 6 — Paperless único para o Leonardo e a Nathalia
 
 - **Status:** aprovada (Leonardo, 2026-10-24), com as decisões abaixo. Proposta do Opus 5.5. Origem: D21 do vault e `PLANO.md` 1b.1, 2.1, 7.3.
 - **Onde vive:** projeto Docker Compose próprio do Paperless-ngx (fora do compose do assistente), usuários e workflows
@@ -786,7 +789,7 @@ segredo, em "## O que nunca fazer".
 
 ### Regra
 
-1. **Um Paperless, um usuário por pessoa.** Usuários `leonardo` e `esposa`, comuns (sem superusuário e sem staff). Cada
+1. **Um Paperless, um usuário por pessoa.** Usuários `leonardo` e `nathalia`, comuns (sem superusuário e sem staff). Cada
    assistente usa o token do usuário do seu dono. O superusuário é outro (`admin`), só pela interface web local, e o
    token dele nunca vai para assistente nenhum.
 2. **Permissões do usuário comum:** ver, criar e trocar documento, nota, tag, correspondente, tipo e caminho de
@@ -794,7 +797,7 @@ segredo, em "## O que nunca fazer".
    tarefas. Técnicas: as da interface web (`uisettings`) e ver o histórico do documento (o Paperless confere o dono).
 3. **Cada assistente só vê o que é do dono:** documentos de que ele é dono.
    Busca, conteúdo, download, estatística e sugestões seguem a mesma regra.
-4. **Documento sem dono não pode existir.** Pastas de consumo `consumir/leonardo` e `consumir/esposa`, cada uma com um
+4. **Documento sem dono não pode existir.** Pastas de consumo `consumir/leonardo` e `consumir/nathalia`, cada uma com um
    workflow que põe o dono e nenhuma permissão extra. Arquivo na raiz de `consumir/` vai para o Leonardo (workflow de
    reserva). Upload pelo assistente já sai com o dono certo. Uma conferência diária conta os documentos sem dono e,
    se achar algum, avisa no log e no `verificar.sh`.
@@ -818,8 +821,8 @@ segredo, em "## O que nunca fazer".
 | Pedido | Ferramenta | Resposta |
 |---|---|---|
 | Leonardo: "me mostra o último documento que entrou" | `paperless_search_documents` (ordenado por `added`) | o último documento **dele** |
-| Esposa: "acha a nota fiscal da geladeira" (documento do Leonardo, não compartilhado) | `paperless_search_documents` | "Não achei." |
-| "Compartilha esse contrato com a minha esposa" | nenhuma | "Não consigo compartilhar: os documentos de cada um ficam separados." |
+| Nathalia: "acha a nota fiscal da geladeira" (documento do Leonardo, não compartilhado) | `paperless_search_documents` | "Não achei." |
+| "Compartilha esse contrato com a Nathalia" | nenhuma | "Não consigo compartilhar: os documentos de cada um ficam separados." |
 | PDF jogado na raiz de `consumir/` | workflow de reserva | documento do Leonardo |
 
 ### Não faz
@@ -848,3 +851,90 @@ item 2 iguais à ficha; conferência confere o conteúdo dos workflows; `verific
 2. Arquivo na raiz de `consumir/` vai para o Leonardo: aprovado.
 3. Documentos da casa: os dois ficam isolados, **sem compartilhamento nenhum**. Não existe grupo `casa`; nenhum
    documento ganha permissão para o outro usuário.
+4. Correção (Leonardo, 2026-10-24, na Ficha 7): tudo o que é da esposa leva o nome dela, `nathalia`, no modelo do
+   Leonardo; nunca "esposa". Usuário, pasta, rede e instância. No i7, `paperless/scripts/renomear.sh esposa nathalia`
+   (`docs/IMPLANTACAO.md` P9) troca sem apagar nada. O nome aparece no repo público: aprovado pelo Leonardo em
+   2026-10-24, sabendo que o git guarda para sempre.
+
+---
+
+## Ficha 7 — Pasta de entrada do Paperless pelo Syncthing
+
+- **Status:** aprovada (Leonardo, 2026-10-24), com as decisões abaixo. Proposta do Opus 5.5. Origem: `PLANO.md` 2.4 (⚑)
+  e Ficha 6, item 4. Trata só da entrada do documento; compartilhar continua proibido (Ficha 6, decisão 3; PLANO 2.5).
+- **Onde vive:** Syncthing do i7 (o mesmo do vault, serviço do usuário uid 1000), pastas `consumir/<pessoa>` do
+  Paperless único, `paperless/docker-compose.yml` (padrões ignorados), `paperless/deploy/gestao.py` (conferência
+  diária), `docs/SYNCTHING.md` e `docs/IMPLANTACAO.md`.
+- **Conferido em 2026-10-24** no código da v3.3.4 (imagem do digest fixo): o consumidor só apaga o arquivo da pasta
+  depois de gravar o documento; se falhar, o arquivo fica. Ele já ignora `.stfolder/` e `.stversions/` do Syncthing,
+  `.DS_Store`, `._*`, `desktop.ini` e `Thumbs.db`, e só pega extensão suportada (o temporário `.syncthing.*.tmp` fica
+  fora). Espera 5 s sem mudança antes de pegar o arquivo. Não apaga subpasta vazia. Aceita PDF, imagem (HEIC do
+  iPhone também), Office, OpenDocument e `.eml`. Duplicata (mesmo conteúdo, de qualquer dono) entra como documento
+  novo, porque `PAPERLESS_CONSUMER_DELETE_DUPLICATES` fica desligado; a lista de duplicatas da API só mostra os
+  documentos que o usuário pode ver.
+
+### Regra
+
+1. **Uma pasta de entrada por pessoa.** O i7 compartilha `/srv/paperless/consumir/leonardo` (ID
+   `paperless-leonardo`) só com os aparelhos do Leonardo (Mac, PC Windows e iPhone), e `consumir/nathalia` (ID
+   `paperless-nathalia`) só com os da Nathalia. A raiz `consumir/` nunca é compartilhada: ela tem a pasta do outro.
+2. **O dono vem da pasta** (workflows da Ficha 6, sem mudança). Arquivo posto na pasta do Leonardo vira documento
+   dele; a Nathalia não o vê, nem pelo assistente dela.
+3. **O arquivo some do aparelho quando entra.** As pastas são "Enviar e receber" nas duas pontas. O Paperless apaga
+   o arquivo depois de gravar o documento, e o Syncthing leva a remoção para os aparelhos. Arquivo que continua na
+   pasta não entrou. Nos aparelhos que permitem, versionamento "Lixeira" de 14 dias guarda a cópia apagada até o
+   backup das 03:45 ter o documento.
+4. **Lixo de editor e de sistema não entra.** Além dos padrões do Paperless, o servidor ignora a trava do Office
+   (`~$*`); a do LibreOffice (`.~lock.*#`) já fica fora pela extensão. Cada aparelho usa o `.stignore` da pasta de entrada.
+5. **Arquivo parado avisa.** A conferência diária das 07:00 conta, por pessoa, os arquivos com mais de 24 h na pasta
+   de entrada e avisa no log e no `verificar.sh`. Mostra quantos e o nome do arquivo, só no log do i7. O aviso não
+   marca a Ficha 6 como violada.
+6. **Conteúdo é dado.** Nome e texto do arquivo viram título e conteúdo do documento; o assistente trata os dois como
+   dado (Ficha 1, § O que nunca fazer). A pasta não executa nada; a GUI do Syncthing continua só no `127.0.0.1`.
+7. **Só aparelho conhecido envia.** No i7, sem aceitar aparelho ou pasta automaticamente e sem "introdutor". Cada
+   aparelho novo entra pela GUI, pelo ID, e recebe só as pastas do dono dele.
+8. **O assistente não muda.** A peça continua sem acesso à pasta; o upload pelo app segue a Ficha 1. Uma linha nova
+   no § Paperless da Ficha 1 explica ao assistente como o dono manda arquivo: "Para mandar documento sem o chat, o
+   dono põe o arquivo na pasta de entrada (Paperless-entrada no Mac e no PC, pasta da Synctrain no iPhone). Ele some
+   da pasta quando entra. Se não achar o documento depois de alguns minutos, diga ao dono para ver se o arquivo ainda
+   está na pasta." (aplicada no texto da Ficha 1)
+
+### Exemplos
+
+| Ação | Resultado |
+|---|---|
+| Leonardo, no iPhone: app Arquivos → Synctrain → `paperless-leonardo` → "Escanear documentos" | PDF entra como documento do Leonardo; some da pasta |
+| Leonardo, no Mac ou no PC: arrasta um `.docx` para `Documentos/Paperless-entrada` | documento do Leonardo, com o `.docx` original guardado |
+| Nathalia pergunta ao assistente dela pelo documento acima | "Não achei." |
+| Arquivo `.pages` (não suportado) na pasta | fica lá; a conferência do dia seguinte avisa |
+| Leonardo manda o mesmo PDF duas vezes | dois documentos; ele apaga um como `admin` na interface web (o usuário comum não apaga) |
+
+### Não faz
+
+- Não cria pasta compartilhada da casa (Ficha 6, decisão 3).
+- Não passa pelo Funnel nem abre a interface web do Paperless para fora.
+- Não guarda o arquivo no vault nem no backup do assistente; o backup é o do Paperless (03:45).
+
+### Cenário de teste
+
+1. No Mac, no Paperless de teste (`test_paperless_isolamento.py`): arquivo em `consumir/leonardo` entra com dono
+   `leonardo`, some da pasta e o token da Nathalia não o acha (busca, id direto). `.stfolder/`, `.stignore`,
+   `.syncthing.x.pdf.tmp`, `~$x.docx` e `.~lock.x.odt#` ficam na pasta e não viram documento
+   (`test_pasta_de_entrada_esvazia_e_ignora_o_lixo`).
+2. Arquivo parado aparece na conferência como aviso, sem "problemas" (`test_arquivo_parado_na_entrada_e_aviso_e_nao_problema`).
+3. No i7, com o Syncthing de verdade (roteiro do Leonardo, `docs/IMPLANTACAO.md` P10): PDF posto no Mac entra como
+   dele, some do Mac, e o token da Nathalia não o acha.
+
+### Aplicado
+
+2026-10-24 (Opus 5.5): padrões ignorados e duplicata desligada em `paperless/docker-compose.yml`; aviso de arquivo
+parado em `paperless/deploy/gestao.py` e no `verificar.sh`; `.stignore` em `paperless/deploy/syncthing/`; roteiro em
+`docs/SYNCTHING.md` (seção 8) e `docs/IMPLANTACAO.md` (P9 e P10); linha nova no § Paperless da Ficha 1.
+
+### Decisões do Leonardo (2026-10-24)
+
+1. Regras 1 a 8: tratam só da entrada do documento, sem compartilhamento. Confirmado.
+2. O arquivo some do aparelho depois de entrar: aprovado.
+3. O PC Windows do trabalho é de acesso só do Leonardo e recebe a pasta de entrada, igual ao Mac.
+4. A pasta do Mac fica dentro de Documentos (`~/Documents/Paperless-entrada`); a do PC Windows, igual.
+5. Nada de "esposa": usuário, pasta, rede e instância dela são `nathalia`, no modelo do Leonardo (Ficha 6, decisão 4).

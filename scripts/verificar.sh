@@ -53,7 +53,8 @@ else
 fi
 
 # --- Paperless único (Ficha 6), só com PAPERLESS_URL: o servidor alcança, o token não é de admin, nenhum
-# documento sem dono (visível às duas pessoas) e a conferência diária (paperless-conferir) não falhou. -----
+# documento sem dono (visível às duas pessoas) e a conferência diária (paperless-conferir) não falhou. Arquivo
+# parado na pasta de entrada (Ficha 7) só avisa. ----------------------------------------------------------------
 if [ -n "$(valor_env PAPERLESS_URL)" ]; then
   if LINHA="$(dc exec -T servidor python - 2>&1 <<'PY'
 import json, os, sys, urllib.request
@@ -75,6 +76,10 @@ PY
   )"; then ok "$(printf '%s' "$LINHA" | tr -d '\r')"; else ruim "$(printf '%s' "$LINHA" | tr -d '\r' | tail -n 1)"; fi
   if command -v systemctl >/dev/null 2>&1 && systemctl is-failed --quiet paperless-conferir.service 2>/dev/null; then
     ruim "Paperless: a conferência diária falhou (journalctl -u paperless-conferir)"
+  fi
+  if command -v journalctl >/dev/null 2>&1 \
+     && journalctl -u paperless-conferir.service --since -26h -o cat --no-pager 2>/dev/null | grep -q 'AVISO: .*parado'; then
+    echo "aviso Paperless: arquivo parado na pasta de entrada, não entrou (journalctl -u paperless-conferir)"
   fi
 else
   echo "pulado Paperless (PAPERLESS_URL vazio)"

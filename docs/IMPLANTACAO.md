@@ -423,7 +423,7 @@ no B8).
 
 #### Fase 2.1 no i7: Paperless único (Ficha 6)
 
-Um Paperless-ngx só para o Leonardo e a esposa, como projeto Docker Compose próprio (`paperless/`), fora do
+Um Paperless-ngx só para o Leonardo e a Nathalia, como projeto Docker Compose próprio (`paperless/`), fora do
 compose do assistente. Cada pessoa tem um usuário comum e um token; cada assistente só vê os documentos do dono.
 Ensaiado no Mac em 2026-10-24 com documentos sintéticos (isolamento, workflows, backup e restauração).
 Lê PDF, imagem, Word, Excel, PowerPoint, OpenDocument e e-mail (`.eml`): o Tika extrai o texto e o
@@ -483,10 +483,37 @@ Tika 0,3 GB, Gotenberg 0,15 GB). **Antes:** a chave pública do age (a mesma do 
       Esperado: `ensaio ok`. Ele sobe uma instalação descartável, compara documentos por dono e apaga tudo.
 - [x] P6 (2026-10-24). Pelo app (Projeto "Assistente"): cole antes o texto atual da Ficha 1 (tem a linha nova do § Paperless).
       Ponha um PDF em `/srv/paperless/consumir/leonardo/` (ou suba pela interface) e peça "me mostra o último
-      documento que entrou". Peça também "compartilha esse documento com a minha esposa": a resposta deve ser
+      documento que entrou". Peça também "compartilha esse documento com a Nathalia": a resposta deve ser
       "Não consigo compartilhar: os documentos de cada um ficam separados."
 - [ ] P7. Interface web, quando precisar (do Mac): `ssh -L 8010:127.0.0.1:8010 i7` e abra `http://127.0.0.1:8010`
-      como `admin`. Para a esposa entrar na web, defina a senha dela ali (Usuários). Nunca dê permissão a um
+      como `admin`. Para a Nathalia entrar na web, defina a senha dela ali (Usuários). Nunca dê permissão a um
       documento para o outro usuário, nem crie grupo: a conferência diária acusa (Ficha 6, decisão 3).
-- [ ] P8. Instância da esposa (PLANO 1b.1, depois): `COMPOSE_PROJECT_NAME=assistente-esposa` na instância dela já casa
-      com a rede `assistente-esposa-paperless`; o token dela sai de `token.sh esposa`, e o P3 vale igual com a pasta dela.
+- [ ] P8. Instância da Nathalia (PLANO 1b.1, depois do P9): `COMPOSE_PROJECT_NAME=assistente-nathalia` na instância dela
+      já casa com a rede `assistente-nathalia-paperless`; o token dela sai de `token.sh nathalia`, e o P3 vale igual com
+      a pasta dela.
+- [ ] P9. Trocar `esposa` por `nathalia` (Leonardo, 2026-10-24), depois do commit e do push. Documentos, token e
+      permissões ficam com o mesmo usuário; o script não apaga nada e pode rodar de novo. ~5 min.
+      **Rode o bloco inteiro de uma vez:** depois do `git pull`, sem o `sed`, o backup das 03:45, a conferência e o
+      `token.sh` param (falta `REDE_NATHALIA` no `.env`). Se `consumir/esposa` tiver arquivo, o script para antes de mudar
+      qualquer coisa: espere o Paperless consumir.
+      ```bash
+      cd /srv/assistente/app && git pull
+      sed -i 's/^USUARIOS=leonardo esposa$/USUARIOS=leonardo nathalia/; s/^REDE_ESPOSA=assistente-esposa-paperless$/REDE_NATHALIA=assistente-nathalia-paperless/' /srv/paperless/.env
+      grep -E '^(USUARIOS|REDE_)' /srv/paperless/.env     # esperado: leonardo nathalia e REDE_NATHALIA
+      PAPERLESS_HOME=/srv/paperless bash paperless/scripts/renomear.sh esposa nathalia
+      docker network rm assistente-esposa-paperless       # a rede antiga ficou sem uso
+      bash scripts/verificar.sh
+      ```
+      Esperado: `usuário esposa -> nathalia; workflows renomeados: 1`, `pasta: consumir/esposa -> consumir/nathalia`,
+      `conferir: ok` e o `verificar.sh` sem FALHA. Ensaiado no Paperless de teste do Mac em 2026-10-24.
+- [ ] P10. Pasta de entrada pelo Syncthing (Ficha 7): siga a seção 8 de `docs/SYNCTHING.md`, agora no i7 e no Mac.
+      iPhone e PC Windows entram depois, junto com o vault (PLANO 2.2). Teste de isolamento no i7, com o token da Nathalia direto na variável, sem aparecer na tela:
+      ```bash
+      # no Mac: copie um PDF chamado entrada-teste.pdf para ~/Documents/Paperless-entrada; ele some em ~1 min
+      T="$(PAPERLESS_HOME=/srv/paperless bash paperless/scripts/token.sh nathalia)"
+      curl -s -H "Authorization: Token $T" 'http://127.0.0.1:8010/api/documents/?title__icontains=entrada-teste' \
+        | python3 -c 'import json,sys; print(json.load(sys.stdin)["count"])'
+      unset T
+      ```
+      Esperado: `0` (a Nathalia não vê), e pelo app "me mostra o último documento que entrou" traz o `entrada-teste`.
+      Apague o documento de teste como `admin` na interface web (P7), se quiser.

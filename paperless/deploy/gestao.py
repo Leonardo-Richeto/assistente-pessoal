@@ -1,11 +1,13 @@
 """Gestão do Paperless único (Ficha 6). Roda dentro do webserver, pelo `manage.py shell`:
 
-    docker compose exec -T -u paperless -e GESTAO_ACAO=<acao> -e USUARIOS="leonardo esposa" \
+    docker compose exec -T -u paperless -e GESTAO_ACAO=<acao> -e USUARIOS="leonardo nathalia" \
         -e ADMIN=admin webserver python3 manage.py shell < paperless/deploy/gestao.py
 
 Ações (GESTAO_ACAO):
     preparar   cria ou acerta os usuários comuns, as permissões e os workflows de dono (idempotente)
-    conferir   lista o que fere a Ficha 6; última linha "ok" ou "problemas: N"
+    conferir   lista o que fere a Ficha 6 e avisa arquivo parado na pasta de entrada (Ficha 7);
+               última linha "ok" ou "problemas: N"
+    renomear   troca o nome de um usuário comum (DE -> PARA, PARA em USUARIOS) e o do workflow da pasta dele
     contar     linhas "chave<TAB>valor" para o manifesto do backup e o ensaio de restauração
     token      imprime o token da API de GESTAO_USUARIO (cria se não existe)
 
@@ -14,6 +16,8 @@ Nunca apaga nada. Só o `token` imprime segredo.
 
 import os
 import sys
+import time
+from pathlib import Path
 
 from django.contrib.auth.models import Group, Permission, User
 from django.contrib.contenttypes.models import ContentType
@@ -36,6 +40,10 @@ ACAO = os.environ.get("GESTAO_ACAO", "")
 USUARIOS = os.environ.get("USUARIOS", "").split()
 ADMIN = os.environ.get("ADMIN", "admin")
 CONSUMO = "/usr/src/paperless/consume"
+# Ficha 7, item 5: o Paperless apaga o arquivo que entra; o que fica mais que isso na pasta de entrada não entrou.
+PARADO_HORAS = float(os.environ.get("PARADO_HORAS") or 24)
+# Lixo de sistema e de editor que o Paperless ignora (padrões dele e PAPERLESS_CONSUMER_IGNORE_PATTERNS).
+IGNORADOS = ("desktop.ini", "Thumbs.db")
 
 # Item 2 da Ficha 6: ver, criar e trocar o que tem dono; nunca apagar; sem usuários, grupos, e-mail, workflow
 # nem tarefas (tarefa sem dono mostra o nome do arquivo do outro). Campo personalizado e visão salva: só ver
@@ -118,6 +126,28 @@ def preparar():
         print(f"workflow '{nome}': {caminho} -> {dono} (ordem {ordem})")
 
 
+def _parados():
+    """{pasta: [arquivos]} com mais de PARADO_HORAS na pasta de consumo. Conta pela chegada (ctime): o Syncthing
+    mantém a data de modificação do aparelho, que pode ser antiga. Oculto (.stfolder/, .stignore, temporário do
+    Syncthing) e trava de editor ficam fora."""
+    limite = time.time() - PARADO_HORAS * 3600
+    raiz = Path(CONSUMO)
+    achados = {}
+    for caminho in sorted(raiz.rglob("*")):
+        rel = caminho.relative_to(raiz)
+        if (any(p.startswith(".") for p in rel.parts) or caminho.name.startswith("~$")
+                or caminho.name in IGNORADOS or not caminho.is_file()):
+            continue
+        try:
+            chegada = caminho.stat().st_ctime
+        except FileNotFoundError:  # o Paperless consumiu entre o rglob e o stat
+            continue
+        if chegada < limite:
+            pasta = f"consumir/{rel.parts[0]}" if len(rel.parts) > 1 else "raiz de consumir"
+            achados.setdefault(pasta, []).append(str(rel))
+    return achados
+
+
 def conferir():
     problemas = []
     docs = _todos_documentos()
@@ -182,6 +212,11 @@ def conferir():
     if outros.exists():
         problemas.append(f"workflow fora da Ficha 6 ligado: {list(outros.values_list('name', flat=True))}")
 
+    # Aviso, não problema: não fere a Ficha 6 (Ficha 7, item 5). Nomes só no log do i7.
+    for pasta, arquivos in _parados().items():
+        print(f"AVISO: {len(arquivos)} arquivo(s) parado(s) há mais de {PARADO_HORAS:g} h em {pasta} "
+              f"(não entraram no Paperless): {arquivos[:5]}")
+
     for p in problemas:
         print(f"PROBLEMA: {p}")
     print("ok" if not problemas else f"problemas: {len(problemas)}")
@@ -200,6 +235,35 @@ def contar():
     print(f"workflows\t{Workflow.objects.count()}")
 
 
+@transaction.atomic
+def renomear():
+    """Troca o nome do usuário DE para PARA (o de USUARIOS) e o nome e o caminho do workflow da pasta dele, juntos:
+    nunca há um momento em que a pasta nova cai só no workflow da raiz (dono errado). Documentos, token e
+    permissões ficam com o mesmo usuário. Idempotente: com PARA já existente e DE não, não faz nada."""
+    de, para = os.environ.get("DE", ""), os.environ.get("PARA", "")
+    if not de or para not in USUARIOS or de in USUARIOS:
+        sys.exit(f"renomear: DE ('{de}') fora de USUARIOS e PARA ('{para}') em USUARIOS.")
+    antigo, novo = User.objects.filter(username=de).first(), User.objects.filter(username=para).first()
+    if antigo is None:
+        if novo is None:
+            sys.exit(f"renomear: nem {de} nem {para} existem; confira os nomes.")
+        print(f"usuário {de}: não existe (já renomeado)")
+        return
+    if novo is not None:
+        sys.exit(f"renomear: {de} e {para} existem os dois; acerte pela interface web (como admin).")
+    if antigo.is_superuser or antigo.is_staff:
+        sys.exit(f"renomear: {de} é superusuário ou staff.")
+    antigo.username = para
+    antigo.save()
+    n = 0
+    for wf in Workflow.objects.filter(name=f"dono: consumir/{de}"):
+        wf.name = f"dono: consumir/{para}"
+        wf.save()
+        wf.triggers.update(filter_path=f"{CONSUMO}/{para}/*")
+        n += 1
+    print(f"usuário {de} -> {para}; workflows renomeados: {n}")
+
+
 def token():
     from rest_framework.authtoken.models import Token
 
@@ -212,7 +276,7 @@ def token():
     print(Token.objects.get_or_create(user=u)[0].key)
 
 
-ACOES = {"preparar": preparar, "conferir": conferir, "contar": contar, "token": token}
+ACOES = {"preparar": preparar, "conferir": conferir, "contar": contar, "renomear": renomear, "token": token}
 if ACAO not in ACOES:
     sys.exit(f"GESTAO_ACAO inválida: '{ACAO}' (use {', '.join(ACOES)}).")
 ACOES[ACAO]()

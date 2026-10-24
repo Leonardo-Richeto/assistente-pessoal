@@ -1,0 +1,27 @@
+// Padrões do Syncthing para a pasta de entrada do Paperless (Ficha 7). Cole na aba "Ignorar padrões" da pasta em
+// cada aparelho e no i7. O Syncthing já ignora .stfolder e .stversions sozinho; o Paperless ignora o resto também,
+// mas sem isto o lixo viaja até o i7 e fica parado na pasta (a conferência das 07:00 não conta oculto nem trava).
+// "(?d)" deixa o Syncthing apagar o item ignorado se ele impedir a remoção de uma pasta.
+
+// Travas e temporários de editores
+*.tmp
+*.swp
+*~
+.~lock.*
+~$*
+
+// macOS
+(?d).DS_Store
+(?d)._*
+(?d).localized
+.Spotlight-V100
+.Trashes
+.fseventsd
+
+// Windows
+(?d)Thumbs.db
+(?d)desktop.ini
+$RECYCLE.BIN
+
+// iCloud e OneDrive: marcador de arquivo que ainda não baixou (o conteúdo não está no aparelho)
+*.icloud

@@ -5,8 +5,9 @@ variáveis, o teste é pulado. O teste sobe documentos sintéticos; nunca aponte
 
     PAPERLESS_TESTE_URL=http://127.0.0.1:8010
     PAPERLESS_TESTE_TOKEN_A=$(PAPERLESS_HOME=<teste> paperless/scripts/token.sh leonardo)
-    PAPERLESS_TESTE_TOKEN_B=$(PAPERLESS_HOME=<teste> paperless/scripts/token.sh esposa)
-    PAPERLESS_TESTE_CONSUMIR=<teste>/consumir     # opcional: confere os workflows de dono
+    PAPERLESS_TESTE_TOKEN_B=$(PAPERLESS_HOME=<teste> paperless/scripts/token.sh nathalia)
+    PAPERLESS_TESTE_CONSUMIR=<teste>/consumir     # opcional: workflows de dono e a pasta de entrada (Ficha 7)
+    PAPERLESS_TESTE_HOME=<teste>                  # opcional: o aviso de arquivo parado (conferir.sh, com docker)
     uv run pytest tests/test_paperless_isolamento.py
 
 A parte da peça (paperless-mcp pelo proxy, como o servidor monta) roda com `uvx` no PATH.
@@ -15,6 +16,7 @@ A parte da peça (paperless-mcp pelo proxy, como o servidor monta) roda com `uvx
 import os
 import io
 import shutil
+import subprocess
 import time
 import uuid
 import zipfile
@@ -29,6 +31,7 @@ URL = os.environ.get("PAPERLESS_TESTE_URL", "").rstrip("/")
 TOKEN_A = os.environ.get("PAPERLESS_TESTE_TOKEN_A", "")
 TOKEN_B = os.environ.get("PAPERLESS_TESTE_TOKEN_B", "")
 CONSUMIR = os.environ.get("PAPERLESS_TESTE_CONSUMIR", "")
+HOME_TESTE = os.environ.get("PAPERLESS_TESTE_HOME", "")
 
 pytestmark = pytest.mark.skipif(not (URL and TOKEN_A and TOKEN_B), reason="sem Paperless de teste (PAPERLESS_TESTE_*)")
 
@@ -234,12 +237,64 @@ def test_mudanca_no_documento_do_outro_e_recusada(docs):
 def test_workflows_poem_o_dono_pela_pasta(docs):
     with _cliente(TOKEN_A) as a, _cliente(TOKEN_B) as b:
         ua, ub = _usuario(a), _usuario(b)
-        casos = {"": (a, ua), "esposa": (b, ub), "leonardo": (a, ua)}
+        casos = {"": (a, ua), "nathalia": (b, ub), "leonardo": (a, ua)}
         for pasta, (c, dono) in casos.items():
             titulo = f"pasta-{pasta or 'raiz'}-{docs['marca']}"
             (Path(CONSUMIR) / pasta / f"{titulo}.pdf").write_bytes(_pdf(f"Pasta {pasta or 'raiz'} {docs['marca']}"))
             doc = _esperar_documento(c, titulo)
             assert doc["owner"] == dono, (pasta, doc["owner"], dono)
+
+
+@pytest.mark.skipif(not CONSUMIR, reason="sem PAPERLESS_TESTE_CONSUMIR")
+def test_pasta_de_entrada_esvazia_e_ignora_o_lixo(docs):
+    """Ficha 7: o arquivo que entra some da pasta (o Syncthing leva a remoção aos aparelhos) e fica só com o dono;
+    marcador e temporário do Syncthing e travas de editor ficam na pasta e não viram documento."""
+    pasta, m = Path(CONSUMIR) / "leonardo", docs["marca"]
+    lixo = {".stignore": b"(?d).DS_Store\n", f".syncthing.lixo-{m}.pdf.tmp": _pdf(f"lixo {m}"),
+            f"~$lixo-{m}.docx": _docx(f"lixo {m}"), f".~lock.lixo-{m}.odt#": b"trava",
+            f"._lixo-{m}.pdf": _pdf(f"lixo {m}")}  # AppleDouble: os padrões do Paperless valem junto com os nossos
+    marcador = pasta / ".stfolder"
+    marcador.mkdir(exist_ok=True)
+    try:
+        for nome, conteudo in lixo.items():
+            (pasta / nome).write_bytes(conteudo)
+        time.sleep(15)  # mais que a espera de estabilidade (5 s) e o polling do Mac (até 10 s)
+        arquivo = pasta / f"entrada-{m}.pdf"
+        arquivo.write_bytes(_pdf(f"Entrada {m}"))
+        with _cliente(TOKEN_A) as a, _cliente(TOKEN_B) as b:
+            doc = _esperar_documento(a, f"entrada-{m}")
+            assert doc["owner"] == _usuario(a)
+            # Um worker, fila em ordem: o lixo, se entrasse, entraria antes do arquivo.
+            assert not a.get("/api/documents/", params={"title__icontains": f"lixo-{m}"}).json()["results"]
+            assert not b.get("/api/documents/", params={"title__icontains": f"entrada-{m}"}).json()["results"]
+            assert b.get(f"/api/documents/{doc['id']}/").status_code in (403, 404)
+        inicio = time.monotonic()
+        while arquivo.exists() and time.monotonic() - inicio < 30:
+            time.sleep(1)
+        assert not arquivo.exists(), "o arquivo continuou na pasta depois de entrar"
+        assert marcador.is_dir()
+        assert all((pasta / nome).exists() for nome in lixo)
+    finally:
+        for nome in lixo:
+            (pasta / nome).unlink(missing_ok=True)
+        marcador.rmdir()
+
+
+@pytest.mark.skipif(not (HOME_TESTE and shutil.which("docker")), reason="sem PAPERLESS_TESTE_HOME ou docker")
+def test_arquivo_parado_na_entrada_e_aviso_e_nao_problema():
+    """Ficha 7, item 5: arquivo que não entrou (extensão sem suporte) aparece como AVISO; a conferência segue ok."""
+    parado = Path(HOME_TESTE) / "consumir" / "nathalia" / f"parado-{uuid.uuid4().hex[:8]}.pages"
+    parado.write_bytes(b"sem suporte")
+    try:
+        r = subprocess.run(["bash", str(Path(__file__).parents[2] / "paperless/scripts/conferir.sh")],
+                           env={**os.environ, "PAPERLESS_HOME": HOME_TESTE, "PARADO_HORAS": "0"},
+                           capture_output=True, text=True, timeout=120)
+        assert r.returncode == 0, r.stdout + r.stderr
+        aviso = [l for l in r.stdout.splitlines() if "AVISO" in l and "consumir/nathalia" in l]
+        assert aviso and parado.name in aviso[0], r.stdout
+        assert "PROBLEMA" not in r.stdout
+    finally:
+        parado.unlink()
 
 
 @pytest.mark.skipif(not shutil.which("uvx"), reason="sem uvx para rodar a peça paperless-mcp")

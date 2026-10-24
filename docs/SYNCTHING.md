@@ -265,9 +265,49 @@ nota, veja `docker compose logs servidor` e avise antes de mudar `chown` ou `chm
 3. Apague uma nota de teste no Mac. Ela some da produção e sobra uma cópia em `/srv/assistente/vault/.stversions`.
 4. Na manhã seguinte, `git -C /srv/assistente/vault log --oneline | head` mostra o commit das 03:30.
 
+## 8. Pasta de entrada do Paperless (Ficha 7)
+
+Um arquivo posto na pasta de entrada vira documento do dono no Paperless e **some da pasta** quando entra. Arquivo
+que continua lá não entrou (formato sem suporte, por exemplo); a conferência das 07:00 avisa depois de 24 h.
+Cada pessoa tem a sua pasta, compartilhada só com os aparelhos dela. **Nunca compartilhe `/srv/paperless/consumir`
+inteira**: ela tem a pasta da outra pessoa. Sem compartilhamento entre o Leonardo e a Nathalia (Ficha 6, decisão 3).
+
+| Pasta (ID) | No i7 | Aparelhos |
+|---|---|---|
+| `paperless-leonardo` | `/srv/paperless/consumir/leonardo` | Mac, PC Windows e iPhone do Leonardo |
+| `paperless-nathalia` | `/srv/paperless/consumir/nathalia` | os da Nathalia (quando ela entrar, PLANO 1b) |
+
+**No i7** (GUI pelo túnel da seção 1), Adicionar pasta:
+
+1. Rótulo `Paperless Leonardo`, ID `paperless-leonardo`, caminho `/srv/paperless/consumir/leonardo` (já existe).
+2. Tipo **Enviar e receber**. Versionamento: nenhum (o Paperless guarda o original).
+3. Aba Ignorar padrões: cole `paperless/deploy/syncthing/.stignore` antes de salvar.
+4. Aba Compartilhamento: marque só os aparelhos do dono.
+5. Em cada aparelho remoto (Editar), deixe desligados "Introdutor" e "Aceitar automaticamente". Aparelho novo entra
+   só pelo ID, aqui.
+
+O Syncthing roda como `<usuario>` (uid 1000), o mesmo uid do Paperless, que assim consegue apagar o arquivo que entrou.
+
+**No Mac**: crie `~/Documents/Paperless-entrada` e aceite a pasta `paperless-leonardo` apontando para ela, tipo
+**Enviar e receber**, versionamento **Lixeira** com 14 dias (guarda a cópia que some até o backup das 03:45), e cole o
+`.stignore` antes de salvar. Se a pasta Documentos estiver no iCloud com "Otimizar armazenamento", o arquivo ainda não
+baixado vira `.icloud` e não viaja: mande só arquivo que está no Mac.
+
+**No PC Windows** (junto com o vault, PLANO 2.2): igual ao Mac, em `%USERPROFILE%\Documents\Paperless-entrada`, com
+"Ignorar permissões" ligado (Avançado). O arquivo passa só pela rede privada até o i7.
+
+**No iPhone (Synctrain, junto com o vault, PLANO 2.2)**: aceite a pasta `paperless-leonardo`; se o Synctrain oferecer versionamento, Lixeira com 14
+dias. Para mandar: app Arquivos → Synctrain → pasta da entrada → ⋯ → "Escanear documentos", ou, de qualquer app,
+Compartilhar → "Salvar em Arquivos" nessa pasta. Abra o Synctrain para ele enviar (o iOS limita o segundo plano).
+
+**Conferir**: ponha um PDF na pasta do Mac. Em ~1 min ele some do Mac e do iPhone, e pelo app "me mostra o último
+documento que entrou" traz o arquivo. O teste de isolamento está em `docs/IMPLANTACAO.md` P10.
+
 ## Se algo der errado
 
 - Apareceu `.sync-conflict-*`: junte à mão e apague o arquivo de conflito.
 - Syncthing "Desatualizado" por muito tempo: veja se o outro aparelho está ligado e na tailnet.
 - Apagou nota por engano: recupere de `.stversions` (produção) ou do `git` (`git -C /srv/assistente/vault checkout -- <arquivo>`).
+- Arquivo não some da pasta de entrada: o Paperless não aceitou. Veja `docker compose logs webserver` no projeto
+  `paperless/` (ou o aviso em `journalctl -u paperless-conferir`) e tire o arquivo da pasta.
 - Dois aparelhos comitaram: pare, não force push, e peça ajuda antes de mexer.

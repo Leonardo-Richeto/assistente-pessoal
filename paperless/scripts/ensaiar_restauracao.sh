@@ -60,7 +60,8 @@ sed -e "s|^[[:space:]]*PAPERLESS_HOME=.*|PAPERLESS_HOME=$(caminho_docker "$ENSAI
     -e "s|^[[:space:]]*COMPOSE_PROJECT_NAME=.*|COMPOSE_PROJECT_NAME=$PROJETO|" \
     -e "s|^[[:space:]]*PORTA_HOST=.*|PORTA_HOST=$PORTA|" \
     -e "s|^[[:space:]]*REDE_PRINCIPAL=.*|REDE_PRINCIPAL=$PROJETO-principal|" \
-    -e "s|^[[:space:]]*REDE_ESPOSA=.*|REDE_ESPOSA=$PROJETO-esposa|" \
+    -e "s|^[[:space:]]*REDE_NATHALIA=.*|REDE_NATHALIA=$PROJETO-nathalia|" \
+    -e "s|^[[:space:]]*REDE_ESPOSA=.*|REDE_NATHALIA=$PROJETO-nathalia|" \
     -e "s|^[[:space:]]*BACKUP_DESTINO=.*|BACKUP_DESTINO=|" "$ENSAIO/env" >"$ENSAIO/.env"
 rm -f "$ENSAIO/env"
 [ "$(valor_env COMPOSE_PROJECT_NAME "$ENSAIO/.env")" = "$PROJETO" ] \

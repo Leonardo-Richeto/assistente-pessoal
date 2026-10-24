@@ -55,11 +55,17 @@ SUB="$(sed -n 's/.*"pasta_export": "\([^"]*\)".*/\1/p' "$TMP/manifesto.json")"
 
 if [ ! -f "$ENV_FILE" ]; then
   log "sem .env no destino: uso o do pacote, com PAPERLESS_HOME=$HOME_DIR"
-  sed "s|^PAPERLESS_HOME=.*|PAPERLESS_HOME=$(caminho_docker "$HOME_DIR")|" "$TMP/env" >"$ENV_FILE" \
+  # Pacote de antes de 2026-10-24 tem REDE_ESPOSA: a variável virou REDE_NATHALIA (Ficha 7).
+  sed -e "s|^PAPERLESS_HOME=.*|PAPERLESS_HOME=$(caminho_docker "$HOME_DIR")|" \
+      -e "s|^REDE_ESPOSA=assistente-esposa-paperless$|REDE_NATHALIA=assistente-nathalia-paperless|" \
+      -e "s|^REDE_ESPOSA=|REDE_NATHALIA=|" \
+    "$TMP/env" >"$ENV_FILE" \
     || falha "não consegui gravar $ENV_FILE."
   chmod 600 "$ENV_FILE"
 fi
 conferir_env
+[[ " $(valor_env USUARIOS) " != *" esposa "* ]] || aviso "pacote de antes de 2026-10-24 (usuário esposa): depois de \
+importar, troque esposa por nathalia em USUARIOS no $ENV_FILE e rode paperless/scripts/renomear.sh esposa nathalia."
 criar_pastas
 
 log "subindo sem criar o admin (ele vem no pacote)"

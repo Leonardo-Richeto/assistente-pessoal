@@ -1,6 +1,6 @@
 # Paperless-ngx único da casa (Ficha 6 de docs/regras-de-negocio.md, D21 do vault).
 # Projeto Docker Compose próprio, fora do compose do assistente: cada instância do assistente (a do
-# Leonardo e a da esposa) entra numa rede só dela e enxerga só o webserver, pelo nome "paperless".
+# Leonardo e a da Nathalia) entra numa rede só dela e enxerga só o webserver, pelo nome "paperless".
 # O banco e o broker ficam na rede interna, que nenhum assistente vê.
 #
 # Estado em ${PAPERLESS_HOME} (fora do git):
@@ -9,7 +9,7 @@
 #   ${PAPERLESS_HOME}/data/redis        fila do broker
 #   ${PAPERLESS_HOME}/data/paperless    índice de busca e classificador
 #   ${PAPERLESS_HOME}/data/media        os documentos (originais e arquivados)
-#   ${PAPERLESS_HOME}/consumir/<pessoa> pasta de consumo de cada um (workflow põe o dono)
+#   ${PAPERLESS_HOME}/consumir/<pessoa> pasta de entrada de cada um, sincronizada pelo Syncthing (workflow põe o dono)
 #   ${PAPERLESS_HOME}/export            área de trabalho do document_exporter (o backup apaga no fim)
 #
 # Rode sempre pelos scripts de paperless/scripts/ (eles passam o .env de fora).
@@ -96,11 +96,17 @@ services:
       PAPERLESS_TIME_ZONE: America/Sao_Paulo
       PAPERLESS_OCR_LANGUAGE: por+eng
       PAPERLESS_OCR_LANGUAGES: por
-      # Subpastas da pasta de consumo (consumir/leonardo, consumir/esposa); o dono vem do workflow.
+      # Subpastas da pasta de consumo (consumir/leonardo, consumir/nathalia); o dono vem do workflow.
       PAPERLESS_CONSUMER_RECURSIVE: "true"
       PAPERLESS_CONSUMER_SUBDIRS_AS_TAGS: "false"
       # 0 = inotify (Linux). No Mac, o bind mount não avisa: use 10 (segundos).
       PAPERLESS_CONSUMER_POLLING: ${PAPERLESS_CONSUMER_POLLING:-0}
+      # Ficha 7: além dos padrões do Paperless (.stfolder/, .DS_Store, ._*...), a trava do Office (~$x.docx), que tem
+      # extensão aceita e falharia. A do LibreOffice (.~lock.x.odt#) já fica fora pela extensão. Regex no nome do
+      # arquivo; $$ é o $ no compose.
+      PAPERLESS_CONSUMER_IGNORE_PATTERNS: '["^~\\$$.*"]'
+      # Duplicata entra como documento novo. Ligado, apagaria o arquivo e diria na tarefa o título do documento do outro.
+      PAPERLESS_CONSUMER_DELETE_DUPLICATES: "false"
       # Pouca RAM: uma tarefa por vez.
       PAPERLESS_TASK_WORKERS: 1
       PAPERLESS_THREADS_PER_WORKER: 1
@@ -111,7 +117,7 @@ services:
     networks:
       interna: {}
       ponte_principal: { aliases: [paperless] }
-      ponte_esposa: { aliases: [paperless] }
+      ponte_nathalia: { aliases: [paperless] }
     healthcheck:
       test: ["CMD", "curl", "-fs", "-o", "/dev/null", "http://127.0.0.1:8000/accounts/login/"]
       interval: 30s
@@ -122,8 +128,8 @@ services:
 networks:
   interna: {}
   # Uma rede por instância do assistente; o compose do assistente entra nela como "external"
-  # (deploy/paperless/rede.yml). A da esposa existe mesmo sem a instância dela: custa nada.
+  # (deploy/paperless/rede.yml). A da Nathalia existe mesmo sem a instância dela: custa nada.
   ponte_principal:
     name: ${REDE_PRINCIPAL:-assistente-paperless}
-  ponte_esposa:
-    name: ${REDE_ESPOSA:-assistente-esposa-paperless}
+  ponte_nathalia:
+    name: ${REDE_NATHALIA:-assistente-nathalia-paperless}

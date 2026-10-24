@@ -40,14 +40,14 @@ cifrado e migração pelo mesmo pacote (Fase 7, `docs/MIGRACAO.md`). Em 2026-10-
 - [x] 1.3b (2026-10-23; Funnel no container, nó `assistente`) Instalar Tailscale no i7, habilitar HTTPS + Funnel, `tailscale funnel --bg 8000`
 - [x] 1.4 (2026-10-23; mesmo cliente do Mac, URL nova acrescentada) Criar o cliente OAuth do Google de produção (decisão de 2026-10-17; GitHub fica como alternativa), preencher `.env`, `docker compose up -d --build`
   - Pronto quando: `docker compose ps` tudo saudável e `curl <url>/.well-known/oauth-protected-resource/mcp` responde
-- [ ] 1.5 Adicionar conector personalizado no claude.ai e testar do iPhone: registrar → consultar → desfazer
+- [x] 1.5 (2026-10-24, B8 e B9 pelo app no i7; o ponto ainda falta no B9) Adicionar conector personalizado no claude.ai e testar do iPhone: registrar → consultar → desfazer
 - [x] 1.6 Criar um Projeto no claude.ai "Assistente" com instruções de uso (quando registrar, tom das confirmações). Feito 2026-10-17 com o texto da ficha 1; no i7, só trocar o conector
 - [ ] 1.7 Medir o consumo com a tomada medidora: i7 parado (24 h, só o Debian), depois com a stack (7 dias). Anotar
   W médio e R$/mês na nota `maquinas-do-assistente-pessoal` do vault. Pronto quando: os dois números estão lá
 
-## Fase 1b — Instância da esposa (opcional, depois da sua estar estável)
+## Fase 1b — Instância da Nathalia (opcional, depois da sua estar estável)
 - [ ] 1b.1 Segunda instância (README → "Segunda instância"), login Google, porta 8001 no host e nó Tailscale próprio
-  (`TS_NOME=assistente-esposa`, URL própria na 443; a ideia antiga de Funnel na 8443 do mesmo nó ficou para trás com o
+  (`TS_NOME=assistente-nathalia`, URL própria na 443; a ideia antiga de Funnel na 8443 do mesmo nó ficou para trás com o
   Tailscale em container). Banco, vault, login e servidor separados: estimativa de ~300–400 MB de RAM por instância e quase nada de CPU (o i7 inteiro, com a stack, usava 1,0 GB de 15 GB em 2026-10-24).
   Decidido (Leonardo, 2026-10-24): **Paperless único**, com um usuário e um token por pessoa (cada token só vê os
   documentos do dono), se o Paperless permitir isso com segurança; senão, um por pessoa. Ver 2.1.
@@ -62,7 +62,7 @@ cifrado e migração pelo mesmo pacote (Fase 7, `docs/MIGRACAO.md`). Em 2026-10-
 
 ## Fase 2 — Documentos e vault
 - [x] 2.1 Subir Paperless-ngx com o compose oficial (rede Docker compartilhada com este stack); gerar token; preencher `PAPERLESS_URL`/`PAPERLESS_API_KEY`
-  - Decisão de 2026-10-24 (Leonardo): um Paperless só para o Leonardo e a esposa (1b), um usuário e um token por
+  - Decisão de 2026-10-24 (Leonardo): um Paperless só para o Leonardo e a Nathalia (1b), um usuário e um token por
     pessoa. Por isso ele fica fora do compose do assistente, como projeto próprio, com backup próprio. Isso
     substitui a ideia de "Paperless no mesmo compose" do prompt antigo do PC Windows e muda a 7.3: o
     `exportar.sh` do assistente não leva os documentos.
@@ -74,11 +74,11 @@ cifrado e migração pelo mesmo pacote (Fase 7, `docs/MIGRACAO.md`). Em 2026-10-
   - 2026-10-24 (Opus 5.5, guiando do Mac): no i7, `docs/IMPLANTACAO.md` P1–P6. Timers de backup (03:45) e
     conferência (07:00), ensaio de restauração no Mac com o pacote do i7 e, pelo app, "me mostra o último documento
     que entrou" e a recusa de compartilhar. Rota padrão do servidor fixa na rede do assistente (`gw_priority`).
-- [ ] 2.2 Migrar o vault para `/srv/assistente/vault` no i7, Syncthing com todos os aparelhos (Mac, iPhone, PC Windows) e GitHub privado mantido por enquanto (decisão de 2026-10-17); preencher `VAULT_PATH`. Detalhe: `SPRINT.md` B12
+- [ ] 2.2 (2026-10-24: feito i7 ↔ Mac; falta iPhone e PC Windows, a fazer no trabalho) Migrar o vault para `/srv/assistente/vault` no i7, Syncthing com todos os aparelhos (Mac, iPhone, PC Windows) e GitHub privado mantido por enquanto (decisão de 2026-10-17); preencher `VAULT_PATH`. Detalhe: `docs/SYNCTHING.md`
 - [x] 2.2b (regra em 2026-10-16, `registro-temporario-de-sprint-na-raiz`; inventário em `maquinas-do-assistente-pessoal`) Levar para o vault a "Regra de passagem" e a nota de inventário das máquinas
-- [ ] 2.3 Job diário de commit do vault (`git add -A && git commit`) para ter histórico de tudo que a IA escrever
-- [ ] ⚑ 2.4 Definir o envio de arquivos para o servidor (pasta "consumir" do Paperless sincronizada pelo Syncthing é o caminho mais simples)
-- [ ] 2.5 Compartilhar documento entre o Leonardo e a esposa (Leonardo, 2026-10-24: "para implementação futura").
+- [x] 2.3 (2026-10-23, `vault-commit.timer` às 03:30 no i7; registro do vault de 2026-10-23) Job diário de commit do vault (`git add -A && git commit`) para ter histórico de tudo que a IA escrever
+- [ ] ⚑ 2.4 (2026-10-24: Ficha 7 aprovada, código e teste no Mac; falta P9 e P10 de `docs/IMPLANTACAO.md` no i7) Definir o envio de arquivos para o servidor (pasta "consumir" do Paperless sincronizada pelo Syncthing é o caminho mais simples)
+- [ ] 2.5 Compartilhar documento entre o Leonardo e a Nathalia (Leonardo, 2026-10-24: "para implementação futura").
   Hoje a Ficha 6 (decisão 3) proíbe. Antes do código, ficha nova: quem compartilha, só ver ou editar, confirmação e
   desfazer. Depois, ferramenta própria (a `paperless-mcp` não muda permissões) com o token do dono e linha em
   `Auditoria`, conferência diária aceitando só esse compartilhamento e testes de isolamento. Estimativa: uma sessão.

@@ -78,20 +78,20 @@ O compose roda sempre com `--env-file ../.env` (no i7, `app/.env` é um link par
    desenvolvedor) usa a mesma URL.
 7. Teste: "registre um gasto de 10 reais de café" → "quanto gastei hoje?" → "desfaz".
 
-### Segunda instância na mesma máquina (ex.: esposa)
+### Segunda instância na mesma máquina (ex.: Nathalia)
 
 Banco, vault, login e nó Tailscale separados — nada é compartilhado. Outra `ASSISTENTE_HOME`:
 ```bash
-sudo ASSISTENTE_HOME=/srv/assistente-esposa bash scripts/preparar_host.sh
-git clone <este repo> /srv/assistente-esposa/app && cd /srv/assistente-esposa/app
-cp .env.example ../.env   # ASSISTENTE_HOME=/srv/assistente-esposa, COMPOSE_PROJECT_NAME=assistente-esposa,
-                          # PORTA_HOST=8001, TS_NOME=assistente-esposa, NOME_USUARIO, senhas novas
-docker compose --env-file ../.env up -d --build   # URL: https://assistente-esposa.<tailnet>.ts.net
+sudo ASSISTENTE_HOME=/srv/assistente-nathalia bash scripts/preparar_host.sh
+git clone <este repo> /srv/assistente-nathalia/app && cd /srv/assistente-nathalia/app
+cp .env.example ../.env   # ASSISTENTE_HOME=/srv/assistente-nathalia, COMPOSE_PROJECT_NAME=assistente-nathalia,
+                          # PORTA_HOST=8001, TS_NOME=assistente-nathalia, NOME_USUARIO, senhas novas
+docker compose --env-file ../.env up -d --build   # URL: https://assistente-nathalia.<tailnet>.ts.net
 ```
 Documentos: o Paperless é um só para a casa (`paperless/`, Ficha 6). Na instância nova, `COMPOSE_FILE` e
-`PAPERLESS_URL` como no `.env.example`, e o token de `paperless/scripts/token.sh esposa` (`docs/IMPLANTACAO.md` P8).
+`PAPERLESS_URL` como no `.env.example`, e o token de `paperless/scripts/token.sh nathalia` (`docs/IMPLANTACAO.md` P8).
 O backup diário instalado pelo `preparar_host.sh` é da instância principal; para esta, rode
-`ASSISTENTE_HOME=/srv/assistente-esposa bash scripts/exportar.sh --retencao` num timer próprio.
+`ASSISTENTE_HOME=/srv/assistente-nathalia bash scripts/exportar.sh --retencao` num timer próprio.
 
 ## Desenvolvimento
 
