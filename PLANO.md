@@ -4,7 +4,7 @@ Cada tarefa é pequena e tem critério de pronto, para ser executada uma por vez
 Claude Code com **Sonnet**. Use **Opus** só nas tarefas marcadas ⚑ (decisão de arquitetura)
 ou quando o Sonnet travar. Ao terminar uma tarefa: testes passando, commit, marque `[x]`.
 
-Convenções do código estão em `AGENTS.md`. Estado e histórico do processo em `CONTEXTO.md`.
+Convenções do código estão em `AGENTS.md`. Estado e histórico do processo no vault (`10-projetos/assistente-pessoal/`, D22; ver `CONTEXTO.md`).
 A sequência de **teste no MacBook → produção no i7** está em `docs/IMPLANTACAO.md`.
 
 ---
@@ -33,7 +33,7 @@ cifrado e migração pelo mesmo pacote (Fase 7, `docs/MIGRACAO.md`). Em 2026-10-
   Se voltar: Scheduled Power-On da BIOS para ligar, timer do systemd para desligar, e os timers das 03:15–03:40 antes do desligamento
 - [x] 1.0 (2026-10-23) BIOS do i7 para economia (na instalação): C-states e package C-state no máximo, ASPM ligado, áudio e
   portas sem uso desligados, "AC power restore" ligado (volta sozinho depois de queda de luz). Lista completa: `docs/IMPLANTACAO.md` B2a
-- [ ] 1.1 Inventário completo de todas as máquinas: especificações, configuração, saúde SMART de cada HD/SSD, VMs → nota no vault + resumo em `docs/inventario.md` (roteiro em `CONTEXTO.md`). i7 feito em 2026-10-24; falta o i5 (1c.1)
+- [ ] 1.1 Inventário completo de todas as máquinas: especificações, configuração, saúde SMART de cada HD/SSD, VMs → nota no vault + resumo e roteiro em `docs/inventario.md`. i7 feito em 2026-10-24; falta o i5 (1c.1)
 - [x] 1.2 (2026-10-23) Instalar Debian 13 direto no i7, com governador da CPU `powersave` e `powertop --auto-tune` no boot, e
   Docker (`docs/IMPLANTACAO.md` B2)
 - [x] 1.3 Exposição: Tailscale Funnel (decidido)
@@ -68,7 +68,7 @@ cifrado e migração pelo mesmo pacote (Fase 7, `docs/MIGRACAO.md`). Em 2026-10-
     `exportar.sh` do assistente não leva os documentos.
   - Pronto quando: "me mostra o último documento que entrou" funciona pelo app
 - [ ] 2.2 Migrar o vault para `/srv/assistente/vault` no i7, Syncthing com todos os aparelhos (Mac, iPhone, PC Windows) e GitHub privado mantido por enquanto (decisão de 2026-10-17); preencher `VAULT_PATH`. Detalhe: `SPRINT.md` B12
-- [ ] 2.2b Levar para o vault a "Regra de passagem" (`CONTEXTO.md`) e a nota de inventário das máquinas
+- [x] 2.2b (regra em 2026-10-16, `registro-temporario-de-sprint-na-raiz`; inventário em `maquinas-do-assistente-pessoal`) Levar para o vault a "Regra de passagem" e a nota de inventário das máquinas
 - [ ] 2.3 Job diário de commit do vault (`git add -A && git commit`) para ter histórico de tudo que a IA escrever
 - [ ] ⚑ 2.4 Definir o envio de arquivos para o servidor (pasta "consumir" do Paperless sincronizada pelo Syncthing é o caminho mais simples)
 
@@ -240,7 +240,8 @@ Vieram da análise do vault de 2026-10-18. O lado do vault já está feito (D4 d
 - [x] M4 (2026-10-18: `SPRINT_HISTORICO.md`; `SPRINT_NOTAS.md` de ~29 mil para ~4,4 mil tokens) Arquivos de sprint mais baratos de ler: "Passos feitos" do `SPRINT_NOTAS.md` (~1.090 linhas, ~24 mil
   tokens por sessão) vão para um `SPRINT_HISTORICO.md` que a sessão não lê no início; estado do projeto num lugar só
   (`SPRINT_NOTAS` durante a sprint, `CONTEXTO` fora dela); a nota `_assistente-pessoal` do vault fica com objetivo e
-  porquê, sem "Estado em". Muda a regra `registro-temporario-de-sprint-na-raiz` do vault
+  porquê, sem "Estado em". Revisto em 2026-10-24 (D22): fora da sprint, o estado mora no vault, no "Estado em" do
+  `_assistente-pessoal`; o `CONTEXTO.md` virou um aviso. Muda a regra `registro-temporario-de-sprint-na-raiz` do vault
 
 ## Ideias sem data
 - ~~Monitor de rede em casa~~ → virou a Fase 7b.2 (2026-10-17).

@@ -100,6 +100,9 @@ uv run pytest                     # SQLite
 TEST_DATABASE_URL=postgresql+psycopg://... uv run pytest   # Postgres
 ```
 
+No Mac, se o `pytest` disser `No module named 'assistente'`, o macOS marcou o `.pth` do `.venv` como oculto e o
+Python 3.14 ignora `.pth` oculto: `chflags nohidden .venv/lib/python3.14/site-packages/*.pth` (2026-10-24).
+
 Teste local sem OAuth (nunca com o tunnel ligado): `AUTH_DESATIVADA=true uv run assistente`
 e aponte um cliente MCP para `http://localhost:8000/mcp`.
 

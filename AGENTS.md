@@ -1,16 +1,18 @@
 # Convenções do projeto
 
 **Durante uma sprint, leia antes `SPRINT.md` e `SPRINT_NOTAS.md`** (plano, passo atual, modelo por passo e passagem entre sessões; arquivos temporários). O histórico
-dos passos fica em `SPRINT_HISTORICO.md`: não leia no começo, só o bloco de que precisar. Depois **leia `CONTEXTO.md`** (estado atual, histórico, pendências e o prompt da próxima etapa).
+dos passos fica em `SPRINT_HISTORICO.md`: não leia no começo, só o bloco de que precisar. Depois leia, no vault do Leonardo, **`10-projetos/assistente-pessoal/_assistente-pessoal.md` e
+`proxima-etapa-do-assistente-pessoal.md`** (estado, pendências e o prompt da próxima etapa; onde fica o vault: `CONTEXTO.md`).
 Depois `README.md` (arquitetura e princípios) e a próxima tarefa aberta em `PLANO.md`.
 Uma tarefa por vez; ao terminar, testes passando e `[x]` no plano. O commit é um só, no fim do trabalho
 (Leonardo, 2026-10-24); antes disso, só quando o i7 precisa do código (`git pull` exige commit e push).
 
 ## Passagem entre modelos (obrigatório)
-Ao terminar uma tarefa ou fase, atualize `CONTEXTO.md`: o que foi feito, o que mudou e por quê,
-decisões, pendências, o que não foi testado e o estado atual. Em seguida, substitua a seção
-"Prompt para a próxima etapa" por um prompt completo para o próximo modelo. Nada importante
-fica só na conversa.
+O estado do projeto mora no vault, não no repo, que é público (D22 de 2026-10-24). Ao terminar uma tarefa ou fase,
+siga "Passagem ao terminar uma etapa" da nota `proxima-etapa-do-assistente-pessoal`: estado no `_assistente-pessoal`,
+uma entrada no `registro-do-assistente-pessoal` (feito, verificado, não verificado), decisão cara no
+`decisoes-do-assistente-pessoal` e o prompt seguinte nessa mesma nota. Passo a passo e causa técnica vão para `docs/`.
+Nada de IP, URL real, nome da tailnet ou segredo no repo. Nada importante fica só na conversa.
 
 ## Regras que não se negociam
 - Nunca criar ferramenta de SQL livre ou que execute comando arbitrário no servidor.

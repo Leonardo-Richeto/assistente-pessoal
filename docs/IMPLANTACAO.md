@@ -89,7 +89,7 @@ ferramentas da 2b).
       - **i7** (hoje com Windows): o SMART não se apaga ao formatar, então rode no Debian já instalado, depois
         do B2d. Antes de formatar, confira o SSD no CrystalDiskInfo (B2a, item 0).
       - O arquivo tem hostname e IP: guarde no vault, não no git. Resumo sem dados reais vai para
-        `docs/inventario.md` (roteiro em `CONTEXTO.md`).
+        `docs/inventario.md` (com o roteiro).
 
 #### B2. BIOS e Debian 13 no i7
 
@@ -250,7 +250,7 @@ printf '/dev/disk/by-id/<ata-do-HD> {\n    spindown_time = 120\n}\n' | sudo tee 
          Depois `docker compose up -d`.
       5. Para começar limpo: apague o banco de conferência com
          `docker compose exec -T postgres sh -c 'dropdb -U "$POSTGRES_USER" assistente_mac'`.
-- [x] B8. (2026-10-24: Projeto recriado; no claude.ai novo ele roda no Claude Code, ver `CONTEXTO.md`.) **Antes:** B11 feito (vault ligado, `VAULT_PATH=/vault`) e a seção "Fase 2b no i7" feita (servidor da 2b
+- [x] B8. (2026-10-24: Projeto recriado; no claude.ai novo ele roda no Claude Code, ver o registro de 2026-10-24 no vault.) **Antes:** B11 feito (vault ligado, `VAULT_PATH=/vault`) e a seção "Fase 2b no i7" feita (servidor da 2b
       de pé). No claude.ai: Configurações → Conectores → adicionar conector personalizado `https://assistente.<tailnet>.ts.net/mcp`
       e entrar com o Google. No Projeto "Assistente": trocar o conector do Mac pelo novo. Depois remova o conector
       de teste. **Nas instruções do Projeto, troque o texto inteiro** pelo texto atual da Ficha 1 (com a Ficha 5):
@@ -396,7 +396,7 @@ no B8).
       7. Opcional: envio a cada hora pelo launchd (plist em `ferramentas/sessoes/exemplos/`, passos em "Agendar no
          Mac" do README). Sem ele, rode o passo 5 à mão.
 - [ ] 2b-7. Pendências que são decisão sua (anote a decisão aqui):
-      - [ ] Lint isolado (Leonardo, 2026-10-24: fazer já). Em vez de um usuário novo, o `vault-lint.service` roda numa
+      - [x] Lint isolado (Leonardo, 2026-10-24: fazer já; feito e provado no i7 às 12:55, nota 3.8 OK). Em vez de um usuário novo, o `vault-lint.service` roda numa
         caixa do systemd: sem rede, sem socket, sem o socket do docker, sem sudo, disco só leitura, grava só o
         `LINT_DIR`. No i7, depois do `git pull`:
         ```bash
@@ -404,10 +404,12 @@ no B8).
         sudo cp vault-lint.service /etc/systemd/system/ && sudo sed -i "s/<usuario>/$USER/" /etc/systemd/system/vault-lint.service
         sudo systemctl daemon-reload && sudo systemctl start vault-lint.service
         systemctl status vault-lint.service --no-pager | head -5; head -3 /srv/assistente/logs/vault-lint/ultimo.md
-        systemd-analyze security vault-lint.service | tail -1          # nota baixa = bem fechado
-        # Prova: o mesmo usuário, com as mesmas travas, não fala com o docker nem com a internet.
-        sudo systemd-run --wait --pipe -q -p User=$USER -p PrivateNetwork=yes -p RestrictAddressFamilies=none \
-          -p InaccessiblePaths=-/run/docker.sock docker ps; echo "docker: código $?"   # esperado: diferente de 0
+        systemd-analyze security vault-lint.service --no-pager | grep -E 'RestrictAddressFamilies|PrivateNetwork|Overall'
+        # Prova: o mesmo usuário, com as travas, não fala com o docker nem com a internet (o systemd-run não aceita
+        # RestrictAddressFamilies=none; a unit aceita, e o systemd-analyze acima mostra que ela aplicou).
+        sudo systemd-run --wait --pipe -q -p User=$USER -p InaccessiblePaths=/run/docker.sock docker ps; echo "docker: código $?"
+        sudo systemd-run --wait --pipe -q -p User=$USER -p PrivateNetwork=yes curl -sS -m 5 https://1.1.1.1 -o /dev/null; echo "internet: código $?"
+        # esperado: os dois diferentes de 0 ("permission denied" no docker, "Could not connect" no curl)
         ```
       - Rever o bloqueio de `vault_move_note` e `vault_move_file` em 2026-11-07, depois de duas semanas de histórico
         (recomendação aceita sem objeção pelo Leonardo, 2026-10-24).

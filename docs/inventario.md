@@ -1,8 +1,15 @@
 # Inventário das máquinas
 
 Resumo sem dados reais (sem IP, serial ou URL). O inventário completo, gerado por `deploy/inventario.sh`,
-e a leitura do SMART ficam no vault, na nota `maquinas-do-assistente-pessoal`. Roteiro: `CONTEXTO.md`
-§ Inventário das máquinas.
+e a leitura do SMART ficam no vault, na nota `maquinas-do-assistente-pessoal` (o arquivo tem hostname, IP e
+serial: não vai para o git).
+
+## Roteiro
+
+Para cada máquina: modelo, função, sistema e versão; CPU, RAM (tipo e slots livres), GPU; discos com uso,
+partições e SMART (horas, setores realocados e pendentes, desgaste do SSD); rede; serviços e VMs; defeitos e
+upgrades possíveis. Em Linux, `deploy/inventario.sh` junta tudo (só lê; precisa de `sudo` e do `smartmontools`);
+no Proxmox, rode como root (`docs/IMPLANTACAO.md` B1). No Mac: `system_profiler SPHardwareDataType SPStorageDataType`.
 
 | Máquina | Inventário | Situação |
 |---|---|---|
