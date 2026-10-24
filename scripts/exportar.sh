@@ -43,7 +43,7 @@ case "$DESTINATARIO" in
   *) falha "AGE_DESTINATARIO vazio ou inválido no .env (precisa ser a chave pública age1...)." ;;
 esac
 if servico_definido paperless; then
-  falha "o compose tem Paperless, e a exportação dele (document_exporter) ainda não foi implementada. Veja docs/MIGRACAO.md."
+  falha "o compose do assistente tem um serviço paperless: o Paperless é projeto próprio (paperless/, Ficha 6), com backup em paperless/scripts/exportar.sh."
 fi
 
 [ -n "$DESTINO" ] || DESTINO="$(valor_env BACKUP_DESTINO)"

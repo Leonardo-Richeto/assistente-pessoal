@@ -1,0 +1,10 @@
+[Unit]
+Description=Backup diario do Paperless as 03:45 (depois do backup do assistente e do commit do vault)
+
+[Timer]
+OnCalendar=*-*-* 03:45:00
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

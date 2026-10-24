@@ -44,11 +44,10 @@ LEITURAS_PECAS = {
     "paperless_search_documents", "paperless_search_everywhere", "paperless_search_autocomplete",
     "paperless_get_document", "paperless_get_document_content", "paperless_get_document_metadata",
     "paperless_get_document_notes", "paperless_get_document_history", "paperless_find_similar_documents",
-    "paperless_download_document", "paperless_get_document_thumbnail", "paperless_get_next_asn",
+    "paperless_download_document", "paperless_get_document_thumbnail",
     "paperless_get_document_suggestions", "paperless_get_document_ai_suggestions",
     "paperless_list_tags", "paperless_list_correspondents", "paperless_list_document_types",
     "paperless_list_storage_paths", "paperless_list_custom_fields", "paperless_list_trash",
-    "paperless_list_active_tasks", "paperless_list_tasks", "paperless_get_task",
     "paperless_get_paperless_info", "paperless_get_statistics", "paperless_get_system_status",
     "paperless_list_saved_views", "paperless_get_saved_view", "paperless_run_saved_view",
     "paperless_list_share_links",
@@ -58,13 +57,11 @@ ESCRITAS_PECAS = {
     # manage_tags com operation=list é leitura (registro.py confere).
     "vault_write_note", "vault_patch_note", "vault_update_frontmatter", "vault_manage_tags",
     # paperless-mcp 0.1.0: escrita sem destruir
-    "paperless_upload_document", "paperless_add_document_note", "paperless_create_tag",
-    "paperless_create_correspondent", "paperless_create_document_type", "paperless_create_storage_path",
-    "paperless_create_custom_field", "paperless_restore_documents", "paperless_acknowledge_tasks",
+    "paperless_upload_document", "paperless_add_document_note", "paperless_restore_documents",
     "paperless_delete_share_link",  # revogar link público reduz exposição (só com deletes ligados)
     # paperless-mcp 0.1.0: escrita que sobrescreve, um item por vez
     "paperless_update_document", "paperless_update_tag", "paperless_update_correspondent",
-    "paperless_update_document_type", "paperless_update_storage_path", "paperless_update_custom_field",
+    "paperless_update_document_type", "paperless_update_storage_path",
     "paperless_set_document_custom_field", "paperless_remove_document_custom_field",
     "paperless_bulk_rotate_documents",
 }
@@ -95,6 +92,18 @@ BLOQUEADAS = {
     "vault_move_file",                   # move qualquer arquivo; com overwrite=true apaga o destino
     "vault_move_note",                   # com overwrite=true apaga a nota de destino
     "paperless_bulk_edit_documents",     # troca tags/tipo/correspondente em lote, sem desfazer
+    # Paperless único (Ficha 6, item 8, Leonardo, 2026-10-24): vazam entre os donos.
+    "paperless_list_tasks",              # tarefa sem dono (pasta de consumo) mostra o nome do arquivo aos dois
+    "paperless_list_active_tasks",       # idem
+    "paperless_get_next_asn",            # revela o maior número de arquivo da casa toda
+    # Revisor da Fase 2.1 (2026-10-24), conferido no Mac: a peça manda "owner": null ao criar, e o Paperless
+    # grava sem dono (o nome aparece para os dois e o outro pode mudar). Criar fica com o dono, na interface.
+    "paperless_create_tag", "paperless_create_correspondent", "paperless_create_document_type",
+    "paperless_create_storage_path",
+    # Campo personalizado não tem dono no Paperless: é da casa toda. Criar ou mudar afeta os dois.
+    "paperless_create_custom_field", "paperless_update_custom_field",
+    # get_task aceita id numérico: dá para ler, um a um, as tarefas sem dono (pasta de consumo do outro).
+    "paperless_get_task", "paperless_acknowledge_tasks",
 }
 
 INSTRUCOES = """\

@@ -420,3 +420,66 @@ no B8).
       (`sudo systemctl start assistente-backup.service`, `journalctl -u assistente-backup -n 30`) e faça um ensaio de
       restauração (`docs/MIGRACAO.md` § Ensaio). Guarde a identidade do age fora do i7.
 - [ ] B13. Seguir para a Fase 2 do `PLANO.md` (Paperless).
+
+#### Fase 2.1 no i7: Paperless único (Ficha 6)
+
+Um Paperless-ngx só para o Leonardo e a esposa, como projeto Docker Compose próprio (`paperless/`), fora do
+compose do assistente. Cada pessoa tem um usuário comum e um token; cada assistente só vê os documentos do dono.
+Ensaiado no Mac em 2026-10-24 com documentos sintéticos (isolamento, workflows, backup e restauração).
+Lê PDF, imagem, Word, Excel, PowerPoint, OpenDocument e e-mail (`.eml`): o Tika extrai o texto e o
+Gotenberg gera o PDF de visualização; o original fica guardado. Gasta ~1,5 GB de RAM (medido no Mac: webserver 1 GB,
+Tika 0,3 GB, Gotenberg 0,15 GB). **Antes:** a chave pública do age (a mesma do assistente) e ~15 min.
+
+- [ ] P1. Estado e `.env` (senhas novas; nunca as do Mac):
+      ```bash
+      sudo mkdir -p /srv/paperless && sudo chown <usuario>: /srv/paperless && chmod 700 /srv/paperless
+      cp /srv/assistente/app/paperless/.env.example /srv/paperless/.env && chmod 600 /srv/paperless/.env
+      nano /srv/paperless/.env   # PAPERLESS_DBPASS, PAPERLESS_SECRET_KEY, PAPERLESS_ADMIN_PASSWORD (openssl rand -hex 32),
+                                 # AGE_DESTINATARIO e BACKUP_DESTINO=/srv/backup-hd/paperless
+      ```
+      Guarde a senha do admin no gerenciador de senhas. `PAPERLESS_CONSUMER_POLLING` fica 0 no Linux.
+- [ ] P2. Subir e preparar (baixa ~2 GB de imagens e o idioma `por` na primeira vez):
+      ```bash
+      cd /srv/assistente/app && PAPERLESS_HOME=/srv/paperless bash paperless/scripts/preparar.sh
+      ```
+      Esperado no fim: `conferir: ok`, `porta: 127.0.0.1:8010 (só loopback)` e `preparar: pronto`. Se a conferência
+      achar problema, o script para; leia as linhas `PROBLEMA`.
+- [ ] P3. Ligar o assistente do Leonardo. O token é segredo: vai direto do comando para o `.env`, sem aparecer na tela:
+      ```bash
+      T="$(PAPERLESS_HOME=/srv/paperless bash paperless/scripts/token.sh leonardo)"
+      sed -i "s|^PAPERLESS_API_KEY=.*|PAPERLESS_API_KEY=$T|; s|^PAPERLESS_URL=.*|PAPERLESS_URL=http://paperless:8000|" /srv/assistente/.env
+      unset T
+      grep -q '^COMPOSE_FILE=' /srv/assistente/.env \
+        || echo 'COMPOSE_FILE=docker-compose.yml:deploy/paperless/rede.yml' >> /srv/assistente/.env
+      cd /srv/assistente/app && docker compose up -d --force-recreate servidor tailscale && bash scripts/verificar.sh
+      ```
+      Esperado: `ok    Paperless: http://paperless:8000 responde, token do usuário comum leonardo, nenhum documento sem dono`. Recrie o
+      `tailscale` junto (ele usa a rede do servidor; veja o aviso do B7).
+- [ ] P4. Timers (backup às 03:45 e conferência às 07:00):
+      ```bash
+      cd /srv/assistente/app/paperless/deploy/systemd
+      for f in paperless-*.service; do
+        sed -e "s#<usuario>#$USER#g" -e "s#<app>#/srv/assistente/app#g" -e "s#<paperless_home>#/srv/paperless#g" "$f" \
+          | sudo tee "/etc/systemd/system/$f" >/dev/null
+      done
+      sudo cp paperless-*.timer /etc/systemd/system/ && sudo systemctl daemon-reload
+      sudo systemctl enable --now paperless-backup.timer paperless-conferir.timer
+      sudo systemctl start paperless-backup.service && journalctl -u paperless-backup -n 5 --no-pager
+      ```
+      Esperado: `exportar: feito: /srv/backup-hd/paperless/paperless-AAAAMMDD-HHMM.tar.age`.
+- [ ] P5. Ensaio de restauração, no Mac, com a identidade do age (o i7 nunca tem a chave privada):
+      ```bash
+      scp i7:/srv/backup-hd/paperless/paperless-<data>.tar.age ~/Downloads/
+      cd ~/Desktop/Projetos/assistente-pessoal
+      bash paperless/scripts/ensaiar_restauracao.sh ~/Downloads/paperless-<data>.tar.age --chave ~/identidade-assistente.txt
+      ```
+      Esperado: `ensaio ok`. Ele sobe uma instalação descartável, compara documentos por dono e apaga tudo.
+- [ ] P6. Pelo app (Projeto "Assistente"): cole antes o texto atual da Ficha 1 (tem a linha nova do § Paperless).
+      Ponha um PDF em `/srv/paperless/consumir/leonardo/` (ou suba pela interface) e peça "me mostra o último
+      documento que entrou". Peça também "compartilha esse documento com a minha esposa": a resposta deve ser
+      "Não consigo compartilhar: os documentos de cada um ficam separados."
+- [ ] P7. Interface web, quando precisar (do Mac): `ssh -L 8010:127.0.0.1:8010 i7` e abra `http://127.0.0.1:8010`
+      como `admin`. Para a esposa entrar na web, defina a senha dela ali (Usuários). Nunca dê permissão a um
+      documento para o outro usuário, nem crie grupo: a conferência diária acusa (Ficha 6, decisão 3).
+- [ ] P8. Instância da esposa (PLANO 1b.1, depois): `COMPOSE_PROJECT_NAME=assistente-esposa` na instância dela já casa
+      com a rede `assistente-esposa-paperless`; o token dela sai de `token.sh esposa`, e o P3 vale igual com a pasta dela.

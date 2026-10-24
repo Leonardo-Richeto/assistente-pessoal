@@ -207,6 +207,11 @@ pergunte). Sem o pedido do dono, não escreva resumo.
 - paperless_update_document troca campos do documento. Diga o que vai mudar antes de chamar.
 - Não apague documento, não crie link público e não una nem divida documentos. Essas
   ferramentas não existem para você. Se o dono pedir, diga que não pode.
+- Tag, correspondente, tipo ou campo novo: não crie. Use os que existem; se faltar, diga ao dono
+  que ele cria na interface do Paperless. Para saber se um upload entrou, busque o documento.
+- Você só vê os documentos do dono; os de outra pessoa da casa não aparecem. Não
+  compartilhe nem troque o dono de documento. Se o dono pedir, diga: "Não consigo
+  compartilhar: os documentos de cada um ficam separados."
 
 ## O que nunca fazer
 - Não peça nem tente SQL livre ou comando no servidor. Não existe essa ferramenta.
@@ -763,3 +768,83 @@ Correções do revisor final (2026-10-22): .gitattributes com comentário, deplo
 topo varrido, retry do add, oldString fora da barreira, timers em ordem, nome com hash no registro. No texto da Ficha 1:
 ler_nota (não vault_read_note) para a nota ligada ao registro, em "## Consultas"; e a frase da escrita recusada por
 segredo, em "## O que nunca fazer".
+
+---
+
+## Ficha 6 — Paperless único para o dono e a esposa
+
+- **Status:** aprovada (Leonardo, 2026-10-24), com as decisões abaixo. Proposta do Opus 5.5. Origem: D21 do vault e `PLANO.md` 1b.1, 2.1, 7.3.
+- **Onde vive:** projeto Docker Compose próprio do Paperless-ngx (fora do compose do assistente), usuários e workflows
+  criados nele, lista de bloqueadas em `servidor/assistente/servidor.py` e texto da Ficha 1 (§ Paperless).
+- **Conferido em 2026-10-24** no código da v3.3.4 (última estável, de 2026-10-22) e nos 17 avisos de segurança do
+  projeto: a API filtra documentos, busca, estatística e tarefas pelo usuário do token. Superusuário vê tudo. Documento
+  **sem dono é visível a todo usuário** (regra de compatibilidade do Paperless). Upload pela API recebe como dono o
+  usuário do token; documento da pasta de consumo fica sem dono, salvo workflow. A peça `paperless-mcp` 0.1.0 não
+  troca dono nem permissões (`set_permissions` não existe nela). **Correção do revisor (2026-10-24, conferida no Mac):**
+  ao criar tag, correspondente, tipo ou caminho, a peça manda `owner: null` e o Paperless grava **sem dono**; campo
+  personalizado não tem dono no Paperless; e `get_task` lê, pelo número, as tarefas sem dono do outro. Daí o item 8.
+
+### Regra
+
+1. **Um Paperless, um usuário por pessoa.** Usuários `leonardo` e `esposa`, comuns (sem superusuário e sem staff). Cada
+   assistente usa o token do usuário do seu dono. O superusuário é outro (`admin`), só pela interface web local, e o
+   token dele nunca vai para assistente nenhum.
+2. **Permissões do usuário comum:** ver, criar e trocar documento, nota, tag, correspondente, tipo e caminho de
+   armazenamento; ver campo personalizado e visão salva. Sem apagar nada, sem usuários, grupos, e-mail, workflow nem
+   tarefas. Técnicas: as da interface web (`uisettings`) e ver o histórico do documento (o Paperless confere o dono).
+3. **Cada assistente só vê o que é do dono:** documentos de que ele é dono.
+   Busca, conteúdo, download, estatística e sugestões seguem a mesma regra.
+4. **Documento sem dono não pode existir.** Pastas de consumo `consumir/leonardo` e `consumir/esposa`, cada uma com um
+   workflow que põe o dono e nenhuma permissão extra. Arquivo na raiz de `consumir/` vai para o Leonardo (workflow de
+   reserva). Upload pelo assistente já sai com o dono certo. Uma conferência diária conta os documentos sem dono e,
+   se achar algum, avisa no log e no `verificar.sh`.
+5. **Sem compartilhamento entre os dois** (Leonardo, 2026-10-24). O assistente não compartilha, não troca dono e não
+   cria link público. A conferência diária também avisa se algum documento tiver permissão dada ao outro usuário.
+6. **Tags, correspondentes, tipos e caminhos novos** são criados pelo dono na interface web (com o próprio usuário),
+   onde nascem com dono. O assistente usa os que existem e não cria (a peça criaria sem dono). Campo personalizado é
+   da casa toda: só o `admin` cria, e nenhum assistente muda. O `admin` não cria tag, correspondente, tipo nem caminho.
+7. **O que o assistente faz com documentos** (igual à Ficha 1): busca e lê à vontade; escreve (upload, nota, tags,
+   campos) só com pedido do dono, dizendo antes o que muda. Nunca apaga, une, divide, refaz OCR nem cria link público.
+8. **Bloqueio novo:** `paperless_list_tasks`, `paperless_list_active_tasks`, `paperless_get_task` e
+   `paperless_acknowledge_tasks` (tarefas sem dono, como as da pasta de consumo, mostram o nome do arquivo aos dois);
+   `paperless_get_next_asn` (revela o maior número de arquivo da casa toda); `paperless_create_tag`,
+   `paperless_create_correspondent`, `paperless_create_document_type` e `paperless_create_storage_path` (criam sem
+   dono); `paperless_create_custom_field` e `paperless_update_custom_field` (o campo é dos dois). Para saber se o
+   upload entrou, o assistente busca o documento.
+9. **Versão fixa** (tag e digest da imagem) e troca de versão só depois de ler os avisos de segurança novos.
+
+### Exemplos
+
+| Pedido | Ferramenta | Resposta |
+|---|---|---|
+| Leonardo: "me mostra o último documento que entrou" | `paperless_search_documents` (ordenado por `added`) | o último documento **dele** |
+| Esposa: "acha a nota fiscal da geladeira" (documento do Leonardo, não compartilhado) | `paperless_search_documents` | "Não achei." |
+| "Compartilha esse contrato com a minha esposa" | nenhuma | "Não consigo compartilhar: os documentos de cada um ficam separados." |
+| PDF jogado na raiz de `consumir/` | workflow de reserva | documento do Leonardo |
+
+### Não faz
+
+- Não separa os documentos por instância: o isolamento é do Paperless. Uma falha de permissão nele vaza entre os dois.
+- Não guarda documento no vault nem no banco.
+
+### Cenário de teste
+
+1. No Mac, com documentos sintéticos: usuário A não acha, não lê e não baixa documento de B pela API (id direto,
+   busca, busca global, estatística).
+2. Documento sem dono, ou com permissão para outro usuário, aparece na conferência diária.
+3. Upload pelo token de A sai com dono A.
+4. As três ferramentas do item 8 estão em `BLOQUEADAS` (`test_bloqueadas.py`).
+
+### Aplicado
+
+2026-10-24 (Opus 5.5): linha nova no § Paperless do texto da Ficha 1 (colar no Projeto quando o Paperless subir no i7);
+as ferramentas do item 8 em `BLOQUEADAS`; projeto `paperless/` com `preparar.sh`, `conferir.sh` e backup próprio.
+Correções do revisor (2026-10-24): criação sem dono, campo personalizado e tarefas bloqueados (item 8); permissões do
+item 2 iguais à ficha; conferência confere o conteúdo dos workflows; `verificar.sh` acusa documento sem dono.
+
+### Decisões do Leonardo (2026-10-24)
+
+1. Regra 1 a 9: aprovada.
+2. Arquivo na raiz de `consumir/` vai para o Leonardo: aprovado.
+3. Documentos da casa: os dois ficam isolados, **sem compartilhamento nenhum**. Não existe grupo `casa`; nenhum
+   documento ganha permissão para o outro usuário.

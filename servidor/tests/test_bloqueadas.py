@@ -42,6 +42,8 @@ PROIBIDAS = {
     "vault_delete_note", "vault_move_file", "vault_move_note",
     "paperless_create_share_link", "paperless_delete_document", "paperless_empty_trash",
     "paperless_bulk_edit_documents",
+    "paperless_list_tasks", "paperless_list_active_tasks", "paperless_get_next_asn",  # Ficha 6
+    "paperless_create_tag", "paperless_create_custom_field", "paperless_get_task",  # revisor da Fase 2.1
 }
 
 

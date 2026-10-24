@@ -88,6 +88,8 @@ cp .env.example ../.env   # ASSISTENTE_HOME=/srv/assistente-esposa, COMPOSE_PROJ
                           # PORTA_HOST=8001, TS_NOME=assistente-esposa, NOME_USUARIO, senhas novas
 docker compose --env-file ../.env up -d --build   # URL: https://assistente-esposa.<tailnet>.ts.net
 ```
+Documentos: o Paperless é um só para a casa (`paperless/`, Ficha 6). Na instância nova, `COMPOSE_FILE` e
+`PAPERLESS_URL` como no `.env.example`, e o token de `paperless/scripts/token.sh esposa` (`docs/IMPLANTACAO.md` P8).
 O backup diário instalado pelo `preparar_host.sh` é da instância principal; para esta, rode
 `ASSISTENTE_HOME=/srv/assistente-esposa bash scripts/exportar.sh --retencao` num timer próprio.
 

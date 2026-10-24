@@ -67,6 +67,11 @@ cifrado e migração pelo mesmo pacote (Fase 7, `docs/MIGRACAO.md`). Em 2026-10-
     substitui a ideia de "Paperless no mesmo compose" do prompt antigo do PC Windows e muda a 7.3: o
     `exportar.sh` do assistente não leva os documentos.
   - Pronto quando: "me mostra o último documento que entrou" funciona pelo app
+  - 2026-10-24 (Opus 5.5, Mac): Ficha 6 aprovada; projeto `paperless/` (v3.3.4, digest fixo, só 127.0.0.1, rede
+    por instância), usuários comuns, workflows de dono por pasta, conferência diária, backup e restauração ensaiados
+    com documentos sintéticos (`tests/test_paperless_isolamento.py`, 15 testes). Word e Excel pelo Tika e
+    Gotenberg (Leonardo, 2026-10-24: "preciso disso"); o original fica guardado. Falta no i7: `docs/IMPLANTACAO.md`
+    § Fase 2.1 no i7 (P1–P6) e o teste pelo app
 - [ ] 2.2 Migrar o vault para `/srv/assistente/vault` no i7, Syncthing com todos os aparelhos (Mac, iPhone, PC Windows) e GitHub privado mantido por enquanto (decisão de 2026-10-17); preencher `VAULT_PATH`. Detalhe: `SPRINT.md` B12
 - [x] 2.2b (regra em 2026-10-16, `registro-temporario-de-sprint-na-raiz`; inventário em `maquinas-do-assistente-pessoal`) Levar para o vault a "Regra de passagem" e a nota de inventário das máquinas
 - [ ] 2.3 Job diário de commit do vault (`git add -A && git commit`) para ter histórico de tudo que a IA escrever
@@ -192,8 +197,8 @@ Substitui o adiamento de 2026-10-18. Procedimento em `docs/MIGRACAO.md`.
   `AGE_DESTINATARIO` e apontar `BACKUP_DESTINO` para o HD de 500 GB do i7 (`/srv/backup-hd`, `docs/IMPLANTACAO.md` B2d)
 - [ ] 7.2 Ensaio de restauração mensal numa máquina ou VM descartável (o i5 vai ser desligado: rever onde). Primeiro
   ensaio em 2026-10-24 no Mac com `scripts/ensaiar_restauracao.sh` (pacote das 03:18): ok, 8 tabelas e 128 notas.
-- [ ] 7.3 Paperless no pacote (`document_exporter`/`document_importer`), junto com a Fase 2.1. Até lá os scripts
-  param com erro se o compose tiver `paperless`
+- [x] 7.3 (2026-10-24, Mac) Paperless com backup próprio, fora do pacote do assistente: `paperless/scripts/exportar.sh`
+  (`document_exporter`, age), `importar.sh` e `ensaiar_restauracao.sh` (ensaio ok no Mac). No i7: timer do P4
 - [ ] 7.4 Migração Mac → i7 com `verificar.sh` sem erro e teste com o i7 em outra rede (4G do celular)
 
 ---

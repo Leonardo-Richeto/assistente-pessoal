@@ -105,8 +105,16 @@ conferir_env() {
   esac
 }
 
+# Arquivos do compose: COMPOSE_FILE do .env (separados por ":", relativos ao repositório), como o
+# docker compose faz sozinho; vazio = docker-compose.yml. Ex.: deploy/paperless/rede.yml (Ficha 6).
 dc() {
-  docker compose --project-directory "$(caminho_docker "$APP")" -f "$(caminho_docker "$APP/docker-compose.yml")" \
+  local lista arquivos=() f
+  lista="$(valor_env COMPOSE_FILE)"
+  [ -n "$lista" ] || lista=docker-compose.yml
+  local IFS=:
+  for f in $lista; do arquivos+=(-f "$(caminho_docker "$APP/$f")"); done
+  unset IFS
+  docker compose --project-directory "$(caminho_docker "$APP")" "${arquivos[@]}" \
     --env-file "$(caminho_docker "$ENV_FILE")" "$@"
 }
 
@@ -279,8 +287,9 @@ conferir_contagens() {  # <contagens.tsv>
 
 # --- Retenção dos pacotes: últimos 7 dias e últimas 4 semanas (como restic --keep-daily 7
 # --keep-weekly 4): por dia e por semana ISO, fica o pacote mais novo. Só toca em arquivos com o
-# nome exato que o exportar cria. ------------------------------------------------------------------
+# nome exato que o exportar cria. O Paperless (paperless/scripts/comum.sh) troca o prefixo e o padrão. ---
 
+PREFIXO_PACOTE=assistente
 PADRAO_PACOTE='assistente-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]*.tar.age'
 
 semana_iso() {  # AAAAMMDD -> AAAA-SS
@@ -292,7 +301,7 @@ pacotes_a_apagar() {  # <pasta> [diarios] [semanais] -> nomes, um por linha
   local dias_vistos="" semanas_vistas="" n_dias=0 n_semanas=0 fica
   while IFS= read -r nome; do
     [ -n "$nome" ] || continue
-    dia="${nome#assistente-}"; dia="${dia%%-*}"
+    dia="${nome#"$PREFIXO_PACOTE"-}"; dia="${dia%%-*}"
     semana="$(semana_iso "$dia")" || { aviso "data inválida no nome $nome; não apago."; continue; }
     fica=0
     case " $dias_vistos " in

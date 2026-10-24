@@ -1,0 +1,13 @@
+[Unit]
+Description=Backup diario do Paperless unico (paperless/scripts/exportar.sh --retencao)
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# <usuario>, <app> e <paperless_home> sao trocados na instalacao (docs/IMPLANTACAO.md, Fase 2.1 no i7).
+User=<usuario>
+Environment=PAPERLESS_HOME=<paperless_home>
+ExecStart=/bin/bash <app>/paperless/scripts/exportar.sh --retencao
+# O Paperless fica de pe durante a exportacao.
+TimeoutStartSec=2h

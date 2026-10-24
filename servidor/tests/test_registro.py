@@ -511,24 +511,21 @@ CLASSIFICACAO_REVISADA = {
     "paperless_get_document": LE, "paperless_get_document_content": LE, "paperless_get_document_metadata": LE,
     "paperless_get_document_notes": LE, "paperless_get_document_history": LE,
     "paperless_find_similar_documents": LE, "paperless_download_document": LE,
-    "paperless_get_document_thumbnail": LE, "paperless_get_next_asn": LE,
+    "paperless_get_document_thumbnail": LE,
     "paperless_get_document_suggestions": LE,
     "paperless_get_document_ai_suggestions": LE,  # devolve sugestões; não aplica nada no documento
     "paperless_list_tags": LE, "paperless_list_correspondents": LE, "paperless_list_document_types": LE,
     "paperless_list_storage_paths": LE, "paperless_list_custom_fields": LE, "paperless_list_trash": LE,
-    "paperless_list_active_tasks": LE, "paperless_list_tasks": LE, "paperless_get_task": LE,
     "paperless_get_paperless_info": LE, "paperless_get_statistics": LE, "paperless_get_system_status": LE,
     "paperless_list_saved_views": LE, "paperless_get_saved_view": LE,
     "paperless_run_saved_view": LE,  # roda a busca salva; só lê documentos
     "paperless_list_share_links": LE,
     # paperless-mcp 0.1.0: escrita
-    "paperless_upload_document": ESCREVE, "paperless_add_document_note": ESCREVE, "paperless_create_tag": ESCREVE,
-    "paperless_create_correspondent": ESCREVE, "paperless_create_document_type": ESCREVE,
-    "paperless_create_storage_path": ESCREVE, "paperless_create_custom_field": ESCREVE,
-    "paperless_restore_documents": ESCREVE, "paperless_acknowledge_tasks": ESCREVE,
+    "paperless_upload_document": ESCREVE, "paperless_add_document_note": ESCREVE,
+    "paperless_restore_documents": ESCREVE,
     "paperless_delete_share_link": ESCREVE, "paperless_update_document": ESCREVE, "paperless_update_tag": ESCREVE,
     "paperless_update_correspondent": ESCREVE, "paperless_update_document_type": ESCREVE,
-    "paperless_update_storage_path": ESCREVE, "paperless_update_custom_field": ESCREVE,
+    "paperless_update_storage_path": ESCREVE,
     "paperless_set_document_custom_field": ESCREVE, "paperless_remove_document_custom_field": ESCREVE,
     "paperless_bulk_rotate_documents": ESCREVE,
     # banco (código nosso)

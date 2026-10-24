@@ -1,0 +1,11 @@
+[Unit]
+Description=Conferencia diaria da Ficha 6 no Paperless (documento sem dono, compartilhamento, superusuario)
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=<usuario>
+Environment=PAPERLESS_HOME=<paperless_home>
+# Falha = unidade "failed" no systemctl e linha PROBLEMA no journalctl -u paperless-conferir.
+ExecStart=/bin/bash <app>/paperless/scripts/conferir.sh

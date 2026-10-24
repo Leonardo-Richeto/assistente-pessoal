@@ -1,0 +1,14 @@
+# Liga o servidor do assistente ao Paperless único (Ficha 6), pela rede que o projeto paperless/ cria
+# (uma por instância: <COMPOSE_PROJECT_NAME>-paperless). O servidor vê o Paperless em http://paperless:8000;
+# o banco e o broker do Paperless ficam numa rede que ele não vê.
+#
+# Ligar: no .env da instância, COMPOSE_FILE=docker-compose.yml:deploy/paperless/rede.yml e
+# PAPERLESS_URL=http://paperless:8000. O Paperless precisa estar de pé antes (a rede é dele).
+services:
+  servidor:
+    networks: [default, paperless]
+
+networks:
+  paperless:
+    external: true
+    name: ${COMPOSE_PROJECT_NAME:-assistente}-paperless

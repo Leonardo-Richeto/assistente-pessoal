@@ -93,7 +93,7 @@ conferir_env
 mkdir -p "$HOME_DIR/data/postgres" "$HOME_DIR/data/sessoes/oauth" "$HOME_DIR/data/tailscale" \
   "$HOME_DIR/vault" "$HOME_DIR/logs" || falha "não consegui criar as pastas de $HOME_DIR."
 if servico_definido paperless; then
-  falha "o compose tem Paperless, e a importação dele (document_importer) ainda não foi implementada."
+  falha "o compose do assistente tem um serviço paperless: o Paperless é projeto próprio (paperless/, Ficha 6), restaurado por paperless/scripts/importar.sh."
 fi
 
 log "construindo as imagens"

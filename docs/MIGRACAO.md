@@ -18,7 +18,6 @@ alimenta a migração. Plano original: "Plano de Portabilidade do Servidor" (Leo
 ├── .env                 configuração e senhas (fora do git)
 ├── data/
 │   ├── postgres/        dados internos do Postgres (NUNCA copiar entre máquinas)
-│   ├── paperless/       reservado para a Fase 2
 │   ├── tailscale/       identidade do nó Tailscale
 │   ├── sessoes/oauth/   clientes e tokens do login (cifrados com a JWT_SIGNING_KEY)
 │   └── vault-versoes/   versões do Syncthing (não entram no pacote)
@@ -121,8 +120,16 @@ qualquer máquina com docker, inclusive o Mac.
 
 ## Limites conhecidos
 
-- **Paperless:** a exportação e a importação (`document_exporter`/`document_importer`) ainda não existem. Os
-  dois scripts param com erro se o compose tiver um serviço `paperless`. Implementar junto com a Fase 2.1.
+- **Paperless:** é projeto próprio (`paperless/`, Ficha 6), com estado em `/srv/paperless` e backup próprio:
+  `paperless/scripts/exportar.sh` (pacote `paperless-AAAAMMDD-HHMM.tar.age`, `document_exporter`, mesma chave do age),
+  `importar.sh` e `ensaiar_restauracao.sh`. O pacote do assistente não leva documentos. Migrar o Paperless para outra
+  máquina: `importar.sh` com `PAPERLESS_HOME` vazio lá. Os scripts do assistente param com erro se alguém puser um
+  serviço `paperless` no compose do assistente.
+  - **Os tokens da API não vêm no pacote** (o `document_exporter` não exporta). Depois do `importar.sh` do Paperless,
+    rode `paperless/scripts/token.sh <pessoa>` e troque o `PAPERLESS_API_KEY` no `.env` de cada instância
+    (`docs/IMPLANTACAO.md` P3). Sem isso, o `verificar.sh` do assistente mostra "não respondeu com o token".
+  - **Ordem numa máquina nova:** o Paperless primeiro. Com `COMPOSE_FILE` apontando para `deploy/paperless/rede.yml`,
+    o assistente não sobe sem a rede `<projeto>-paperless`, que o Paperless cria.
 - **Mac de teste (layout antigo):** os dados de lá estão nos volumes nomeados do compose antigo, que o compose
   novo não usa (depois do `git pull`, o Mac sobe com banco vazio; o volume antigo continua lá, intacto). Para
   levar os registros: com a stack antiga de pé, `git show 8d2ec8d:deploy/backup-banco.sh > /tmp/backup-banco.sh`,
