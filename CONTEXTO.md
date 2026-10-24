@@ -194,7 +194,7 @@ perguntas fora da busca real; `consultar_sessoes` sem `comandos`.
   restaurar, desatualizada → desfazer, resumo da conversa no diário (Ficha 4, com `registro: atividade-1`).
 - **B9 falhou:** "o que eu fiz no Claude Code esta semana?" foi respondido pelo histórico do próprio ambiente, sem
   `consultar_sessoes`. Correção na Ficha 1 aprovada (Leonardo, 2026-10-24; `docs/regras-de-negocio.md`, "Mudança do
-  B9"); **falta colar o texto novo no Projeto** e repetir a pergunta.
+  B9"); texto novo colado e pergunta repetida às 07:06: `consultar_sessoes` chamada (chamada 59), resposta certa.
 - **Sessões:** a sessão de 2026-10-23 estava na fila do Mac; enviada à mão. Envio automático ligado no Mac (launchd,
   a cada hora). O launchd não lê o Desktop (TCC): roda uma cópia de `enviar.py` e `fila.py` em
   `~/.local/share/assistente/sessoes/` (recopiar quando mudarem; `ferramentas/sessoes/README.md`).
@@ -278,8 +278,7 @@ Vale para todo projeto longo dividido em fases, executado por modelos diferentes
 ```
 Leia CONTEXTO.md (entrada 2026-10-23), docs/IMPLANTACAO.md (roteiro e B8/B9) e PLANO.md (1.5, 1.7, 1.9, 1.10, 7.2).
 O i7 está no ar: stack, vault, Syncthing i7↔Mac, timers, backup no HD e sessões. Falta, nesta ordem:
-1. B8 feito em 2026-10-24. Colar o texto novo da Ficha 1 (mudança do B9) no Projeto e repetir "o que eu fiz no
-   Claude Code esta semana?": deve chamar consultar_sessoes.
+1. B8 feito em 2026-10-24, com a mudança do B9 colada e testada.
 2. Resto do B9 (ponto, quando o Leonardo ajustar; nota que mudou no meio; lint) e B9b no Mac.
 3. Conferir de manhã: journal do backup e do vault-commit, DNS público do Funnel depois das 03:15 (PLANO 1.10).
 4. Ensaio de restauração do backup (docs/MIGRACAO.md § Ensaio) com a identidade do age do Leonardo.
