@@ -61,7 +61,7 @@ cifrado e migração pelo mesmo pacote (Fase 7, `docs/MIGRACAO.md`). Em 2026-10-
 - [ ] 1c.4 Medir de novo (1.7) com tudo no i7
 
 ## Fase 2 — Documentos e vault
-- [ ] 2.1 Subir Paperless-ngx com o compose oficial (rede Docker compartilhada com este stack); gerar token; preencher `PAPERLESS_URL`/`PAPERLESS_API_KEY`
+- [x] 2.1 Subir Paperless-ngx com o compose oficial (rede Docker compartilhada com este stack); gerar token; preencher `PAPERLESS_URL`/`PAPERLESS_API_KEY`
   - Decisão de 2026-10-24 (Leonardo): um Paperless só para o Leonardo e a esposa (1b), um usuário e um token por
     pessoa. Por isso ele fica fora do compose do assistente, como projeto próprio, com backup próprio. Isso
     substitui a ideia de "Paperless no mesmo compose" do prompt antigo do PC Windows e muda a 7.3: o
@@ -69,13 +69,19 @@ cifrado e migração pelo mesmo pacote (Fase 7, `docs/MIGRACAO.md`). Em 2026-10-
   - Pronto quando: "me mostra o último documento que entrou" funciona pelo app
   - 2026-10-24 (Opus 5.5, Mac): Ficha 6 aprovada; projeto `paperless/` (v3.3.4, digest fixo, só 127.0.0.1, rede
     por instância), usuários comuns, workflows de dono por pasta, conferência diária, backup e restauração ensaiados
-    com documentos sintéticos (`tests/test_paperless_isolamento.py`, 15 testes). Word e Excel pelo Tika e
-    Gotenberg (Leonardo, 2026-10-24: "preciso disso"); o original fica guardado. Falta no i7: `docs/IMPLANTACAO.md`
-    § Fase 2.1 no i7 (P1–P6) e o teste pelo app
+    com documentos sintéticos (`tests/test_paperless_isolamento.py`, 17 testes). Word e Excel pelo Tika e
+    Gotenberg (Leonardo, 2026-10-24: "preciso disso"); o original fica guardado.
+  - 2026-10-24 (Opus 5.5, guiando do Mac): no i7, `docs/IMPLANTACAO.md` P1–P6. Timers de backup (03:45) e
+    conferência (07:00), ensaio de restauração no Mac com o pacote do i7 e, pelo app, "me mostra o último documento
+    que entrou" e a recusa de compartilhar. Rota padrão do servidor fixa na rede do assistente (`gw_priority`).
 - [ ] 2.2 Migrar o vault para `/srv/assistente/vault` no i7, Syncthing com todos os aparelhos (Mac, iPhone, PC Windows) e GitHub privado mantido por enquanto (decisão de 2026-10-17); preencher `VAULT_PATH`. Detalhe: `SPRINT.md` B12
 - [x] 2.2b (regra em 2026-10-16, `registro-temporario-de-sprint-na-raiz`; inventário em `maquinas-do-assistente-pessoal`) Levar para o vault a "Regra de passagem" e a nota de inventário das máquinas
 - [ ] 2.3 Job diário de commit do vault (`git add -A && git commit`) para ter histórico de tudo que a IA escrever
 - [ ] ⚑ 2.4 Definir o envio de arquivos para o servidor (pasta "consumir" do Paperless sincronizada pelo Syncthing é o caminho mais simples)
+- [ ] 2.5 Compartilhar documento entre o Leonardo e a esposa (Leonardo, 2026-10-24: "para implementação futura").
+  Hoje a Ficha 6 (decisão 3) proíbe. Antes do código, ficha nova: quem compartilha, só ver ou editar, confirmação e
+  desfazer. Depois, ferramenta própria (a `paperless-mcp` não muda permissões) com o token do dono e linha em
+  `Auditoria`, conferência diária aceitando só esse compartilhamento e testes de isolamento. Estimativa: uma sessão.
 
 ## Fase 2b — Vault inteligente (ideias do ai-memory, Leonardo, 2026-10-21)
 Vieram do estudo do vault com o [ai-memory](https://github.com/akitaonrails/ai-memory) em 2026-10-21; o porquê

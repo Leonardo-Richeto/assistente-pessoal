@@ -458,6 +458,10 @@ Tika 0,3 GB, Gotenberg 0,15 GB). **Antes:** a chave pública do age (a mesma do 
       e `1` no `grep` (a imagem tem as bloqueadas da Ficha 6). O `--build` é obrigatório: o código entra na imagem, e
       sem ele o servidor sobe com a lista antiga, que deixa criar tag sem dono e ler tarefas do outro. Recrie o
       `tailscale` junto (ele usa a rede do servidor; veja o aviso do B7).
+      **Funnel fora depois de recriar** (2026-10-24): o `verificar.sh` passou e, ~15 min depois, o Funnel deu `000` (o TLS
+      cai na entrada pública; pela tailnet o nó dá 401 e nenhum pacote chega a ele). Recriar de novo zerou a espera: voltou
+      10 min depois. Não é a rota nem o Tailnet Lock. Espere até ~20 min sem recriar nada e confira de fora:
+      `curl -4 -s -o /dev/null -w '%{http_code}' https://<nome>.<tailnet>.ts.net/mcp` (esperado 401).
 - [x] P4 (2026-10-24). Timers (backup às 03:45 e conferência às 07:00):
       ```bash
       cd /srv/assistente/app/paperless/deploy/systemd
@@ -477,7 +481,7 @@ Tika 0,3 GB, Gotenberg 0,15 GB). **Antes:** a chave pública do age (a mesma do 
       bash paperless/scripts/ensaiar_restauracao.sh ~/Downloads/paperless-<data>.tar.age --chave ~/identidade-assistente.txt
       ```
       Esperado: `ensaio ok`. Ele sobe uma instalação descartável, compara documentos por dono e apaga tudo.
-- [ ] P6. Pelo app (Projeto "Assistente"): cole antes o texto atual da Ficha 1 (tem a linha nova do § Paperless).
+- [x] P6 (2026-10-24). Pelo app (Projeto "Assistente"): cole antes o texto atual da Ficha 1 (tem a linha nova do § Paperless).
       Ponha um PDF em `/srv/paperless/consumir/leonardo/` (ou suba pela interface) e peça "me mostra o último
       documento que entrou". Peça também "compartilha esse documento com a minha esposa": a resposta deve ser
       "Não consigo compartilhar: os documentos de cada um ficam separados."
