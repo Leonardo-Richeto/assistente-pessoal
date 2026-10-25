@@ -488,12 +488,12 @@ Tika 0,3 GB, Gotenberg 0,15 GB). **Antes:** a chave pública do age (a mesma do 
 - [ ] P7. Interface web, quando precisar (do Mac): `ssh -L 8010:127.0.0.1:8010 <usuario>@i7` (o usuário do i7, não o do Mac) e abra `http://127.0.0.1:8010`
       como `admin`. Para a Nathalia entrar na web, defina a senha dela ali (Usuários). Nunca dê permissão a um
       documento para o outro usuário, nem crie grupo: a conferência diária acusa (Ficha 6, decisão 3).
-- [ ] P8. Instância da Nathalia (PLANO 1b.1, Ficha 8; só com a ficha aprovada). ~1 h. Ensaiada no Mac em 2026-10-24
+- [x] P8. Instância da Nathalia (PLANO 1b.1, Ficha 8; só com a ficha aprovada). ~1 h. Ensaiada no Mac em 2026-10-24
       (sem Tailscale e com segredos falsos). `COMPOSE_PROJECT_NAME=assistente-nathalia` já casa com a rede
       `assistente-nathalia-paperless` do Paperless único.
       **No i7 em 2026-10-24:** feito até o primeiro backup dela (`verificar.sh` tudo ok, Funnel 401, timer às 03:25) e
-      a pasta `paperless-nathalia` com o PC Windows dela (seção 8 do `docs/SYNCTHING.md`, PDF entrou). Falta o conector
-      no Claude dela e os testes do fim. O Funnel dela também leva minutos para voltar depois do backup (ele religa o
+      a pasta `paperless-nathalia` com o PC Windows dela (seção 8 do `docs/SYNCTHING.md`, PDF entrou). **Em 2026-10-25:**
+      ChatGPT dela conectado (Ficha 9); os testes de isolamento do fim ficaram pendentes. O Funnel dela também leva minutos para voltar depois do backup (ele religa o
       `tailscale`). Para ajustar o `.env`, `sed` com `def() { sed -i "s|^#\? \?$1=.*|$1=$2|" "$E"; }` evita erro de
       digitação; confira com os segredos mascarados (`sed -E 's/^((SENHA_|JWT_|...)[A-Z_]*=).+/\1***/'`).
       **Antes, fora do i7 (Leonardo):**
@@ -548,7 +548,27 @@ Tika 0,3 GB, Gotenberg 0,15 GB). **Antes:** a chave pública do age (a mesma do 
       Se o Funnel ainda não responder, espere até ~20 min sem recriar (P3 da Fase 2.1). Depois que o nó entrar, apague
       o valor de `TS_AUTHKEY` do `.env` dela. Rode o backup dela uma vez: `sudo systemctl start assistente-nathalia-backup`
       e `ls /srv/backup-hd/assistente-nathalia`.
-      **No Claude da Nathalia:** Configurações → Conectores → conector personalizado →
+      **No ChatGPT da Nathalia (Ficha 9; o Claude dela fica para depois).** No i7, some os callbacks do ChatGPT ao
+      `.env` dela e recrie o servidor. O `tailscale` vai junto (usa a rede do `servidor`): o Funnel pode levar até
+      ~20 min para voltar; espere sem recriar.
+      ```bash
+      E=/srv/assistente-nathalia/.env
+      sed -i 's|^#\? \?AUTH_REDIRECTS_PERMITIDOS=.*|AUTH_REDIRECTS_PERMITIDOS=https://chatgpt.com/connector_platform_oauth_redirect,https://chatgpt.com/connector/oauth/*|' "$E"
+      grep '^AUTH_REDIRECTS_PERMITIDOS=' "$E"    # esperado: os dois endereços do chatgpt.com
+      cd /srv/assistente-nathalia/app && docker compose up -d --force-recreate servidor tailscale
+      bash scripts/verificar.sh                 # esperado: sem FALHA; Funnel = 401 (pode demorar)
+      ```
+      No ChatGPT dela, em chatgpt.com no PC (os nomes do menu podem variar):
+      1. Configurações → Controles de dados → "Melhorar o modelo para todos" desligado (Ficha 9, regra 5).
+      2. Configurações → Apps → Configurações avançadas → Modo de desenvolvedor ligado.
+      3. Criar app: nome "Assistente", URL `https://assistente-nathalia.<tailnet>.ts.net/mcp`, autenticação OAuth
+         (registro automático). Login Google dela. Se o ChatGPT mostrar outro endereço de callback, compare com o `.env`.
+      4. Projeto "Assistente" com o "Texto para o ChatGPT" da Ficha 9. Numa conversa do Projeto, escolha o app
+         "Assistente" (botão + → Modo de desenvolvedor). Se o app não aparecer no Projeto, use as instruções
+         personalizadas (Ficha 9, regra 4).
+      Teste: ela registra e consulta um gasto; pergunta pelo último documento (o PDF do PC dela); pergunta por
+      `entrada-teste` e recebe "Não achei"; você, pelo seu app, não vê o gasto dela.
+      **No Claude da Nathalia (depois):** Configurações → Conectores → conector personalizado →
       `https://assistente-nathalia.<tailnet>.ts.net/mcp` → login Google dela. Projeto "Assistente" com o texto da Ficha 1
       sem a linha da pasta de entrada (Ficha 8, item 5). Teste: ela registra e consulta um gasto; pergunta por
       `entrada-teste` e recebe "Não achei"; você, pelo seu app, não vê o gasto dela.

@@ -147,6 +147,25 @@ async def test_redirect_extra_soma_no_registro(tmp_path):
                 assert r.status_code == esperado, (redirect, r.text)
 
 
+# Ficha 9: o ChatGPT só entra na instância que soma os callbacks dele no .env (a da Nathalia).
+CALLBACKS_CHATGPT = "https://chatgpt.com/connector_platform_oauth_redirect,https://chatgpt.com/connector/oauth/*"
+
+
+@pytest.mark.parametrize("extra,aceito", [(CALLBACKS_CHATGPT, True), ("", False)])
+async def test_registro_aceita_chatgpt_so_com_os_callbacks_no_env(tmp_path, extra, aceito):
+    app = criar_app(_cfg(tmp_path, auth_redirects_permitidos=extra)).http_app()
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://mcp.exemplo.com") as c:
+            for redirect in ["https://chatgpt.com/connector_platform_oauth_redirect",
+                             "https://chatgpt.com/connector/oauth/abc123"]:
+                r = await c.post("/register", json={"redirect_uris": [redirect], "client_name": "teste",
+                                                    "token_endpoint_auth_method": "none"})
+                assert r.status_code == (201 if aceito else 400), (redirect, r.text)
+            r = await c.post("/register", json={"redirect_uris": ["https://chatgpt.com/outro"], "client_name": "teste",
+                                                "token_endpoint_auth_method": "none"})
+            assert r.status_code == 400
+
+
 @pytest.mark.parametrize("provedor", ["github", "google"])
 @pytest.mark.parametrize("redirect,aceito", [
     ("https://claude.ai/api/mcp/auth_callback", True),

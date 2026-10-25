@@ -46,12 +46,13 @@ cifrado e migração pelo mesmo pacote (Fase 7, `docs/MIGRACAO.md`). Em 2026-10-
   W médio e R$/mês na nota `maquinas-do-assistente-pessoal` do vault. Pronto quando: os dois números estão lá
 
 ## Fase 1b — Instância da Nathalia (opcional, depois da sua estar estável)
-- [ ] 1b.1 (2026-10-24: Ficha 8 aprovada; P8 feito no i7 até o backup e a pasta de entrada do PC dela; falta o conector no Claude dela e os testes) Segunda instância (README → "Segunda instância"), login Google, porta 8001 no host e nó Tailscale próprio
+- [x] 1b.1 (2026-10-24: Ficha 8 aprovada; P8 feito no i7 até o backup e a pasta de entrada do PC dela; 2026-10-25: Ficha 9 aprovada, o ChatGPT Plus dela conectado; testes de isolamento pendentes; o Claude dela fica para a 1b.3) Segunda instância (README → "Segunda instância"), login Google, porta 8001 no host e nó Tailscale próprio
   (`TS_NOME=assistente-nathalia`, URL própria na 443; a ideia antiga de Funnel na 8443 do mesmo nó ficou para trás com o
   Tailscale em container). Banco, vault, login e servidor separados: estimativa de ~300–400 MB de RAM por instância e quase nada de CPU (o i7 inteiro, com a stack, usava 1,0 GB de 15 GB em 2026-10-24).
   Decidido (Leonardo, 2026-10-24): **Paperless único**, com um usuário e um token por pessoa (cada token só vê os
   documentos do dono), se o Paperless permitir isso com segurança; senão, um por pessoa. Ver 2.1.
-- [ ] 1b.2 Ela pede ao GPT para despejar no vault tudo o que ele sabe dela; depois conecta o Claude dela e confirma que ele usa esse contexto
+- [x] 1b.2 (2026-10-25: pelo próprio ChatGPT dela, já conectado) Ela pede ao GPT para despejar no vault tudo o que ele sabe dela
+- [ ] 1b.3 Conectar o Claude dela (P8 "No Claude da Nathalia") e confirmar que ele usa o contexto da 1b.2
 
 ## Fase 1c — Desligar o i5 (depois da Fase 1 estável)
 - [ ] 1c.1 Inventário do i5 (B1): o que roda em cada VM, RAM e disco de cada serviço; conferir se cabe nos 16 GB do i7
