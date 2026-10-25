@@ -197,7 +197,8 @@ fi
 # Uma unidade por instância, com o nome da pasta: /srv/assistente -> assistente-backup (a de sempre),
 # /srv/assistente-nathalia -> assistente-nathalia-backup. Nome fixo faria a segunda instância tomar o backup da primeira.
 UNIDADE="$(basename "$HOME_DIR")-backup"
-info "Timer do backup diário ${UNIDADE} (03:15, scripts/exportar.sh --retencao)"
+HORA_BACKUP=03:15; [ "$UNIDADE" = "assistente-backup" ] || HORA_BACKUP=03:25
+info "Timer do backup diário ${UNIDADE} (${HORA_BACKUP}, scripts/exportar.sh --retencao)"
 UNIDADE_SRV="$(sed -e "s#<usuario>#${USUARIO}#g" -e "s#<home>#${HOME_DIR}#g" "$APP/deploy/systemd/assistente-backup.service")"
 UNIDADE_TIMER="$(cat "$APP/deploy/systemd/assistente-backup.timer")"
 if [ "$UNIDADE" != "assistente-backup" ]; then

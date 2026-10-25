@@ -46,7 +46,7 @@ cifrado e migração pelo mesmo pacote (Fase 7, `docs/MIGRACAO.md`). Em 2026-10-
   W médio e R$/mês na nota `maquinas-do-assistente-pessoal` do vault. Pronto quando: os dois números estão lá
 
 ## Fase 1b — Instância da Nathalia (opcional, depois da sua estar estável)
-- [ ] 1b.1 (2026-10-24: Ficha 8 aprovada; roteiro P8 de `docs/IMPLANTACAO.md` ensaiado no Mac) Segunda instância (README → "Segunda instância"), login Google, porta 8001 no host e nó Tailscale próprio
+- [ ] 1b.1 (2026-10-24: Ficha 8 aprovada; P8 feito no i7 até o backup e a pasta de entrada do PC dela; falta o conector no Claude dela e os testes) Segunda instância (README → "Segunda instância"), login Google, porta 8001 no host e nó Tailscale próprio
   (`TS_NOME=assistente-nathalia`, URL própria na 443; a ideia antiga de Funnel na 8443 do mesmo nó ficou para trás com o
   Tailscale em container). Banco, vault, login e servidor separados: estimativa de ~300–400 MB de RAM por instância e quase nada de CPU (o i7 inteiro, com a stack, usava 1,0 GB de 15 GB em 2026-10-24).
   Decidido (Leonardo, 2026-10-24): **Paperless único**, com um usuário e um token por pessoa (cada token só vê os

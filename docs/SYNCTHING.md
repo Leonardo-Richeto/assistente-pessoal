@@ -275,7 +275,7 @@ inteira**: ela tem a pasta da outra pessoa. Sem compartilhamento entre o Leonard
 | Pasta (ID) | No i7 | Aparelhos |
 |---|---|---|
 | `paperless-leonardo` | `/srv/paperless/consumir/leonardo` | Mac, PC Windows e iPhone do Leonardo |
-| `paperless-nathalia` | `/srv/paperless/consumir/nathalia` | os da Nathalia (quando ela entrar, PLANO 1b) |
+| `paperless-nathalia` | `/srv/paperless/consumir/nathalia` | PC Windows da Nathalia (desde 2026-10-24, sem Tailscale, pela rede de casa) |
 
 **No i7** (GUI pelo túnel da seção 1), Adicionar pasta:
 
@@ -292,6 +292,11 @@ O Syncthing roda como `<usuario>` (uid 1000), o mesmo uid do Paperless, que assi
 **Enviar e receber**, versionamento **Lixeira** com 14 dias (guarda a cópia que some até o backup das 03:45), e cole o
 `.stignore` antes de salvar. Se a pasta Documentos estiver no iCloud com "Otimizar armazenamento", o arquivo ainda não
 baixado vira `.icloud` e não viaja: mande só arquivo que está no Mac.
+
+**PC da Nathalia sem Tailscale** (fica em casa): o Syncthing acha o i7 pela descoberta local. A rede do Windows
+precisa estar como **Privada** e o firewall liberado para o Syncthing nas redes privadas; no i7, o dispositivo fica
+com o endereço `dynamic` (ou `tcp://<IP do PC na rede de casa>:22000`, se não achar). Use o SyncTrayzor v2 para
+iniciar com o Windows; ele tem ID de dispositivo próprio, diferente do `syncthing` rodado à mão.
 
 **No PC Windows** (junto com o vault, PLANO 2.2): igual ao Mac, em `%USERPROFILE%\Documents\Paperless-entrada`, com
 "Ignorar permissões" ligado (Avançado). O arquivo passa só pela rede privada até o i7.

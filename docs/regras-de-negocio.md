@@ -964,8 +964,10 @@ token da Nathalia deu 0 na busca e 404 no id direto); Ficha 1 colada no Projeto.
 4. **O vault dela começa quase vazio**: `00-inbox/onde-parei.md`, `20-areas/perfil-do-nathalia.md` e `50-diario/`, com
    git local (cada escrita do assistente vira commit). Sem Syncthing e sem commit diário até ela usar o Obsidian; sem
    push para GitHub. O conteúdo vem da 1b.2 (o que o GPT sabe dela).
-5. **Projeto "Assistente" dela** no Claude dela, com o texto da Ficha 1, sem a linha da pasta de entrada do Paperless
-   (ela ainda não tem a pasta no Syncthing).
+5. **Projeto "Assistente" dela** no Claude dela, com o texto da Ficha 1. A linha da pasta de entrada do Paperless
+   cita só o PC Windows dela, a máquina principal: "Para mandar arquivo sem o chat, o dono põe na pasta
+   Paperless-entrada do PC." (Leonardo, 2026-10-24: ela tem o mesmo recurso do Mac dele, pela pasta `paperless-nathalia`
+   da Ficha 7). Aparelho novo dela entra na linha quando receber a pasta.
 6. **Backup** às 03:25, cifrado com a chave pública do age (a mesma do Leonardo), em `/srv/backup-hd/assistente-nathalia`.
    A pasta guarda o nome da instância; o backup de uma instância recusa a pasta da outra.
 7. **O Leonardo administra o i7.** Como dono da máquina, ele tem acesso técnico ao banco, ao vault e ao backup dela. O

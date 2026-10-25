@@ -491,6 +491,11 @@ Tika 0,3 GB, Gotenberg 0,15 GB). **Antes:** a chave pública do age (a mesma do 
 - [ ] P8. Instância da Nathalia (PLANO 1b.1, Ficha 8; só com a ficha aprovada). ~1 h. Ensaiada no Mac em 2026-10-24
       (sem Tailscale e com segredos falsos). `COMPOSE_PROJECT_NAME=assistente-nathalia` já casa com a rede
       `assistente-nathalia-paperless` do Paperless único.
+      **No i7 em 2026-10-24:** feito até o primeiro backup dela (`verificar.sh` tudo ok, Funnel 401, timer às 03:25) e
+      a pasta `paperless-nathalia` com o PC Windows dela (seção 8 do `docs/SYNCTHING.md`, PDF entrou). Falta o conector
+      no Claude dela e os testes do fim. O Funnel dela também leva minutos para voltar depois do backup (ele religa o
+      `tailscale`). Para ajustar o `.env`, `sed` com `def() { sed -i "s|^#\? \?$1=.*|$1=$2|" "$E"; }` evita erro de
+      digitação; confira com os segredos mascarados (`sed -E 's/^((SENHA_|JWT_|...)[A-Z_]*=).+/\1***/'`).
       **Antes, fora do i7 (Leonardo):**
       1. Tailscale (painel): uma chave de autenticação de uso único para o nó `assistente-nathalia`. O Funnel precisa
          valer para ele na política de acesso, como para o `assistente` (B4).
