@@ -1,0 +1,13 @@
+[Unit]
+Description=Backup diario do cofre (cofre/scripts/exportar.sh --retencao)
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# <usuario>, <app> e <cofre_home> sao trocados na instalacao (docs/IMPLANTACAO.md, "Cofre (2b.3a)").
+User=<usuario>
+Environment=COFRE_HOME=<cofre_home>
+ExecStart=/bin/bash <app>/cofre/scripts/exportar.sh --retencao
+# O cofre fica de pe durante a exportacao (copia do SQLite pela API de backup).
+TimeoutStartSec=30min

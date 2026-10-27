@@ -35,7 +35,15 @@ class Gasto(_Registro, Base):
     forma_pagamento: Mapped[str | None] = mapped_column(String(40))
     # "manual" (pelo chat) ou o nome do worker de ingestão, ex.: "pluggy"
     origem: Mapped[str] = mapped_column(String(30), default="manual", server_default="manual")
+    # "pluggy:<id da transação>" ou "pluggy-parcela:<chave da compra>:<nn>" (Ficha 10, regras 6 e 10).
     id_externo: Mapped[str | None] = mapped_column(String(120), unique=True)
+    # Falso = gasto do banco que o dono ainda não conferiu (Ficha 10, regra 8). O manual nasce conferido.
+    conferido: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    # Gasto que este, vindo do banco, parece repetir: um manual ou outro do banco com outro id (Ficha 10, regra 14).
+    # Só aviso; nada se desfaz sozinho.
+    duplicata_de: Mapped[int | None] = mapped_column(Integer)
+    # Parcela futura lançada pelo worker antes de o banco trazê-la (Ficha 10, regra 6). Vira falso quando chega.
+    previsto: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
 
 class Ponto(_Registro, Base):
@@ -120,6 +128,24 @@ class Sessao(Base):
     # O hook leu só parte do transcript (sessão muito grande).
     parcial: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     versao_resumo: Mapped[int] = mapped_column(Integer)
+
+
+class Sincronizacao(Base):
+    """Uma rodada de um worker de ingestão (Ficha 10, regras 13 e 15). Só INSERT (migração 0007)."""
+
+    __tablename__ = "sincronizacoes"
+    __table_args__ = (Index("ix_sincronizacoes_worker_inicio", "worker", "inicio"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # Nome do worker, ex.: "pluggy".
+    worker: Mapped[str] = mapped_column(String(30))
+    inicio: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    fim: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ok: Mapped[bool] = mapped_column(Boolean)
+    # Gastos gravados nesta rodada (parcelas futuras contam).
+    novos: Mapped[int] = mapped_column(Integer, default=0)
+    # Motivo curto da falha, sem segredo nem dado do banco (ex.: "Pluggy respondeu 401 em /auth").
+    erro: Mapped[str | None] = mapped_column(String(300))
 
 
 class Auditoria(Base):

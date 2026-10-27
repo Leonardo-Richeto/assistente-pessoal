@@ -498,6 +498,8 @@ CLASSIFICACAO_REVISADA = {
     "vault_read_note": LE, "vault_read_note_lines": LE, "vault_read_multiple_notes": LE, "vault_search_notes": LE,
     "vault_list_directory": LE, "vault_get_note_outline": LE, "vault_get_notes_info": LE,
     "vault_get_frontmatter": LE, "vault_get_vault_stats": LE, "vault_list_all_tags": LE,
+    "gastos_a_conferir": LE, "conciliar_gastos": LE,  # nossas (banco.py, Ficha 10): só lêem
+    "conferir_gastos": ESCREVE,  # nossa (banco.py, Ficha 10): marca conferido e troca a categoria
     "buscar_vault": LE,  # nossa (vault.py): índice em memória das notas; só lê
     "ler_nota": LE, "notas_recentes": LE, "contexto_inicial": LE,  # nossas (vault.py): só lêem
     "escrever_nota": ESCREVE,  # nossa (vault.py): troca a nota inteira, só com a versão lida

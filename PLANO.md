@@ -7,6 +7,14 @@ ou quando o Sonnet travar. Ao terminar uma tarefa: testes passando, commit, marq
 Convenções do código estão em `AGENTS.md`. Estado e histórico do processo no vault (`10-projetos/assistente-pessoal/`, D22; ver `CONTEXTO.md`).
 A sequência de **teste no MacBook → produção no i7** está em `docs/IMPLANTACAO.md`.
 
+**Ordem a partir de 2026-10-26 (Leonardo):**
+1. Pluggy: Fase 3 inteira (3.1 a 3.4), com as chaves no `.env` por enquanto (Ficha 10).
+2. Vaultwarden (2b.3a); as chaves do Pluggy ganham a cópia oficial nele e a de uso fica no `.env` (Ficha 11, regra 8).
+3. Consumo (1.7), quando a tomada medidora chegar; corre em paralelo.
+4. Sem pressa, quando houver mais tempo: testes de isolamento da Nathalia (Ficha 8, item 3), Claude dela (1b.3),
+   iPhone e Windows no Syncthing (2.2), teste do ponto (B9) e inventário do i5 (1.1).
+5. Por último: compartilhar documento entre o Leonardo e a Nathalia (2.5).
+
 ---
 
 ## Fase 0 — Esqueleto ✅
@@ -54,12 +62,13 @@ cifrado e migração pelo mesmo pacote (Fase 7, `docs/MIGRACAO.md`). Em 2026-10-
 - [x] 1b.2 (2026-10-25: pelo próprio ChatGPT dela, já conectado) Ela pede ao GPT para despejar no vault tudo o que ele sabe dela
 - [ ] 1b.3 Conectar o Claude dela (P8 "No Claude da Nathalia") e confirmar que ele usa o contexto da 1b.2
 
-## Fase 1c — Desligar o i5 (depois da Fase 1 estável)
+## Fase 1c — Desligar o i5 (descartada em 2026-10-26)
+Leonardo, 2026-10-26: o i5 está desligado e os serviços dele não são importantes. Fica só o inventário (1.1), sem pressa.
 - [ ] 1c.1 Inventário do i5 (B1): o que roda em cada VM, RAM e disco de cada serviço; conferir se cabe nos 16 GB do i7
-- [ ] 1c.2 Subir no i7 cada serviço do i5 como projeto Docker Compose próprio, com rede e `.env` separados:
+- [-] (descartado) 1c.2 Subir no i7 cada serviço do i5 como projeto Docker Compose próprio, com rede e `.env` separados:
   agente-whatsapp (`-p agentewhatsapp`, dados por dump do banco dele) e os serviços de rede (AdGuard, WireGuard)
-- [ ] 1c.3 Desligar o i5. O HD de 500 GB dele já foi para o i7 em 2026-10-23, como destino do backup (o HD avulso estava ruim); o i5 ficou só com o SSD
-- [ ] 1c.4 Medir de novo (1.7) com tudo no i7
+- [-] (descartado) 1c.3 Desligar o i5. O HD de 500 GB dele já foi para o i7 em 2026-10-23, como destino do backup (o HD avulso estava ruim); o i5 ficou só com o SSD
+- [-] (descartado) 1c.4 Medir de novo (1.7) com tudo no i7
 
 ## Fase 2 — Documentos e vault
 - [x] 2.1 Subir Paperless-ngx com o compose oficial (rede Docker compartilhada com este stack); gerar token; preencher `PAPERLESS_URL`/`PAPERLESS_API_KEY`
@@ -104,7 +113,7 @@ podem escrever. Itens que mudam o que o Claude do app faz (2b.2, 2b.6, 2b.7, 2b.
   senha; a referência `{{segredo:NOME}}` passa. O valor fica no Vaultwarden, fora do vault, e o servidor nunca o
   resolve (resolvido, iria para o contexto do modelo). O `commit-diario.sh` roda o gitleaks antes do commit
   - Feito (2026-10-22, Passo 5): middleware `BarreiraSegredo` recusa escrita do banco e do vault com cara de segredo; restaurar_nota confere o conteúdo do git; commit por escrita pula e foto recusa arquivo com segredo; importador de sessões redige; `commit-diario.sh` roda gitleaks v8.30.1 (digest fixo) e não comita se achar. Vault real: 125 notas, 0 achados.
-- [ ] ⚑ 2b.3a Vaultwarden no i7 (Leonardo, 2026-10-21), em Docker Compose próprio, guarda os valores do 2b.3.
+- [ ] ⚑ 2b.3a (2026-10-27: Ficha 11 aprovada; `cofre/` pronto e ensaiado no Mac; falta o roteiro C1–C8 de `docs/IMPLANTACAO.md` no i7) Vaultwarden no i7 (Leonardo, 2026-10-21), em Docker Compose próprio, guarda os valores do 2b.3.
   Proposta: acesso só pela Tailscale, sem Funnel. Os dados dele entram no backup cifrado da Fase 7 (`exportar.sh`)
   - Pronto quando: o backup da Fase 7 leva o volume do Vaultwarden para fora do SSD do i7 e a restauração foi testada, antes do primeiro segredo.
     Enquanto o 7.1 estiver desligado (2026-10-21), o 2b.3a espera
@@ -137,11 +146,11 @@ Fora, decidido no estudo: decaimento, compactação e deduplicação de nota; co
 agentes e multiusuário; relações tipadas; consulta por data (o git já responde).
 
 ## Fase 3 — Workers (ingestão)
-- [ ] 3.1 Pacote `servidor/assistente/workers/` + serviço `workers` no compose rodando APScheduler; worker usa a conexão de **escrita** e grava auditoria com `autor="worker:<nome>"`
-- [ ] 3.2 Testar o Meu Pluggy manualmente (consentimento, formato das transações)
-- [ ] 3.3 Worker Pluggy diário: grava em `gastos` com `origem="pluggy"` e `id_externo` (idempotente — rodar duas vezes não duplica)
+- [x] 3.1 (2026-10-26; laço próprio de horário no lugar do APScheduler, perfil `pluggy`) Pacote `servidor/assistente/workers/` + serviço `workers` no compose rodando APScheduler; worker usa a conexão de **escrita** e grava auditoria com `autor="worker:<nome>"`
+- [x] 3.2 (2026-10-27: Nubank pelo MeuPluggy numa aplicação nova; 12 meses reais lidos e ensaiados num banco descartável) Testar o Meu Pluggy manualmente (consentimento, formato das transações)
+- [ ] 3.3 (2026-10-27: calibrado com o Nubank real; falta ligar no i7) Worker Pluggy diário: grava em `gastos` com `origem="pluggy"` e `id_externo` (idempotente — rodar duas vezes não duplica)
   - Pronto quando: teste com resposta gravada do Pluggy passa e reexecução não duplica
-- [ ] 3.4 Ferramenta `conciliar_gastos`: lista gastos manuais e do Pluggy com mesmo valor/data próxima para o Leonardo decidir
+- [x] 3.4 (2026-10-26, com `gastos_a_conferir` e `conferir_gastos`, Ficha 10) Ferramenta `conciliar_gastos`: lista gastos manuais e do Pluggy com mesmo valor/data próxima para o Leonardo decidir
 
 ## Fase 4 — Agenda
 - [ ] 4.1 Usar o conector nativo do Google Calendar no claude.ai para ler/criar eventos

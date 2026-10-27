@@ -14,6 +14,7 @@
 # Perfis (COMPOSE_PROFILES no .env):
 #   (nenhum)    Postgres + migração + servidor MCP em 127.0.0.1:${PORTA_HOST}
 #   tailscale   + nó Tailscale "${TS_NOME}" com Funnel para o servidor (só na produção)
+#   pluggy      + worker dos gastos do banco (Ficha 10; só a instância do Leonardo)
 #
 # Imagens com versão e digest fixos (multi-arch: amd64 e arm64). Para atualizar: troque a tag
 # e o digest juntos (docker buildx imagetools inspect <imagem>:<tag>) e leia o changelog.
@@ -115,6 +116,25 @@ services:
       timeout: 10s
       start_period: 60s
       retries: 3
+    depends_on:
+      migracao: { condition: service_completed_successfully }
+
+  # Worker do Pluggy (Ficha 10): gastos do banco às 00, 06, 12 e 18 h, e uma vez na subida. Só com o perfil
+  # `pluggy` no COMPOSE_PROFILES (a instância da Nathalia não tem). Passo a passo: docs/PLUGGY.md.
+  workers:
+    build: ./servidor
+    profiles: ["pluggy"]
+    restart: unless-stopped
+    command: ["python", "-m", "assistente.workers"]
+    # Só a conexão de escrita (a auditoria leva autor "worker:pluggy"); nada de vault nem de login.
+    environment:
+      DATABASE_URL_ESCRITA: postgresql+psycopg://assistente_escrita:${SENHA_ESCRITA}@postgres/assistente
+      PLUGGY_CLIENT_ID: ${PLUGGY_CLIENT_ID:-}
+      PLUGGY_CLIENT_SECRET: ${PLUGGY_CLIENT_SECRET:-}
+      PLUGGY_ITEM_IDS: ${PLUGGY_ITEM_IDS:-}
+      TZ: America/Sao_Paulo
+    # Mesmo motivo do servidor: DNS fixo para achar api.pluggy.ai mesmo com o resolv.conf do host atrasado.
+    dns: [1.1.1.1, 8.8.8.8]
     depends_on:
       migracao: { condition: service_completed_successfully }
 

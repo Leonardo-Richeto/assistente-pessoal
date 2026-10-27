@@ -1,0 +1,70 @@
+# Cofre de senhas (Ficha 11, PLANO 2b.3a): Vaultwarden só pela tailnet. Projeto próprio, fora do compose do
+# assistente e do Paperless, com rede própria (Ficha 11, regra 9). Roteiro: docs/IMPLANTACAO.md, "Cofre (2b.3a)".
+#
+# Todo o estado fica em ${COFRE_HOME}:
+#   ${COFRE_HOME}/.env               configuração (fora do git; modelo em cofre/.env.example)
+#   ${COFRE_HOME}/data/vaultwarden   banco SQLite, chaves RSA, anexos e sends do Vaultwarden
+#   ${COFRE_HOME}/data/tailscale     identidade do nó Tailscale "${TS_NOME}"
+#
+# Rodar sempre pelos scripts de cofre/scripts (eles passam o .env de fora do repositório).
+# Perfis (COMPOSE_PROFILES no .env): tailscale = nó com Serve (só na produção; nunca Funnel).
+# Imagens com versão e digest fixos. Para atualizar: troque a tag e o digest juntos e leia o changelog.
+
+name: ${COMPOSE_PROJECT_NAME:-cofre}
+
+services:
+  vaultwarden:
+    image: vaultwarden/server:1.37.4@sha256:efb3cde962015fcc036b2ea625242248611943b27212ebf4392841fb30fad055
+    restart: unless-stopped
+    # Usuário comum: os arquivos de data/vaultwarden ficam do usuário do host, que o backup lê sem root.
+    user: "${COFRE_UID:-1000}:${COFRE_GID:-1000}"
+    environment:
+      DOMAIN: ${DOMINIO:?defina DOMINIO no .env}
+      # Fechado; só o cadastro.sh abre, para criar a conta (Ficha 11, regra 3).
+      SIGNUPS_ALLOWED: ${SIGNUPS_ALLOWED:-false}
+      INVITATIONS_ALLOWED: "false"
+      SHOW_PASSWORD_HINT: "false"
+      PASSWORD_HINTS_ALLOWED: "false"
+      # Sem ícone de site buscado na internet (Ficha 11, regra 6).
+      DISABLE_ICON_DOWNLOAD: "true"
+      ICON_SERVICE: internal
+      # ADMIN_TOKEN fica de fora de propósito: sem ele, o painel /admin não existe (Ficha 11, regra 4).
+      # Porta acima de 1024: o container roda sem root.
+      ROCKET_PORT: "8080"
+      LOG_LEVEL: warn
+      TZ: America/Sao_Paulo
+    volumes:
+      - ${COFRE_HOME:?defina COFRE_HOME no .env}/data/vaultwarden:/data
+    # Só o loopback do host (túnel SSH ou conferência local). De fora, só pelo Tailscale.
+    ports:
+      - "127.0.0.1:${PORTA_HOST:-8030}:8080"
+    # Mesmo motivo do servidor do assistente: DNS fixo para o Tailscale, que divide esta rede.
+    dns: [1.1.1.1, 8.8.8.8]
+
+  # Nó Tailscale próprio. Serve (HTTPS da tailnet) para o Vaultwarden; sem AllowFunnel no serve.json.
+  tailscale:
+    image: tailscale/tailscale:v1.104.1@sha256:87c55d6be56ad85b3d8bceca5f87f73de288c609131460dd1be1874c250cc41d
+    profiles: ["tailscale"]
+    restart: unless-stopped
+    network_mode: service:vaultwarden
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      TS_HOSTNAME: ${TS_NOME:-cofre}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: "true"
+      TS_SERVE_CONFIG: /config/serve.json
+      TS_ENABLE_HEALTH_CHECK: "true"
+      TS_LOCAL_ADDR_PORT: 127.0.0.1:9002
+    volumes:
+      - ${COFRE_HOME}/data/tailscale:/var/lib/tailscale
+      - ./deploy/serve.json:/config/serve.json:ro
+    # Saudável só se o tailscaled responde E o Vaultwarden é alcançável pela rede que o Tailscale enxerga: se o
+    # Vaultwarden for recriado sozinho, o Tailscale fica na rede antiga (Serve dá 502) e vira unhealthy.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9002/healthz && wget -q -O /dev/null http://127.0.0.1:8080/alive"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    depends_on:
+      vaultwarden: { condition: service_started }

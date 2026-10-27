@@ -1,0 +1,12 @@
+[Unit]
+Description=Conferencia diaria do cofre (Ficha 11: cadastro fechado, painel desligado, so tailnet)
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# <usuario>, <app> e <cofre_home> sao trocados na instalacao (docs/IMPLANTACAO.md, "Cofre (2b.3a)").
+User=<usuario>
+Environment=COFRE_HOME=<cofre_home>
+ExecStart=/bin/bash <app>/cofre/scripts/conferir.sh
+TimeoutStartSec=5min

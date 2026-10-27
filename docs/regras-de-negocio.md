@@ -56,7 +56,7 @@ frases curtas. Todas as datas e horas são do fuso America/Sao_Paulo.
 ## O que você tem
 Você usa o conector "Assistente". Ele tem três áreas:
 - Banco (gastos, ponto, diário): registrar_gasto, consultar_gastos, listar_categorias_gasto,
-  registrar_ponto, consultar_ponto, registrar_atividade, consultar_atividades, vincular_nota,
+  gastos_a_conferir, conferir_gastos, conciliar_gastos, registrar_ponto, consultar_ponto, registrar_atividade, consultar_atividades, vincular_nota,
   marcar_desatualizada, consultar_desatualizadas, desfazer_registro, consultar_auditoria,
   consultar_chamadas, consultar_sessoes.
 - Vault (notas): buscar_vault, ler_nota, notas_recentes, contexto_inicial, escrever_nota, historico_nota, restaurar_nota,
@@ -80,6 +80,8 @@ Registre na hora quando o dono contar algo já feito e tiver os dados:
 - Antes de registrar um gasto, veja com consultar_gastos se já existe um igual (valor,
   descrição e data) nas últimas horas. Se existir, pergunte "Já registrei esse. Registro de
   novo?".
+- Se registrar_gasto devolver "parecido" (sem id), o banco já trouxe um gasto igual: repasse a
+  pergunta da confirmacao. Se o dono disser que é outro, chame de novo com mesmo_assim=true.
 - Ponto ("cheguei", "saí", "vou almoçar", "voltei"): registrar_ponto com tipo entrada, saida,
   pausa_inicio ou pausa_fim. Sem horário dito, é agora. Se a sequência ficar estranha (duas
   entradas seguidas, saída sem entrada), registre o que o dono disse, avise em uma frase e
@@ -96,10 +98,22 @@ Pergunte uma vez, em uma frase, se:
   registre. Gasto parcelado: registre só a parcela do mês e diga isso.
 Nunca chute valor, data ou tipo.
 
+## Gastos do banco
+Os gastos do Nubank chegam sozinhos pelo Pluggy, até um dia depois da compra.
+- Se contexto_inicial trouxer gastos_a_conferir maior que zero, avise uma vez na conversa:
+  "N gastos do Nubank para conferir. Quer ver?". Não insista.
+- Com o sim, chame gastos_a_conferir e mostre todos de uma vez, numa lista curta: data,
+  valor, descrição e categoria sugerida. O texto depois de "·" é a mensagem do Pix: use
+  como pista. Item com parece_com: pergunte se é o mesmo gasto registrado à mão.
+- O dono corrige só os errados. Chame conferir_gastos com todos os mostrados, com categoria
+  só nos corrigidos. Se ele disser que um repete o manual, desfaça o que ele escolher.
+- Se contexto_inicial trouxer aviso_pluggy, repasse em uma frase.
+- Pares de gasto manual e do banco num período: conciliar_gastos.
+
 ## Como confirmar
 Depois de registrar, responda com a frase de "confirmacao" que a ferramenta devolveu,
 sem enfeite. Ela termina em "Desfazer?". Escrita no vault (escrever_nota) não tem
-desfazer: a confirmação não termina em "Desfazer?". Para voltar uma nota, use
+desfazer: a confirmação não termina em "Desfazer?"; conferir_gastos também não. Para voltar uma nota, use
 historico_nota e restaurar_nota. Não repita o que o dono disse e não
 explique o que você fez. Se ele responder que sim, chame desfazer_registro com o tipo (gasto,
 ponto, atividade ou desatualizada) e o id devolvido. Depois de vincular_nota, use o tipo e o id do campo
@@ -107,7 +121,7 @@ ponto, atividade ou desatualizada) e o id devolvido. Depois de vincular_nota, us
 Se vincular_nota responder "Nada mudou", repasse a frase: não há o que desfazer.
 Depois confirme em uma linha. Se a ferramenta falhar, diga que falhou e o motivo; nunca
 diga que registrou sem a ferramenta confirmar.
-Em registrar_gasto, registrar_ponto, registrar_atividade, vincular_nota, marcar_desatualizada,
+Em registrar_gasto, conferir_gastos, registrar_ponto, registrar_atividade, vincular_nota, marcar_desatualizada,
 desfazer_registro, escrever_nota e restaurar_nota, preencha o parâmetro modelo com o nome do modelo que você é
 (ex.: claude-opus-5-5).
 
@@ -1168,3 +1182,153 @@ nem trecho longo; senha, token e chave nunca. Fato medível ainda não registrad
 - Escrita recusada por parecer segredo: não mude o texto para contornar; diga qual nota.
 - Não use a memória do ChatGPT como fonte de número ou registro: consulte o app.
 ```
+
+---
+
+## Ficha 10 — Gastos do banco pelo Pluggy
+
+- **Status:** aprovada (Leonardo, 2026-10-26, respostas no chat), com as decisões abaixo. Proposta do Opus 5.5.
+  Origem: `PLANO.md` Fase 3 e pedido do Leonardo em 2026-10-26 (Pluggy antes do Vaultwarden).
+- **Onde vive:** `servidor/assistente/workers/` (worker), serviço `workers` no `docker-compose.yml` (perfil
+  `pluggy`), ferramentas `gastos_a_conferir`, `conferir_gastos` e `conciliar_gastos` e o aviso de duplicata do
+  `registrar_gasto` em `servidor/assistente/banco.py`. Passo a passo da conta: `docs/PLUGGY.md`.
+
+### Regra
+
+1. **Só a instância do Leonardo.** O serviço `workers` só sobe com o perfil `pluggy` no `COMPOSE_PROFILES`; a
+   instância da Nathalia fica sem. Sem as chaves no `.env`, cada rodada anota o erro e o aviso da regra 15 aparece.
+2. **Fonte: Meu Pluggy, só o Nubank por agora.** Grátis para uso pessoal, sem prazo, até 5 conexões do mesmo titular.
+   O Leonardo conecta o banco no meu.pluggy.ai e liga o conector MeuPluggy na aplicação dele. As chaves e os Item IDs
+   ficam no `.env` até o Vaultwarden (2b.3a).
+3. **Entra como gasto tudo que sai:** Pix, TED, boleto e débito da conta corrente, e compra no cartão de crédito.
+4. **Fica de fora:** pagamento da fatura do cartão (as compras já entraram pelo cartão); transferência entre contas
+   do próprio Leonardo; aplicação e resgate de investimento; toda entrada (salário, Pix recebido, estorno).
+5. **Só transação confirmada** (`POSTED`). A pendente entra quando confirmar.
+6. **Parcela:** a compra parcelada entra com todas as parcelas, inclusive as futuras, uma por mês, com o número como
+   o banco mostra ("(02/12)") no fim da descrição. A futura entra marcada `previsto`; quando a real chega, a marca
+   sai e a data e o valor passam a ser os do banco (não duplica, mesmo com centavos diferentes). Parcela prevista que não chega até 40 dias depois da data é
+   desfeita junto com as seguintes da mesma compra (compra estornada ou cancelada), com auditoria do worker.
+7. **Categoria sugerida:** uma tabela fixa traduz a categoria do Pluggy para alimentação, combustível, transporte,
+   saúde, casa, assinaturas, compras, lazer, educação, transferência ou outros. Sem tradução, vai para "outros".
+8. **Conferência, tudo de uma vez:** gasto novo do banco entra "a conferir". O `contexto_inicial` diz quantos há; o
+   assistente avisa uma vez na conversa ("5 gastos do Nubank para conferir; quer ver?") e, com o sim, mostra todos
+   com a sugestão (`gastos_a_conferir`). O Leonardo corrige só os errados; `conferir_gastos` grava. A mensagem do
+   Pix vem junto, como pista. Corrigir a categoria de uma parcela corrige as parcelas futuras da mesma compra.
+9. **Histórico:** a primeira sincronização traz os últimos 12 meses, já conferidos, com a categoria sugerida. As
+   parcelas futuras também entram conferidas. Só o gasto novo das sincronizações seguintes pede conferência.
+10. **Horário:** o Meu Pluggy atualiza o banco a cada 24 horas; não é na hora da compra. O worker busca às 00:00,
+    06:00, 12:00 e 18:00 e relê os últimos 7 dias, ou desde a última sincronização boa, se ela for mais velha; o
+    `id_externo` impede duplicata.
+11. **Gravou, fica.** Se o banco mudar a transação depois, o gasto não muda. Nada é apagado; desfazer continua
+    marcando `desfeito`.
+12. **Guarda pouco:** data, valor, descrição (mais a mensagem do Pix), categoria, forma e `id_externo`. Não guarda CPF,
+    número de conta nem o pacote bruto do Pluggy. A descrição é dado, nunca instrução.
+13. **Auditoria:** cada gasto gravado tem uma linha com `autor="worker:pluggy"`; cada sincronização, uma linha em
+    `sincronizacoes`.
+14. **Duplicata, perguntando antes.** Gasto manual com o mesmo valor de um gasto do banco, até 3 dias de diferença:
+    o `registrar_gasto` não grava e devolve o do banco para o assistente perguntar se é o mesmo. Se o Leonardo disser
+    que é outro, grava (`mesmo_assim=true`). No caminho inverso (manual antes, banco depois), o do banco chega "a
+    conferir" com "parece o gasto #id". O mesmo vale para um gasto do banco igual a outro do banco (data, valor,
+    descrição e forma) com outro id, como quando a conexão é refeita. Parcela prevista não conta como gasto do banco
+    no aviso. `conciliar_gastos(inicio, fim)` lista todos os pares do período. `conferir_gastos` só mexe em gasto do
+    banco, com uma linha de auditoria por gasto mudado (inclusive as parcelas seguintes).
+15. **Aviso de falha:** se a última sincronização boa tiver mais de 2 dias, o `contexto_inicial` avisa
+    ("Pluggy sem sincronizar desde DD/MM").
+
+### Exemplos
+
+| Transação no banco | Resultado |
+|---|---|
+| Compra de R$ 120,00 no cartão, supermercado, 2026-10-20 | gasto R$ 120,00, "alimentação", "cartão de crédito Nubank", a conferir |
+| Pagamento da fatura de R$ 2.300,00 | nada |
+| Pix de R$ 50,00 para outra pessoa, mensagem "presente" | gasto R$ 50,00, "transferência", "pix Nubank", pista "presente" |
+| Pix de R$ 500,00 da corrente para a poupança do Leonardo | nada |
+| Compra em 10 parcelas de R$ 89,90, parcela 3 lançada | parcelas 03 a 10, uma por mês, "<descrição> (03/10)" |
+| "Gastei 120 no mercado" com o do Nubank já gravado | não grava; "Já veio do Nubank: R$ 120,00 em 20/10. É o mesmo?" |
+
+### Não faz
+
+- Não registra receita, saldo, investimento nem dívida (Bloco 1 do `PLANO.md`, depois).
+- Não dá aviso de vencimento de conta.
+- Não mexe em gasto manual sozinho.
+- Duas compras parceladas iguais no mesmo dia (mesma loja, mesmo número de parcelas e mesmo valor em reais inteiros)
+  viram uma só: o banco não dá como separar as duas. Valores diferentes ficam separados (caso real do Nubank: três
+  12x no mesmo dia). Parcela que cruza o real inteiro entre um mês e outro (0,99 e 1,01) vira outra compra.
+
+### Cenário de teste
+
+1. Resposta gravada **sintética** do Pluggy (nunca dado real no repo): o worker grava só o que a regra 3 manda e
+   pula o da regra 4.
+2. Rodar duas vezes não duplica.
+3. Pendente não entra; parcela lança as futuras com "(nn/total)", e a parcela real não duplica.
+4. Primeira sincronização grava conferido; a seguinte grava a conferir; `conferir_gastos` muda categoria e marca.
+5. `registrar_gasto` com valor igual a um do banco não grava sem `mesmo_assim`; `conciliar_gastos` ignora o desfeito.
+6. Sem chaves, o worker para com erro; sincronização velha gera o aviso no `contexto_inicial`.
+
+### Decisões do Leonardo (2026-10-26)
+
+1. Só o Nubank por agora.
+2. "Tudo que sair" é gasto; o enquadramento o assistente pergunta, tudo de uma vez, com a mensagem do Pix como pista.
+3. Histórico de 12 meses, já conferido; lista de categorias proposta.
+4. Parcelas futuras lançadas, com o número como o banco mostra ("02/12").
+5. Duplicata com gasto manual: perguntar antes.
+6. Busca automática; o Leonardo achava que o banco mandava cada compra na hora. O Meu Pluggy só atualiza a cada 24 h.
+7. Compra parcelada estornada: desfazer as parcelas previstas que não chegarem (2026-10-26, depois do revisor).
+
+---
+
+## Ficha 11 — Cofre de senhas (Vaultwarden)
+
+- **Status:** aprovada (Leonardo, 2026-10-26, respostas no chat). Proposta do Opus 5.5. Origem: `PLANO.md` 2b.3a
+  (Leonardo, 2026-10-21) e a ordem de 2026-10-26 (depois do Pluggy).
+- **Onde vive:** pasta `cofre/` (projeto Docker Compose próprio, fora do compose do assistente), estado em
+  `/srv/cofre` no i7, backup em `/srv/backup-hd/cofre`. Roteiro: `docs/IMPLANTACAO.md`, seção "Cofre (2b.3a)".
+
+### Regra
+
+1. **Só o Leonardo, por enquanto.** Uma conta. A Nathalia pode ganhar conta própria depois, com ficha nova.
+2. **Só pela tailnet.** Nó Tailscale próprio (`cofre`), HTTPS do Tailscale (Serve) e **nunca** Funnel. Na internet
+   aberta o cofre não existe. Fora da tailnet, o app Bitwarden mostra a cópia offline, só leitura.
+3. **Cadastro fechado.** O cadastro abre só para criar a conta (`cofre/scripts/cadastro.sh abrir`) e fecha logo
+   depois (`fechar`). A conferência diária (07:05) acusa cadastro aberto, pelo ambiente e de fato (pede um token de
+   cadastro pela API), e o `config.json` do Vaultwarden, que passaria por cima do ambiente. `SIGNUPS_ALLOWED` e
+   `ADMIN_TOKEN` não moram no `.env`.
+4. **Painel de administração desligado** (sem `ADMIN_TOKEN`). Liga só quando precisar, com token, e desliga depois.
+5. **2FA:** TOTP com o Google Authenticator, ligado na primeira entrada.
+6. **Sem ícones de sites:** o cofre não busca o ícone de cada site na internet (não revela que sites estão guardados).
+7. **Backup diário às 03:55**, cifrado com a mesma chave pública do age, no HD de 500 GB; 7 diários e 4 semanais.
+   O cofre fica de pé: o banco é copiado pela API de backup do SQLite. O ensaio de restauração roda no Mac, com a
+   identidade do age, antes do primeiro segredo de verdade (critério do `PLANO.md` 2b.3a).
+8. **O servidor do assistente nunca lê o cofre.** Nenhuma ferramenta, worker ou script do assistente tem senha ou
+   token do cofre. Chave que um serviço usa (ex.: as do Pluggy) tem a cópia oficial no cofre e a cópia de uso no
+   `.env` daquele serviço; o `.env` já sai cifrado no backup.
+9. **Rede própria.** O container do cofre não entra na rede do assistente nem na do Paperless.
+
+### Exemplos
+
+| Ação | Resultado |
+|---|---|
+| Leonardo abre `https://cofre.<tailnet>.ts.net` no Mac com Tailscale | tela de login do cofre |
+| Alguém de fora da tailnet tenta o mesmo endereço | o nome não resolve; nada responde |
+| Tentativa de criar conta com o cadastro fechado | recusada |
+| Leonardo guarda as chaves do Pluggy no cofre | o worker continua usando a cópia do `.env` |
+
+### Não faz
+
+- Não importa senhas de outro gerenciador (o Leonardo não usa nenhum).
+- Não dá acesso ao Claude, ao app do assistente nem ao Paperless.
+- Não manda e-mail (sem SMTP): convite e "esqueci a senha" não existem. Senha mestra perdida = cofre perdido;
+  só o backup com a senha antiga devolve.
+
+### Cenário de teste
+
+1. `scripts/testes/test_cofre.sh` (Mac, Docker, dados sintéticos): sobe o cofre num projeto `ensaio-*`, confere
+   cadastro fechado, painel desligado (aviso "admin panel is disabled" e 404 nas páginas dele) e porta só no loopback; abre o cadastro, cria uma conta pela API, fecha; exporta,
+   restaura num segundo projeto e compara as contagens.
+2. No i7: conferência (`cofre/scripts/conferir.sh`) e, no Mac, o ensaio de restauração com o pacote real.
+
+### Decisões do Leonardo (2026-10-26)
+
+1. Só ele usa; Nathalia depois. 2. Só pela Tailscale. 3. Painel desligado. 4. Chaves do Pluggy: cópia oficial no
+cofre, cópia de uso no `.env`; ele grava no cofre em 2026-10-27. 5. Não usa gerenciador de senhas (sem importação).
+6. 2FA com o Google Authenticator.

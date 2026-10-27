@@ -22,6 +22,9 @@ NOME = re.compile(r"\b[a-z]+(?:_[a-z]+)+\b")
 NAO_FERRAMENTA = {
     "nota_vault",  # parâmetro das registrar_* e campo das consultas
     "pausa_inicio", "pausa_fim",  # valores do tipo de registrar_ponto
+    "mesmo_assim",  # parâmetro de registrar_gasto (Ficha 10, regra 14)
+    "parece_com",  # campo de gastos_a_conferir
+    "aviso_pluggy",  # campo de contexto_inicial (Ficha 10, regra 15)
 }
 
 
@@ -57,6 +60,7 @@ async def test_toda_ferramenta_citada_existe_e_nao_esta_bloqueada(app):  # noqa:
     assert not citadas & servidor.BLOQUEADAS
     for nome in ("registrar_gasto", "registrar_ponto", "registrar_atividade"):
         assert "nota_vault" in ferramentas[nome].input_schema["properties"], nome
+    assert "mesmo_assim" in ferramentas["registrar_gasto"].input_schema["properties"]
 
 
 async def test_texto_cita_toda_ferramenta_do_banco_e_do_vault(app):  # noqa: F811

@@ -1,0 +1,10 @@
+[Unit]
+Description=Backup diario do cofre as 03:55 (depois do Paperless)
+
+[Timer]
+OnCalendar=*-*-* 03:55:00
+Persistent=true
+RandomizedDelaySec=3min
+
+[Install]
+WantedBy=timers.target

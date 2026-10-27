@@ -18,7 +18,7 @@ from zoneinfo import ZoneInfo
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
-from pydantic import Field
+from pydantic import BaseModel, Field
 from sqlalchemy import and_, func, select
 from sqlalchemy.exc import IntegrityError
 
@@ -36,8 +36,8 @@ TipoRegistro = Literal["gasto", "ponto", "atividade"]
 TipoDesfazer = Literal["gasto", "ponto", "atividade", "vinculo", "desatualizada"]
 TabelaAuditoria = Literal["gastos", "ponto", "atividades", "notas_desatualizadas", "sessoes", "vault", "paperless",
                           "ferramenta"]
-AcaoAuditoria = Literal["criar", "desfazer", "vincular", "desfazer_vinculo", "escrever", "ok", "erro", "cancelado",
-                        "negado"]
+AcaoAuditoria = Literal["criar", "desfazer", "vincular", "desfazer_vinculo", "conferir", "confirmar", "escrever", "ok",
+                        "erro", "cancelado", "negado"]
 # Só o registro (registro.py) lê este parâmetro: valida (^[A-Za-z0-9 ._-]{1,60}$) e grava em
 # `chamadas.modelo_declarado`; inválido é descartado sem falhar a chamada. A ferramenta não usa.
 Modelo = Annotated[str | None, Field(description="Nome do modelo em uso (ex.: claude-opus-5-5). Fica registrado como declarado.")]
@@ -97,10 +97,18 @@ NotaVault = Annotated[str | None, Field(
 # Nomes das ferramentas abaixo, para o registro (registro.py): leitura só vai para o log; as
 # escritas já gravam a auditoria em _gravar. Ferramenta nova aqui sem entrar numa lista conta
 # como escrita de fora (linha `escrever` a mais); test_registro.py confere as listas.
-LEITURAS_BANCO = {"consultar_gastos", "listar_categorias_gasto", "consultar_ponto", "consultar_atividades",
-                  "consultar_auditoria", "consultar_chamadas", "consultar_desatualizadas", "consultar_sessoes"}
-ESCRITAS_BANCO = {"registrar_gasto", "registrar_ponto", "registrar_atividade", "desfazer_registro", "vincular_nota",
-                  "marcar_desatualizada"}
+LEITURAS_BANCO = {"consultar_gastos", "listar_categorias_gasto", "gastos_a_conferir", "conciliar_gastos",
+                  "consultar_ponto", "consultar_atividades", "consultar_auditoria", "consultar_chamadas",
+                  "consultar_desatualizadas", "consultar_sessoes"}
+ESCRITAS_BANCO = {"registrar_gasto", "conferir_gastos", "registrar_ponto", "registrar_atividade", "desfazer_registro",
+                  "vincular_nota", "marcar_desatualizada"}
+DIAS_PARECIDO = 3  # gasto manual x gasto do banco: mesmo valor, até 3 dias de diferença (Ficha 10, regra 14)
+MAX_CONFERIR = 200  # gastos_a_conferir: gastos devolvidos de uma vez
+
+
+class ItemConferencia(BaseModel):
+    id: Annotated[int, Field(description="Id do gasto (de gastos_a_conferir)")]
+    categoria: Annotated[str | None, Field(description="Categoria certa, se a sugerida estiver errada. Vazio = mantém.")] = None
 
 
 def _autor() -> str | None:
@@ -184,6 +192,12 @@ def horas_por_dia(registros: list[Ponto], tz: ZoneInfo) -> dict[str, float]:
     return resultado
 
 
+def _gasto(g: Gasto) -> dict:
+    return {"id": g.id, "data": g.data.isoformat(), "valor": str(g.valor), "descricao": g.descricao,
+            "categoria": g.categoria, "forma_pagamento": g.forma_pagamento, "origem": g.origem,
+            "conferido": g.conferido, "previsto": g.previsto}
+
+
 def criar_servidor_banco(bancos: Bancos, tz: ZoneInfo, nome: str = "Leonardo") -> FastMCP:
     mcp = FastMCP(
         "banco",
@@ -218,13 +232,28 @@ def criar_servidor_banco(bancos: Bancos, tz: ZoneInfo, nome: str = "Leonardo") -
         data: Annotated[date | None, Field(description="Padrão: hoje")] = None,
         forma_pagamento: str | None = None,
         nota_vault: NotaVault = None,
+        mesmo_assim: Annotated[bool, Field(description="Só depois de o dono dizer que não é o gasto do banco devolvido em `parecido`.")] = False,
         modelo: Modelo = None,
     ) -> dict:
-        """Registra um gasto feito pelo dono do assistente."""
+        """Registra um gasto feito pelo dono do assistente. Se o banco já trouxe um gasto igual, não grava: devolve `parecido` para perguntar se é o mesmo."""
         nota_vault = caminho_da_nota(nota_vault)
         data = data or _agora().date()
         categoria = categoria.strip().lower()
         valor = valor.quantize(Decimal("0.01"))
+        if not mesmo_assim:
+            with bancos.leitura() as s:
+                parecidos = s.scalars(select(Gasto).where(
+                    Gasto.origem != "manual", Gasto.desfeito.is_(False), Gasto.previsto.is_(False), Gasto.valor == valor,
+                    Gasto.data >= data - timedelta(days=DIAS_PARECIDO), Gasto.data <= data + timedelta(days=DIAS_PARECIDO),
+                ).order_by(Gasto.data, Gasto.id).limit(5)).all()
+            if parecidos:
+                p = parecidos[0]
+                return {
+                    "id": None,
+                    "parecido": [_gasto(g) for g in parecidos],
+                    "confirmacao": f"Não registrei: já veio do banco {_brl(p.valor)} — {p.descricao} em {p.data:%d/%m}"
+                                   f" ({p.forma_pagamento}). É o mesmo gasto? Se for outro, registro.",
+                }
         gid = _gravar(
             Gasto(data=data, valor=valor, descricao=descricao.strip(), categoria=categoria, forma_pagamento=forma_pagamento,
                   nota_vault=nota_vault),
@@ -254,12 +283,8 @@ def criar_servidor_banco(bancos: Bancos, tz: ZoneInfo, nome: str = "Leonardo") -
         return {
             "total": str(sum((g.valor for g in gastos), Decimal("0"))),
             "por_categoria": {k: str(v) for k, v in sorted(por_categoria.items(), key=lambda kv: -kv[1])},
-            "gastos": [
-                {"id": g.id, "data": g.data.isoformat(), "valor": str(g.valor), "descricao": g.descricao,
-                 "categoria": g.categoria, "forma_pagamento": g.forma_pagamento, "origem": g.origem,
-                 "nota_vault": g.nota_vault}
-                for g in gastos
-            ],
+            "a_conferir": sum(1 for g in gastos if not g.conferido),
+            "gastos": [{**_gasto(g), "nota_vault": g.nota_vault} for g in gastos],
         }
 
     @mcp.tool(annotations=LEITURA)
@@ -269,6 +294,99 @@ def criar_servidor_banco(bancos: Bancos, tz: ZoneInfo, nome: str = "Leonardo") -
         q = select(Gasto.categoria).where(Gasto.desfeito.is_(False)).distinct().order_by(Gasto.categoria)
         with bancos.leitura() as s:
             return list(s.scalars(q))
+
+    @mcp.tool(annotations=LEITURA)
+    def gastos_a_conferir() -> dict:
+        """Gastos que vieram do banco e o dono ainda não conferiu, com a categoria sugerida, a mensagem do Pix (na descrição, depois de "·") e o gasto manual que cada um parece repetir. Mostre todos de uma vez."""
+        with bancos.leitura() as s:
+            gastos = s.scalars(select(Gasto).where(Gasto.conferido.is_(False), Gasto.desfeito.is_(False))
+                               .order_by(Gasto.data, Gasto.id).limit(MAX_CONFERIR + 1)).all()
+            manuais = {g.id: g for g in s.scalars(select(Gasto).where(
+                Gasto.id.in_({g.duplicata_de for g in gastos if g.duplicata_de}), Gasto.desfeito.is_(False)))}
+            categorias = list(s.scalars(select(Gasto.categoria).where(Gasto.desfeito.is_(False)).distinct()
+                                        .order_by(Gasto.categoria)))
+        itens = []
+        for g in gastos[:MAX_CONFERIR]:
+            item = _gasto(g)
+            if (m := manuais.get(g.duplicata_de)) is not None:
+                item["parece_com"] = _gasto(m)
+            itens.append(item)
+        return {"gastos": itens, "total": len(itens), "mais": len(gastos) > MAX_CONFERIR, "categorias": categorias}
+
+    @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=True, openWorldHint=False))
+    def conferir_gastos(
+        itens: Annotated[list[ItemConferencia], Field(min_length=1, max_length=MAX_CONFERIR,
+                                                      description="Os gastos conferidos; categoria só nos que mudam.")],
+        modelo: Modelo = None,
+    ) -> dict:
+        """Marca gastos do banco como conferidos e troca a categoria dos que o dono corrigiu. Numa compra parcelada, a categoria nova vale também para as parcelas seguintes."""
+        conferidos, trocados, parcelas = 0, 0, 0
+        auditorias = []
+        with bancos.escrita.begin() as s:
+            for item in itens:
+                g = s.get(Gasto, item.id, with_for_update=True)
+                if g is None or g.desfeito:
+                    raise ToolError(f"Não achei gasto em vigor com id {item.id}.")
+                if g.origem == "manual":
+                    raise ToolError(f"O gasto {item.id} foi registrado à mão; a conferência é dos gastos do banco.")
+                nova = item.categoria.strip().lower() if item.categoria and item.categoria.strip() else None
+                if nova and len(nova) > 60:
+                    raise ToolError(f"Categoria longa demais no gasto {item.id} (até 60 caracteres).")
+                dados: dict = {"conferido": True}
+                if nova and nova != g.categoria:
+                    dados.update(categoria=nova, anterior=g.categoria)
+                    g.categoria = nova
+                    trocados += 1
+                    seguintes = _parcelas_seguintes(s, g)
+                    for p in seguintes:
+                        if p.categoria != nova:
+                            auditorias.append(Auditoria(ferramenta="conferir_gastos", tabela="gastos", registro_id=p.id,
+                                                        acao="conferir", autor=_autor(),
+                                                        dados={"categoria": nova, "anterior": p.categoria, "parcela_de": g.id}))
+                            p.categoria = nova
+                    if seguintes:
+                        dados["parcelas"] = [p.id for p in seguintes]
+                        parcelas += len(seguintes)
+                elif g.conferido:
+                    continue  # nada muda: não grava auditoria
+                g.conferido = True
+                conferidos += 1
+                auditorias.append(Auditoria(ferramenta="conferir_gastos", tabela="gastos", registro_id=g.id,
+                                            acao="conferir", dados=dados, autor=_autor()))
+            s.add_all(auditorias)
+            s.flush()
+        for a in auditorias:
+            anotar_auditoria(a.id)
+        extra = f"; {trocados} com categoria trocada" if trocados else ""
+        extra += f" (e {parcelas} parcelas seguintes)" if parcelas else ""
+        return {"conferidos": conferidos, "categorias_trocadas": trocados, "parcelas_seguintes": parcelas,
+                "confirmacao": f"Conferidos: {conferidos} gasto{'s' if conferidos != 1 else ''}{extra}."}
+
+    def _parcelas_seguintes(s, g: Gasto) -> list[Gasto]:
+        """As parcelas depois desta, da mesma compra (`pluggy-parcela:<chave>:<nn>`), em vigor."""
+        if not (g.id_externo or "").startswith("pluggy-parcela:"):
+            return []
+        prefixo = g.id_externo.rsplit(":", 1)[0] + ":"
+        return list(s.scalars(select(Gasto).where(Gasto.id_externo.startswith(prefixo, autoescape=True),
+                                                  Gasto.id_externo > g.id_externo, Gasto.desfeito.is_(False))))
+
+    @mcp.tool(annotations=LEITURA)
+    def conciliar_gastos(inicio: date, fim: date) -> list[dict]:
+        """Pares de gasto registrado à mão e gasto vindo do banco com o mesmo valor e até 3 dias de diferença, no período. O dono escolhe qual desfazer."""
+        if fim < inicio:
+            raise ToolError("A data final é anterior à inicial.")
+        folga = timedelta(days=DIAS_PARECIDO)
+        with bancos.leitura() as s:
+            manuais = s.scalars(select(Gasto).where(Gasto.origem == "manual", Gasto.desfeito.is_(False),
+                                                    Gasto.data >= inicio, Gasto.data <= fim).order_by(Gasto.data, Gasto.id)).all()
+            do_banco = s.scalars(select(Gasto).where(Gasto.origem != "manual", Gasto.desfeito.is_(False), Gasto.previsto.is_(False),
+                                                     Gasto.data >= inicio - folga, Gasto.data <= fim + folga)).all()
+        pares = []
+        for m in manuais:
+            for b in do_banco:
+                if b.valor == m.valor and abs((b.data - m.data).days) <= DIAS_PARECIDO:
+                    pares.append({"manual": _gasto(m), "banco": _gasto(b)})
+        return pares
 
     # ---------------- Ponto ----------------
 

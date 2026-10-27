@@ -195,6 +195,7 @@ ESCRITAS_BANCO = [
     ("desfazer_registro", {"tipo": "gasto", "id": 1, "modelo": AWS}, "aws"),
     ("vincular_nota", {"tipo": "gasto", "id": 1, "caminho": f"00-inbox/{AWS}.md"}, "aws"),
     ("marcar_desatualizada", {"caminho": HORTA, "motivo": f"tem password={SENHA}"}, "cabecalho_auth"),
+    ("conferir_gastos", {"itens": [{"id": 1, "categoria": f"lazer {AWS}"}]}, "aws"),
 ]
 
 

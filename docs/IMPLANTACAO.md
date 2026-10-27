@@ -598,3 +598,66 @@ Tika 0,3 GB, Gotenberg 0,15 GB). **Antes:** a chave pública do age (a mesma do 
       ```
       Esperado: `0` (a Nathalia não vê), e pelo app "me mostra o último documento que entrou" traz o `entrada-teste`.
       Apague o documento de teste como `admin` na interface web (P7), se quiser.
+
+### Cofre (2b.3a) — Vaultwarden no i7
+
+Ficha 11: um Vaultwarden só do Leonardo, só pela tailnet (nó Tailscale `cofre`, HTTPS do Serve, nunca Funnel), projeto
+Docker Compose próprio (`cofre/`), backup cifrado às 03:55 no HD. Ensaiado no Mac em 2026-10-27 com dados sintéticos
+(`bash scripts/testes/test_cofre.sh <pasta-vazia>`: cadastro fechado e aberto, painel desligado, backup cifrado e
+restauração). **Antes:** uma auth key nova da Tailscale, a senha mestra pensada e o Google Authenticator no celular.
+A senha mestra não tem recuperação (sem e-mail): esquecida, o cofre só volta pelo backup com a senha antiga.
+
+- [ ] C1. Auth key do nó: no painel da Tailscale, Settings → Keys → Generate auth key, sem "Reusable" e sem
+      "Ephemeral". Copie; ela vai só para o `.env` do C2.
+- [ ] C2. Estado e `.env`:
+      ```bash
+      sudo mkdir -p /srv/cofre && sudo chown "$USER": /srv/cofre && chmod 700 /srv/cofre
+      cd /srv/assistente/app && git pull
+      cp cofre/.env.example /srv/cofre/.env && chmod 600 /srv/cofre/.env
+      sed -i "s|^COFRE_UID=.*|COFRE_UID=$(id -u)|; s|^COFRE_GID=.*|COFRE_GID=$(id -g)|; \
+        s|^BACKUP_DESTINO=.*|BACKUP_DESTINO=/srv/backup-hd/cofre|; \
+        s|^AGE_DESTINATARIO=.*|$(grep '^AGE_DESTINATARIO=' /srv/assistente/.env)|" /srv/cofre/.env
+      nano /srv/cofre/.env   # TS_AUTHKEY (do C1) e DOMINIO=https://cofre.<tailnet>.ts.net
+      ```
+- [ ] C3. Subir e conferir; depois, apagar a auth key do `.env` (a identidade fica em `data/tailscale`):
+      ```bash
+      COFRE_HOME=/srv/cofre bash cofre/scripts/preparar.sh
+      sed -i 's|^TS_AUTHKEY=.*|TS_AUTHKEY=|' /srv/cofre/.env
+      ```
+      Esperado: `conferir: ok`, `porta: 127.0.0.1:8030 (só loopback)` e `preparar: pronto`. No Mac, com o Tailscale
+      ligado, `https://cofre.<tailnet>.ts.net` abre a tela de login (o certificado pode levar ~1 min na primeira vez).
+      No painel da Tailscale, Machines → `cofre` → "Disable key expiry", como no nó `assistente`: sem isso, o nó sai
+      da tailnet em ~180 dias.
+- [ ] C4. Criar a conta (cadastro aberto só durante este passo):
+      ```bash
+      COFRE_HOME=/srv/cofre bash cofre/scripts/cadastro.sh abrir
+      # no Mac: https://cofre.<tailnet>.ts.net → "Criar conta", com o seu e-mail e a senha mestra
+      COFRE_HOME=/srv/cofre bash cofre/scripts/cadastro.sh fechar
+      ```
+      Esperado no fim: `conferir: ok` e `cadastro fechado.`
+- [ ] C5. 2FA: no cofre, Configurações → Segurança → Login em duas etapas → Aplicativo autenticador. Escaneie no
+      Google Authenticator e guarde o código de recuperação em papel, fora do Mac.
+- [ ] C6. Apps: no iPhone (com o Tailscale ligado), app Bitwarden → região "Auto-hospedado" → URL do cofre. No Mac,
+      a extensão do Bitwarden no navegador, do mesmo jeito.
+- [ ] C7. Timers: backup às 03:55 e conferência às 07:05 (cadastro aberto, painel ligado ou Tailscale doente):
+      ```bash
+      cd /srv/assistente/app/cofre/deploy/systemd
+      for f in cofre-*.service; do
+        sed -e "s#<usuario>#$USER#g" -e "s#<app>#/srv/assistente/app#g" -e "s#<cofre_home>#/srv/cofre#g" "$f" \
+          | sudo tee "/etc/systemd/system/$f" >/dev/null
+      done
+      sudo cp cofre-*.timer /etc/systemd/system/ && sudo systemctl daemon-reload
+      sudo systemctl enable --now cofre-backup.timer cofre-conferir.timer
+      sudo systemctl start cofre-backup.service && journalctl -u cofre-backup -n 5 --no-pager
+      sudo systemctl start cofre-conferir.service && journalctl -u cofre-conferir -n 5 --no-pager
+      ```
+      Esperado: `exportar: feito: /srv/backup-hd/cofre/cofre-AAAAMMDD-HHMM.tar.age (... 1 contas, ...)` e `conferir: ok`.
+- [ ] C8. Ensaio de restauração, no Mac, com a identidade do age (o i7 nunca tem a chave privada):
+      ```bash
+      scp i7:/srv/backup-hd/cofre/cofre-<data>.tar.age ~/Downloads/
+      cd ~/Desktop/Projetos/assistente-pessoal
+      bash cofre/scripts/ensaiar_restauracao.sh ~/Downloads/cofre-<data>.tar.age --chave <identidade-age.txt>
+      ```
+      Esperado: `ensaio ok`. **Só depois deste passo** entra o primeiro segredo de verdade (critério do PLANO 2b.3a):
+      as chaves do Pluggy (cópia oficial; a de uso continua no `.env`, Ficha 11, regra 8) e as senhas longas que hoje
+      estão em `.env`. Apague o pacote de `~/Downloads` no fim.

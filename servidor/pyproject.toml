@@ -9,6 +9,8 @@ dependencies = [
     "psycopg[binary]>=3.2",
     "alembic>=1.13",
     "pydantic-settings>=2.4",
+    # Cliente HTTP do worker do Pluggy; já vinha com o FastMCP 4.1.0, aqui fica explícito.
+    "httpx2>=2.13",
 ]
 
 [project.scripts]
