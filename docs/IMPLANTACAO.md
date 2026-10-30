@@ -51,7 +51,7 @@ ferramentas da 2b).
    Confira: `git ls-remote https://github.com/Leonardo-Richeto/assistente-pessoal main` e
    `curl -fsI https://raw.githubusercontent.com/Leonardo-Richeto/assistente-pessoal/main/deploy/inventario.sh`
    (deve responder `200`). Se der 404, pare: o push não aconteceu.
-1. [ ] (5 min) Ligue o i7 na tomada medidora. A máquina está decidida: i7 com Debian direto (2026-10-18).
+1. [x] (5 min) Ligue o i7 na tomada medidora. Feito em 2026-10-28 (11,5 a 15 W logo depois de religar). A máquina está decidida: i7 com Debian direto (2026-10-18).
 2. [x] (10 min) Inventário no host (B1). No i7, depois do B2d (o SMART não se apaga ao formatar). Feito em 2026-10-24 (`docs/inventario.md`).
 3. [x] (40 a 60 min) BIOS, Debian 13 no i7, economia de energia, SMART e HD do backup (B2).
 4. [x] (10 min) Na máquina nova: clonar em `/srv/assistente/app` e rodar `sudo bash scripts/preparar_host.sh` (B3).
@@ -64,10 +64,10 @@ ferramentas da 2b).
 10. [x] (40 min) Vault e Syncthing e o timer do commit do vault (B11, `docs/SYNCTHING.md`), com `VAULT_PATH=/vault`.
 11. [x] (40 min) Fase 2b no i7 (menos o 2b-7, decisões pendentes): código e migrações, gitleaks, `.gitignore` do vault, timers, deploy key, sessões
     do Claude Code (seção "Fase 2b no i7", abaixo).
-12. [ ] (B8 feito em 2026-10-24; falta o B9) (30 min) claude.ai: conector novo, trocar no Projeto "Assistente", colar o texto atual da Ficha 1 (B8) e
+12. [x] (B8 feito em 2026-10-24; B9 em 2026-10-30) (30 min) claude.ai: conector novo, trocar no Projeto "Assistente", colar o texto atual da Ficha 1 (B8) e
     testes, inclusive os da Ficha 5 (B9).
 13. [ ] (5 min) Só agora, no Mac (o Funnel do Mac já estava sem configuração em 2026-10-23; o servidor do Mac, parado): `tailscale funnel --https=443 off` e `docker compose stop` (B9b).
-14. [ ] (5 min) Anote o consumo parado (lido no B2c) e comece os 7 dias de medição com a stack (`PLANO.md` 1.7).
+14. [ ] (5 min) Comece os 7 dias de medição com a stack inteira (`PLANO.md` 1.7). Sem medição do i7 parado (2026-10-28).
 
 > **Feito em 2026-10-23 (Opus 5.5 guiando do Mac):** passos 3 a 11. Lições: o Syncthing 2 não cria "Default Folder" nem
 > mostra a aba de ignorar ao criar a pasta (ponha o `.stignore` na raiz antes); no Mac, o caminho da pasta vai completo
@@ -132,8 +132,8 @@ cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor   # depois: powersave
 ```
 
       Se a rede cair ou ficar instável depois disso, apague a linha do `powertop` no serviço e reinicie: o
-      `--auto-tune` liga economia na placa de rede, e algumas placas não aguentam. Deixe o i7 parado e anote
-      o consumo da tomada (`PLANO.md` 1.7).
+      `--auto-tune` liga economia na placa de rede, e algumas placas não aguentam. O consumo se mede só com a stack
+      inteira (`PLANO.md` 1.7).
       Confira se o processador desce a estados fundos: `sudo powertop`, aba "Idle stats", deve chegar a Pkg C6
       ou mais. Se parar em C2 ou C3, alguma peça está sem ASPM (a placa de rede é a suspeita comum).
 - [ ] B2d. SMART e HD do backup (2026-10-23: o HD de 500 GB do i5 foi para o i7; o HD avulso estava ruim). O
@@ -259,7 +259,7 @@ printf '/dev/disk/by-id/<ata-do-HD> {\n    spindown_time = 120\n}\n' | sudo tee 
       **Suba o servidor da 2b e cole o texto no mesmo momento.** O texto novo cita ferramentas que só existem na 2b
       (`buscar_vault`, `ler_nota`, `escrever_nota`...). O servidor da 2b recusa `vault_write_note` sem `mode`, que o
       texto antigo usava. Servidor velho com texto novo, ou o contrário, quebra a escrita no vault.
-- [ ] B9. Repetir os testes do A10 pelo iPhone (gasto → consultar → desfazer; ponto → horas). Testar também as
+- [x] B9. (2026-10-30: rodada única pelo app, sem erro, relatada pelo Leonardo.) Repetir os testes do A10 pelo iPhone (gasto → consultar → desfazer; ponto → horas). Testar também as
       Fichas 3 e 4: "estudei X 1 h e aprendi Y" anota em `50-diario/AAAA/AAAA-MM-DD.md`, seção "Pelo assistente";
       "registra o que fizemos" escreve o resumo na mesma nota; `python3 -I /srv/assistente/vault/90-meta/lint-do-vault.py` sem ERRO.
       Depois, os exemplos da Ficha 5. Antes, crie no Obsidian do Mac uma nota de teste `00-inbox/teste-2b.md` com
@@ -607,9 +607,9 @@ Docker Compose próprio (`cofre/`), backup cifrado às 03:55 no HD. Ensaiado no 
 restauração). **Antes:** uma auth key nova da Tailscale, a senha mestra pensada e o Google Authenticator no celular.
 A senha mestra não tem recuperação (sem e-mail): esquecida, o cofre só volta pelo backup com a senha antiga.
 
-- [ ] C1. Auth key do nó: no painel da Tailscale, Settings → Keys → Generate auth key, sem "Reusable" e sem
+- [x] C1. (2026-10-27) Auth key do nó: no painel da Tailscale, Settings → Keys → Generate auth key, sem "Reusable" e sem
       "Ephemeral". Copie; ela vai só para o `.env` do C2.
-- [ ] C2. Estado e `.env`:
+- [x] C2. (2026-10-27) Estado e `.env`:
       ```bash
       sudo mkdir -p /srv/cofre && sudo chown "$USER": /srv/cofre && chmod 700 /srv/cofre
       cd /srv/assistente/app && git pull
@@ -619,27 +619,29 @@ A senha mestra não tem recuperação (sem e-mail): esquecida, o cofre só volta
         s|^AGE_DESTINATARIO=.*|$(grep '^AGE_DESTINATARIO=' /srv/assistente/.env)|" /srv/cofre/.env
       nano /srv/cofre/.env   # TS_AUTHKEY (do C1) e DOMINIO=https://cofre.<tailnet>.ts.net
       ```
-- [ ] C3. Subir e conferir; depois, apagar a auth key do `.env` (a identidade fica em `data/tailscale`):
+- [x] C3. (2026-10-27) Subir e conferir; depois, apagar a auth key do `.env` (a identidade fica em `data/tailscale`):
       ```bash
       COFRE_HOME=/srv/cofre bash cofre/scripts/preparar.sh
       sed -i 's|^TS_AUTHKEY=.*|TS_AUTHKEY=|' /srv/cofre/.env
       ```
       Esperado: `conferir: ok`, `porta: 127.0.0.1:8030 (só loopback)` e `preparar: pronto`. No Mac, com o Tailscale
       ligado, `https://cofre.<tailnet>.ts.net` abre a tela de login (o certificado pode levar ~1 min na primeira vez).
+      Se o Mac não achar o endereço, ligue o Tailscale no Mac e marque "Use Tailscale DNS settings".
       No painel da Tailscale, Machines → `cofre` → "Disable key expiry", como no nó `assistente`: sem isso, o nó sai
       da tailnet em ~180 dias.
-- [ ] C4. Criar a conta (cadastro aberto só durante este passo):
+- [x] C4. (2026-10-27) Criar a conta (cadastro aberto só durante este passo):
       ```bash
       COFRE_HOME=/srv/cofre bash cofre/scripts/cadastro.sh abrir
       # no Mac: https://cofre.<tailnet>.ts.net → "Criar conta", com o seu e-mail e a senha mestra
       COFRE_HOME=/srv/cofre bash cofre/scripts/cadastro.sh fechar
       ```
+      O link "Criar conta" pode não aparecer na aba já aberta (cache): use uma janela anônima ou `/#/signup`.
       Esperado no fim: `conferir: ok` e `cadastro fechado.`
-- [ ] C5. 2FA: no cofre, Configurações → Segurança → Login em duas etapas → Aplicativo autenticador. Escaneie no
+- [x] C5. (2026-10-27) 2FA: no cofre, Configurações → Segurança → Login em duas etapas → Aplicativo autenticador. Escaneie no
       Google Authenticator e guarde o código de recuperação em papel, fora do Mac.
-- [ ] C6. Apps: no iPhone (com o Tailscale ligado), app Bitwarden → região "Auto-hospedado" → URL do cofre. No Mac,
+- [x] C6. (2026-10-27) Apps: no iPhone (com o Tailscale ligado), app Bitwarden → região "Auto-hospedado" → URL do cofre. No Mac,
       a extensão do Bitwarden no navegador, do mesmo jeito.
-- [ ] C7. Timers: backup às 03:55 e conferência às 07:05 (cadastro aberto, painel ligado ou Tailscale doente):
+- [x] C7. (2026-10-27) Timers: backup às 03:55 e conferência às 07:05 (cadastro aberto, painel ligado ou Tailscale doente):
       ```bash
       cd /srv/assistente/app/cofre/deploy/systemd
       for f in cofre-*.service; do
@@ -652,7 +654,7 @@ A senha mestra não tem recuperação (sem e-mail): esquecida, o cofre só volta
       sudo systemctl start cofre-conferir.service && journalctl -u cofre-conferir -n 5 --no-pager
       ```
       Esperado: `exportar: feito: /srv/backup-hd/cofre/cofre-AAAAMMDD-HHMM.tar.age (... 1 contas, ...)` e `conferir: ok`.
-- [ ] C8. Ensaio de restauração, no Mac, com a identidade do age (o i7 nunca tem a chave privada):
+- [x] C8. (2026-10-27) Ensaio de restauração, num Terminal do Mac (não na sessão SSH), com a identidade do age (o i7 nunca tem a chave privada):
       ```bash
       scp i7:/srv/backup-hd/cofre/cofre-<data>.tar.age ~/Downloads/
       cd ~/Desktop/Projetos/assistente-pessoal

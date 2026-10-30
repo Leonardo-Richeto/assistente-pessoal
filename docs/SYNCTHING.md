@@ -1,8 +1,8 @@
 # Vault: Syncthing e commit diário
 
 Roteiro do Leonardo. A produção (o i7) é o **nó central**: ela guarda o vault em
-`/srv/assistente/vault`, faz o commit diário e é a única que fala com o GitHub. Mac, PC Windows e iPhone
-sincronizam com ela. Decisões: D10 (nada pago além do Pro), D15 (só a produção comita).
+`/srv/assistente/vault`, faz o commit diário e é a única que fala com o GitHub. Mac e PC Windows
+sincronizam com ela. O iPhone fica fora do vault (Leonardo, 2026-10-30): ele usa o vault pelo assistente (MCP). Decisões: D10 (nada pago além do Pro), D15 (só a produção comita).
 
 Pré-requisito: `scripts/preparar_host.sh` já rodou (Syncthing instalado, `/srv/assistente/vault` criada).
 Troque `<usuario>` pelo seu usuário na produção e `<maquina>` pelo nome dela na tailnet.
@@ -143,7 +143,41 @@ com a tarefa de iniciar no login. Alternativa com manutenção: Syncthing Tray.
 Crie a pasta em um caminho curto (ex.: `C:\Vault`), ID `vault`, Send & Receive, e cole o `.stignore` na aba Ignorar padrões antes de salvar.
 Ative "Ignorar permissões" na pasta (Avançado), porque o Windows não tem permissões de arquivo Unix.
 
-### iPhone: Synctrain
+#### PC do trabalho, sem Tailscale (D27, 2026-10-30)
+
+O PC do trabalho não pode ter Tailscale. O Syncthing tenta então a descoberta global e os relays públicos. O conteúdo
+viaja cifrado de ponta a ponta, mas a rede da empresa pode bloquear. Por isso é um teste: se não conectar, o PC segue
+com `git pull`.
+
+1. **No i7** (GUI pelo túnel da seção 1): Ações → Configurações → Conexões. Deixe ligados "Descoberta global",
+   "Habilitar relaying" e "Travessia de NAT". O i7 só abre conexões de saída; nenhuma porta do roteador muda.
+2. **No PC:** `winget install Syncthing.Syncthing`, rode `syncthing` e abra `http://127.0.0.1:8384`. Defina usuário e
+   senha da GUI, apague a "Default Folder" e anote o ID do dispositivo (Ações → Mostrar ID).
+3. **No i7:** Adicionar dispositivo com o ID do PC, endereço `dynamic`. Aba Compartilhamento: marque **só** a pasta
+   `vault` (a entrada do Paperless fica para depois do teste). Deixe desligados "Introdutor" e "Aceitar
+   automaticamente".
+4. **No PC:** aceite o i7 e a pasta `vault` numa **pasta nova e vazia**, `%USERPROFILE%\Vault`. Nunca aponte para o
+   clone git antigo: arquivo apagado no i7 e ainda presente no clone voltaria. Tipo **Enviar e receber**, "Ignorar
+   permissões" ligado, `.stignore` colado antes de salvar.
+5. **Espere até 15 min.** Se o i7 aparecer "Conectado" e a pasta "Atualizado", o teste passou. Se ficar
+   "Desconectado", o teste falhou: no i7, remova o dispositivo do PC e siga com `git pull`.
+
+**Se passou**, troque o clone pela pasta nova:
+
+1. Renomeie o clone antigo para `<clone>-git-antigo`, sem apagar. Pare de rodar `git pull` nele.
+2. Refaça o link do `CLAUDE.md` global e as junctions da memória apontando para `%USERPROFILE%\Vault` (comandos em
+   `claude-md-global` e `sincronizacao-git-multi-maquina`, no vault).
+3. Confira: uma nota criada no Mac aparece em `%USERPROFILE%\Vault` em menos de 1 min.
+
+**Se falhou e o PC segue com `git pull`:** o vault do PC é só leitura. Nunca comite nem dê push nele: só o i7
+comita (D15), e um push do PC faria o push das 03:30 do i7 falhar. Quem escreve no vault pelo PC é o Claude, pelo
+MCP. O que o Claude Code do PC gravar na memória local não chega ao i7.
+
+### iPhone: Synctrain (fora do vault desde 2026-10-30)
+
+O iPhone não sincroniza o vault: o Leonardo quase não abriria o Obsidian nele, e o Claude do app já lê e
+escreve o vault pelo assistente. O roteiro abaixo fica só como referência, se um dia voltar.
+
 
 **Synctrain** (App Store, gratuito, código aberto, licença MPL 2.0). Decisão D10: não pagar app de sync.
 No iPhone as pastas ficam na pasta do app, visível no app Arquivos.
@@ -168,7 +202,7 @@ Copie o arquivo do repositório para a raiz da pasta sincronizada **em cada apar
 cp /srv/assistente/app/deploy/vault/.stignore /srv/assistente/vault/.stignore    # na produção
 ```
 
-No Mac/Windows/iPhone, cole o conteúdo na aba "Ignorar padrões" da pasta (mesmo efeito). Ele ignora
+No Mac e no Windows, cole o conteúdo na aba "Ignorar padrões" da pasta (mesmo efeito). Ele ignora
 `.git`, `.obsidian/workspace*.json`, `.trash`, temporários e lixo de macOS e Windows.
 
 ## 5. Commit diário na produção
@@ -261,7 +295,7 @@ nota, veja `docker compose logs servidor` e avise antes de mudar `chown` ou `chm
 ## 7. Conferir que funciona
 
 1. Crie uma nota no Mac. Ela aparece em `/srv/assistente/vault` em segundos (`ls -lt /srv/assistente/vault | head`).
-2. Peça ao Claude para criar uma nota em `00-inbox`. Ela aparece no Mac e no iPhone.
+2. Peça ao Claude para criar uma nota em `00-inbox`. Ela aparece no Mac e no PC Windows.
 3. Apague uma nota de teste no Mac. Ela some da produção e sobra uma cópia em `/srv/assistente/vault/.stversions`.
 4. Na manhã seguinte, `git -C /srv/assistente/vault log --oneline | head` mostra o commit das 03:30.
 

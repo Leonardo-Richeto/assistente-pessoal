@@ -201,6 +201,118 @@ def test_sem_categoria_conhecida_vai_para_outros():
     assert (g.categoria, g.forma_pagamento) == ("outros", "débito Nubank")
 
 
+# "Shopping" genérico (08000000): o Nubank real manda assim muita compra no débito em padaria e mercado (2026-10-30).
+@pytest.mark.parametrize("descricao,conta,categoria", [
+    ("Compra no débito|PANIF FICTICIA LTDA", CONTA_CORRENTE, "alimentação"),
+    ("Compra no débito|ACOUGUE FICTICIO", CONTA_CORRENTE, "alimentação"),
+    ("Compra no débito|MERCADO FICTICIO", CONTA_CORRENTE, "alimentação"),
+    ("Compra no débito|LANCHONETE FICTICIA", CONTA_CORRENTE, "alimentação"),
+    ("Compra no débito|MISTURA FICTICIA RESTAU", CONTA_CORRENTE, "alimentação"),  # cortado pelo banco
+    ("Compra no débito|AUTO POSTO FICTICIO", CONTA_CORRENTE, "combustível"),
+    ("Compra no débito|ESTACIONA FICTICIO", CONTA_CORRENTE, "transporte"),
+    ("Compra no débito|DROGARIA FICTICIA", CONTA_CORRENTE, "saúde"),
+    ("Compra no débito|LOJA FICTICIA", CONTA_CORRENTE, "compras"),
+    ("Mercado*Lojaficticia", CARTAO, "compras"),  # Mercado Livre não é mercado
+    ("Mercadolivre*Lojafict", CARTAO, "compras"),
+    ("Compra no débito|ATACADO DE TINTAS FICT", CONTA_CORRENTE, "compras"),
+    ("Compra no débito|RESTAURA MOVEIS FICT", CONTA_CORRENTE, "compras"),
+    ("Compra no débito|LANCHAS NAUTICA FICT", CONTA_CORRENTE, "compras"),
+    ("Compra no débito|GARAGEM BURGER FICT", CONTA_CORRENTE, "alimentação"),
+])
+def test_shopping_generico_usa_palavra_do_nome_da_loja(descricao, conta, categoria):
+    [g], _ = _converter(_t("sg", -10, "2026-10-20", "08000000", descricao=descricao), conta)
+    assert g.categoria == categoria
+
+
+def test_categoria_especifica_do_pluggy_ganha_da_palavra():
+    [g], _ = _converter(_t("se", -10, "2026-10-20", "08040000", descricao="Compra no débito|PADARIA FICTICIA"))
+    assert g.categoria == "compras"
+
+
+@pytest.mark.parametrize("a,b", [
+    ("Compra no débito|PANIF FICTICIA LTDA", "Panif Ficticia"),
+    ("Compra no débito|CasaDoPaoFicticia", "Casa do Pão Fictícia"),
+    ("Compra no débito|CASA DO PAO FICTICIA CE", "Casa do Pao Ficticia Centro"),  # cortado pelo banco
+])
+def test_mesma_loja_no_debito_e_no_credito(a, b):
+    assert pluggy.mesma_loja(pluggy.nome_da_loja(a), pluggy.nome_da_loja(b))
+
+
+@pytest.mark.parametrize("a,b", [("Compra no débito|CASA", "Casa Nova"), ("Compra no débito|LOJA FICTICIA", "Loja Real")])
+def test_lojas_diferentes(a, b):
+    assert not pluggy.mesma_loja(pluggy.nome_da_loja(a), pluggy.nome_da_loja(b))
+
+
+def test_shopping_generico_usa_a_categoria_da_mesma_loja_na_mesma_leva(bancos, url):
+    api = ApiFalsa({"conta-cartao": [_t("h1", 30, "2026-10-01", "10000000", descricao="Casa do Pao Ficticia")],
+                    "conta-cc": [_t("h2", -12, "2026-10-02", "08000000", descricao="Compra no débito|CASA DO PAO FICTICIA"),
+                                 _t("h3", -40, "2026-10-03", "08000000", descricao="Compra no débito|LOJA FICTICIA")]})
+    _sincronizar(bancos, api)
+    por_id = {g.id_externo: g.categoria for g in _gastos(url)}
+    assert por_id == {"pluggy:h1": "alimentação", "pluggy:h2": "alimentação", "pluggy:h3": "compras"}
+
+
+def test_shopping_generico_aprende_com_a_correcao_e_nao_muda_o_passado(bancos, url):
+    loja = "Compra no débito|LOJA FICTICIA"
+    _sincronizar(bancos, ApiFalsa({"conta-cc": [_t("k1", -40, "2026-10-03", "08000000", descricao=loja)]}))
+    with Session(create_engine(url)) as s, s.begin():  # o dono corrigiu na conferência
+        s.scalars(select(Gasto)).one().categoria = "lazer"
+    api = ApiFalsa({"conta-cc": [_t("k1", -40, "2026-10-03", "08000000", descricao=loja),
+                                 _t("k2", -50, "2026-10-26", "08000000", descricao=loja),
+                                 _t("k3", -5, "2026-10-26", "08000000", descricao="Compra no débito|PADARIA FICTICIA")]})
+    _sincronizar(bancos, api, agora=AGORA + timedelta(days=1))
+    por_id = {g.id_externo: g.categoria for g in _gastos(url)}
+    assert por_id == {"pluggy:k1": "lazer", "pluggy:k2": "lazer", "pluggy:k3": "alimentação"}
+
+
+def test_marketplace_nao_herda_a_categoria_de_outra_compra(bancos, url):
+    api = ApiFalsa({"conta-cartao": [_t("n1", 90, "2026-10-01", "17030000", descricao="Mercadolivre*Lojafict"),
+                                     _t("n2", 40, "2026-10-02", "08000000", descricao="Mercadolivre*Lojafict")]})
+    _sincronizar(bancos, api)
+    assert {g.id_externo: g.categoria for g in _gastos(url)} == {"pluggy:n1": "casa", "pluggy:n2": "compras"}
+
+
+def test_correcao_do_dono_nao_perde_para_a_releitura_do_pluggy(bancos, url):
+    # A releitura de 7 dias traz de novo o gasto do crédito; só conta a versão gravada, com a correção.
+    loja_credito, loja_debito = "Loja Ficticia Centro", "Compra no débito|LOJA FICTICIA CENTRO"
+    credito = _t("q2", 20, "2026-10-24", "10000000", descricao=loja_credito)
+    _sincronizar(bancos, ApiFalsa({"conta-cartao": [_t("q1", 20, "2026-10-01", "10000000", descricao=loja_credito),
+                                                    credito]}))
+    with Session(create_engine(url)) as s, s.begin():
+        s.scalars(select(Gasto).where(Gasto.id_externo == "pluggy:q2")).one().categoria = "lazer"
+    api = ApiFalsa({"conta-cartao": [credito],
+                    "conta-cc": [_t("q3", -9, "2026-10-26", "08000000", descricao=loja_debito)]})
+    _sincronizar(bancos, api, agora=AGORA + timedelta(days=1))
+    assert {g.id_externo: g.categoria for g in _gastos(url)}["pluggy:q3"] == "lazer"  # empate: a mais recente
+
+
+def test_parcelas_contam_como_uma_compra(bancos, url):
+    api = ApiFalsa({"conta-cartao": [_parcela("r1", 50, "2026-10-10", 1, 12, descricao="Loja Ficticia Centro")
+                                     | {"categoryId": "17030000", "category": "Houseware"},
+                                     _t("r2", 20, "2026-10-11", "10000000", descricao="Loja Ficticia Centro"),
+                                     _t("r3", 20, "2026-10-12", "10000000", descricao="Loja Ficticia Centro")],
+                    "conta-cc": [_t("r4", -9, "2026-10-20", "08000000", descricao="Compra no débito|LOJA FICTICIA CENTRO")]})
+    _sincronizar(bancos, api)
+    assert {g.id_externo: g.categoria for g in _gastos(url)}["pluggy:r4"] == "alimentação"
+
+
+@pytest.mark.parametrize("descricao", ["MERCADOPAGO*LOJAFICT", "PAGSEGURO*LOJAFICT", "PICPAY*LOJAFICT",
+                                       "AMAZON MARKETPLACE*LOJAFICT", "AMZN*LOJAFICT", "SHOPEE*LOJAFICT"])
+def test_intermediario_de_pagamento_nao_herda(descricao):
+    lojas = [(pluggy.nome_da_loja(descricao.split("*")[0] + "*OUTRAFICT"), "casa")]
+    assert pluggy._categoria_da_loja(lojas, descricao.split("*")[0]) is None
+
+
+def test_historico_ignora_compras_e_outros(bancos, url):
+    loja = "Compra no débito|PADARIA FICTICIA"
+    with Session(create_engine(url)) as s, s.begin():  # gravado antes da 3.5, com a sugestão antiga
+        s.add(Gasto(data=date(2026, 10, 1), valor=Decimal("5.00"), descricao=loja, categoria="compras",
+                    origem="pluggy", id_externo="pluggy:velho"))
+    _sincronizar(bancos, ApiFalsa({"conta-cc": [_t("m1", -5, "2026-10-20", "08000000", descricao=loja)]}))
+    por_id = {g.id_externo: g.categoria for g in _gastos(url)}
+    assert por_id == {"pluggy:velho": "compras", "pluggy:m1": "alimentação"}
+
+
 def test_data_no_fuso_de_sao_paulo():
     # 01:30 UTC do dia 21 = 22:30 do dia 20 em São Paulo.
     t = _t("x5", -15, "2026-10-21") | {"date": "2026-10-21T01:30:00.000Z"}

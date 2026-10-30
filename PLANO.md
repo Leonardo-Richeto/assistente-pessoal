@@ -10,9 +10,9 @@ A sequência de **teste no MacBook → produção no i7** está em `docs/IMPLANT
 **Ordem a partir de 2026-10-26 (Leonardo):**
 1. Pluggy: Fase 3 inteira (3.1 a 3.4), com as chaves no `.env` por enquanto (Ficha 10).
 2. Vaultwarden (2b.3a); as chaves do Pluggy ganham a cópia oficial nele e a de uso fica no `.env` (Ficha 11, regra 8).
-3. Consumo (1.7), quando a tomada medidora chegar; corre em paralelo.
+3. Consumo (1.7): tomada instalada em 2026-10-28; falta a média, que o Leonardo passa.
 4. Sem pressa, quando houver mais tempo: testes de isolamento da Nathalia (Ficha 8, item 3), Claude dela (1b.3),
-   iPhone e Windows no Syncthing (2.2), teste do ponto (B9) e inventário do i5 (1.1).
+   iPhone e Windows no Syncthing (2.2), inventário do i5 (1.1).
 5. Por último: compartilhar documento entre o Leonardo e a Nathalia (2.5).
 
 ---
@@ -48,10 +48,10 @@ cifrado e migração pelo mesmo pacote (Fase 7, `docs/MIGRACAO.md`). Em 2026-10-
 - [x] 1.3b (2026-10-23; Funnel no container, nó `assistente`) Instalar Tailscale no i7, habilitar HTTPS + Funnel, `tailscale funnel --bg 8000`
 - [x] 1.4 (2026-10-23; mesmo cliente do Mac, URL nova acrescentada) Criar o cliente OAuth do Google de produção (decisão de 2026-10-17; GitHub fica como alternativa), preencher `.env`, `docker compose up -d --build`
   - Pronto quando: `docker compose ps` tudo saudável e `curl <url>/.well-known/oauth-protected-resource/mcp` responde
-- [x] 1.5 (2026-10-24, B8 e B9 pelo app no i7; o ponto ainda falta no B9) Adicionar conector personalizado no claude.ai e testar do iPhone: registrar → consultar → desfazer
+- [x] 1.5 (2026-10-24, B8 e B9 pelo app no i7; 2026-10-30: rodada única de testes pelo app, ponto incluído, tudo certo segundo o Leonardo) Adicionar conector personalizado no claude.ai e testar do iPhone: registrar → consultar → desfazer
 - [x] 1.6 Criar um Projeto no claude.ai "Assistente" com instruções de uso (quando registrar, tom das confirmações). Feito 2026-10-17 com o texto da ficha 1; no i7, só trocar o conector
-- [ ] 1.7 Medir o consumo com a tomada medidora: i7 parado (24 h, só o Debian), depois com a stack (7 dias). Anotar
-  W médio e R$/mês na nota `maquinas-do-assistente-pessoal` do vault. Pronto quando: os dois números estão lá
+- [ ] 1.7 (2026-10-28: tomada instalada; 1ª leitura 11,5 a 15 W, com a stack, logo depois de religar) Medir o consumo com a tomada medidora, só em pleno funcionamento (stack inteira, 7 dias; sem medição do i7 parado,
+  Leonardo, 2026-10-28). Anotar W médio e R$/mês na nota `maquinas-do-assistente-pessoal` do vault. Pronto quando: o número está lá
 
 ## Fase 1b — Instância da Nathalia (opcional, depois da sua estar estável)
 - [x] 1b.1 (2026-10-24: Ficha 8 aprovada; P8 feito no i7 até o backup e a pasta de entrada do PC dela; 2026-10-25: Ficha 9 aprovada, o ChatGPT Plus dela conectado; testes de isolamento pendentes; o Claude dela fica para a 1b.3) Segunda instância (README → "Segunda instância"), login Google, porta 8001 no host e nó Tailscale próprio
@@ -84,7 +84,7 @@ Leonardo, 2026-10-26: o i5 está desligado e os serviços dele não são importa
   - 2026-10-24 (Opus 5.5, guiando do Mac): no i7, `docs/IMPLANTACAO.md` P1–P6. Timers de backup (03:45) e
     conferência (07:00), ensaio de restauração no Mac com o pacote do i7 e, pelo app, "me mostra o último documento
     que entrou" e a recusa de compartilhar. Rota padrão do servidor fixa na rede do assistente (`gw_priority`).
-- [ ] 2.2 (2026-10-24: feito i7 ↔ Mac; falta iPhone e PC Windows, a fazer no trabalho) Migrar o vault para `/srv/assistente/vault` no i7, Syncthing com todos os aparelhos (Mac, iPhone, PC Windows) e GitHub privado mantido por enquanto (decisão de 2026-10-17); preencher `VAULT_PATH`. Detalhe: `docs/SYNCTHING.md`
+- [ ] 2.2 (2026-10-24: feito i7 ↔ Mac; falta o PC Windows, a fazer no trabalho, sem Tailscale e com `git pull` como plano B; 2026-10-30, D27: iPhone fora do vault, usa o vault pelo MCP) Migrar o vault para `/srv/assistente/vault` no i7, Syncthing com o Mac e o PC Windows e GitHub privado mantido por enquanto (decisão de 2026-10-17); preencher `VAULT_PATH`. Detalhe: `docs/SYNCTHING.md`
 - [x] 2.2b (regra em 2026-10-16, `registro-temporario-de-sprint-na-raiz`; inventário em `maquinas-do-assistente-pessoal`) Levar para o vault a "Regra de passagem" e a nota de inventário das máquinas
 - [x] 2.3 (2026-10-23, `vault-commit.timer` às 03:30 no i7; registro do vault de 2026-10-23) Job diário de commit do vault (`git add -A && git commit`) para ter histórico de tudo que a IA escrever
 - [x] ⚑ 2.4 (2026-10-24: Ficha 7; P9 e P10 no i7 testados com o Syncthing de verdade; iPhone e PC Windows na 2.2) Definir o envio de arquivos para o servidor (pasta "consumir" do Paperless sincronizada pelo Syncthing é o caminho mais simples)
@@ -113,7 +113,7 @@ podem escrever. Itens que mudam o que o Claude do app faz (2b.2, 2b.6, 2b.7, 2b.
   senha; a referência `{{segredo:NOME}}` passa. O valor fica no Vaultwarden, fora do vault, e o servidor nunca o
   resolve (resolvido, iria para o contexto do modelo). O `commit-diario.sh` roda o gitleaks antes do commit
   - Feito (2026-10-22, Passo 5): middleware `BarreiraSegredo` recusa escrita do banco e do vault com cara de segredo; restaurar_nota confere o conteúdo do git; commit por escrita pula e foto recusa arquivo com segredo; importador de sessões redige; `commit-diario.sh` roda gitleaks v8.30.1 (digest fixo) e não comita se achar. Vault real: 125 notas, 0 achados.
-- [ ] ⚑ 2b.3a (2026-10-27: Ficha 11 aprovada; `cofre/` pronto e ensaiado no Mac; falta o roteiro C1–C8 de `docs/IMPLANTACAO.md` no i7) Vaultwarden no i7 (Leonardo, 2026-10-21), em Docker Compose próprio, guarda os valores do 2b.3.
+- [x] ⚑ 2b.3a (2026-10-27: no ar no i7, roteiro C1–C8 feito; backup às 03:55 e ensaio de restauração ok; 2026-10-30: primeiros segredos guardados) Vaultwarden no i7 (Leonardo, 2026-10-21), em Docker Compose próprio, guarda os valores do 2b.3.
   Proposta: acesso só pela Tailscale, sem Funnel. Os dados dele entram no backup cifrado da Fase 7 (`exportar.sh`)
   - Pronto quando: o backup da Fase 7 leva o volume do Vaultwarden para fora do SSD do i7 e a restauração foi testada, antes do primeiro segredo.
     Enquanto o 7.1 estiver desligado (2026-10-21), o 2b.3a espera
@@ -148,9 +148,11 @@ agentes e multiusuário; relações tipadas; consulta por data (o git já respon
 ## Fase 3 — Workers (ingestão)
 - [x] 3.1 (2026-10-26; laço próprio de horário no lugar do APScheduler, perfil `pluggy`) Pacote `servidor/assistente/workers/` + serviço `workers` no compose rodando APScheduler; worker usa a conexão de **escrita** e grava auditoria com `autor="worker:<nome>"`
 - [x] 3.2 (2026-10-27: Nubank pelo MeuPluggy numa aplicação nova; 12 meses reais lidos e ensaiados num banco descartável) Testar o Meu Pluggy manualmente (consentimento, formato das transações)
-- [ ] 3.3 (2026-10-27: calibrado com o Nubank real; falta ligar no i7) Worker Pluggy diário: grava em `gastos` com `origem="pluggy"` e `id_externo` (idempotente — rodar duas vezes não duplica)
+- [x] 3.3 (2026-10-27: calibrado com o Nubank real; no ar no i7 desde 2026-10-27, 1ª rodada com 920 gastos) Worker Pluggy diário: grava em `gastos` com `origem="pluggy"` e `id_externo` (idempotente — rodar duas vezes não duplica)
   - Pronto quando: teste com resposta gravada do Pluggy passa e reexecução não duplica
 - [x] 3.4 (2026-10-26, com `gastos_a_conferir` e `conferir_gastos`, Ficha 10) Ferramenta `conciliar_gastos`: lista gastos manuais e do Pluggy com mesmo valor/data próxima para o Leonardo decidir
+- [x] 3.5 (2026-10-30: causa lida na API real, o Pluggy manda "Shopping" genérico `08000000` para parte das lojas do débito; regra 7 aprovada: mesma loja no histórico, depois palavra do nome; 197 gastos antigos recategorizados com auditoria) Categoria sugerida da compra no débito: hoje sai "compras" em padaria, mercado e posto, e a mesma loja no crédito sai "alimentação"
+  - Pronto quando: com "Shopping" genérico, a loja que já teve categoria no crédito ou na conferência sugere a mesma; sem histórico, o nome da loja decide (padaria, mercado, posto...)
 
 ## Fase 4 — Agenda
 - [ ] 4.1 Usar o conector nativo do Google Calendar no claude.ai para ler/criar eventos

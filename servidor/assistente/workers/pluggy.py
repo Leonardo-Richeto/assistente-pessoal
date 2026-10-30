@@ -202,6 +202,22 @@ _CATEGORIA_DESCRICAO = (
     ("transferência", ("transfer", "pix")),
 )
 CATEGORIA_PADRAO = "outros"
+# "Shopping" sem subcategoria não diz o que é: o Nubank real manda assim muita compra no débito em padaria e mercado, e
+# a mesma loja no crédito vem "Groceries" (2026-10-30). Aí vale a mesma loja no histórico e, sem ela, o nome da loja.
+_SHOPPING_GENERICO = "08000000"
+_CATEGORIA_NOME_DA_LOJA = (
+    ("alimentação", re.compile(r"padari|panif|supermerc|\bmercado\b(?!\s*(\*|livre|pago))|acougue|hortifruti|sacolao"
+                               r"|emporio|atacadao|atacadista|restaurante|restau$|\brest\b|gastronom"
+                               r"|lanchonete|lancheria|lanchet|\blanches?\b|burger|hamburg|pizzari|sorvete|lamen|churrasc|confeitari|doceri|\bdoces?\b")),
+    ("combustível", re.compile(r"\bposto\b")),
+    ("transporte", re.compile(r"estaciona|\bgaragem\b|\bparking\b")),
+    ("saúde", re.compile(r"farmac|drogari")),
+)
+# Marketplace e intermediário de pagamento: o nome é o deles, e cada compra lá é uma coisa.
+_MARKETPLACE = re.compile(r"mercado\s*livre|mercado\s*\*|mercado\s*pago|pagseguro|picpay|paypal|amazon|amzn|shopee")
+_SEM_HISTORICO = ("compras", CATEGORIA_PADRAO)  # o que a sugestão antiga dava às lojas de "Shopping" genérico
+_SUFIXO_EMPRESA = re.compile(r"\b(ltda|me|eireli|epp|sa)\b")
+_LETRAS_MESMA_LOJA = 8  # o banco corta o nome (22 letras no débito): casa pelo começo, se sobrar o bastante
 CATEGORIAS = tuple(dict.fromkeys(c for _, c in _CATEGORIA_PREFIXO)) + (CATEGORIA_PADRAO,)
 
 
@@ -223,6 +239,8 @@ class GastoNovo:
     forma_pagamento: str
     # Só a parcela que veio do banco (ou a transação comum) pode ser conferida e virar duplicata; a projetada não.
     real: bool = True
+    # O Pluggy disse só "Shopping": a categoria da mesma loja no histórico ganha da sugestão (regra 7).
+    generica: bool = False
 
 
 def motivo_fora(conta: dict, t: dict) -> str | None:
@@ -252,8 +270,32 @@ def _so_digitos(texto: str) -> str:
     return re.sub(r"\D", "", texto)
 
 
+def _parte_da_loja(descricao: str) -> str:
+    descricao = descricao.split(" · ")[0]  # tira a mensagem do Pix
+    descricao = descricao.split("|", 1)[-1]  # "Compra no débito|PADARIA X"
+    return _PARCELA_NA_DESCRICAO.sub("", descricao)
+
+
+def nome_da_loja(descricao: str) -> str:
+    """Chave da loja: "PANIF X LTDA" no débito e "Panif X" no crédito dão a mesma."""
+    texto = re.sub(r"[^a-z0-9]+", " ", _normal(_parte_da_loja(descricao)))
+    return _SUFIXO_EMPRESA.sub(" ", texto).replace(" ", "")
+
+
+def mesma_loja(a: str, b: str) -> bool:
+    curto, longo = sorted((a, b), key=len)
+    return bool(curto) and (curto == longo or (len(curto) >= _LETRAS_MESMA_LOJA and longo.startswith(curto)))
+
+
+def _pelo_nome_da_loja(descricao: str) -> str | None:
+    texto = _normal(_parte_da_loja(descricao))
+    return next((categoria for categoria, padrao in _CATEGORIA_NOME_DA_LOJA if padrao.search(texto)), None)
+
+
 def categoria_sugerida(t: dict) -> str:
     codigo = str(t.get("categoryId") or "")
+    if codigo == _SHOPPING_GENERICO:
+        return _pelo_nome_da_loja(t.get("description") or "") or "compras"
     if codigo:
         return _pelo_prefixo(codigo, _CATEGORIA_PREFIXO) or CATEGORIA_PADRAO
     texto = _normal(t.get("category"))
@@ -322,10 +364,11 @@ def converter(conta: dict, t: dict, banco: str, tz: ZoneInfo) -> tuple[list[Gast
     data = _data_local(t["date"], tz)
     categoria = categoria_sugerida(t)
     forma = forma_de_pagamento(conta, t, banco)
+    generica = str(t.get("categoryId") or "") == _SHOPPING_GENERICO
     cartao = t.get("creditCardMetadata") or {}
     numero, total = cartao.get("installmentNumber"), cartao.get("totalInstallments")
     if not (isinstance(numero, int) and isinstance(total, int) and 1 <= numero <= total and total > 1):
-        return [GastoNovo(f"pluggy:{t['id']}", data, valor, descricao_de(t), categoria, forma)], None
+        return [GastoNovo(f"pluggy:{t['id']}", data, valor, descricao_de(t), categoria, forma, generica=generica)], None
 
     base = _PARCELA_NA_DESCRICAO.sub("", descricao_de(t)).strip() or "compra parcelada"
     compra = cartao.get("purchaseDate")
@@ -338,7 +381,8 @@ def converter(conta: dict, t: dict, banco: str, tz: ZoneInfo) -> tuple[list[Gast
     largura = max(2, len(str(total)))
     gastos = [
         GastoNovo(f"pluggy-parcela:{chave}:{k:0{largura}d}", _mais_meses(data, k - numero), valor,
-                  f"{base} ({k:0{largura}d}/{total:0{largura}d})"[:TAMANHO_DESCRICAO], categoria, forma, real=(k == numero))
+                  f"{base} ({k:0{largura}d}/{total:0{largura}d})"[:TAMANHO_DESCRICAO], categoria, forma,
+                  real=(k == numero), generica=generica)
         for k in range(numero, total + 1)
     ]
     return gastos, None
@@ -393,6 +437,8 @@ def gravar(bancos: Bancos, gastos: list[GastoNovo], primeira: bool) -> tuple[int
         for i in range(0, len(ids), 500):
             existentes |= {g.id_externo: g for g in s.scalars(select(Gasto).where(Gasto.id_externo.in_(ids[i:i + 500])))}
         usados: set[int] = set()
+        lojas = (_historico_das_lojas(s, gastos, existentes)
+                 if any(g.generica and g.id_externo not in existentes for g in gastos) else [])
         for g in gastos:
             if (atual := existentes.get(g.id_externo)) is not None:
                 if g.real and atual.previsto:  # a previsão vira o fato: data e valor passam a ser os do banco
@@ -407,23 +453,46 @@ def gravar(bancos: Bancos, gastos: list[GastoNovo], primeira: bool) -> tuple[int
                     s.add(Auditoria(ferramenta="worker_pluggy", tabela="gastos", registro_id=atual.id, acao="confirmar",
                                     dados=dados, autor=AUTOR))
                 continue
+            categoria = (g.generica and _categoria_da_loja(lojas, g.descricao)) or g.categoria
             conferido = primeira or not g.real
             duplicata = _duplicata(s, g, usados, primeira) if g.real else None
             if duplicata is not None:
                 conferido = False  # mesmo na primeira: o dono decide se repete
-            registro = Gasto(data=g.data, valor=g.valor, descricao=g.descricao, categoria=g.categoria,
+            registro = Gasto(data=g.data, valor=g.valor, descricao=g.descricao, categoria=categoria,
                              forma_pagamento=g.forma_pagamento, origem=WORKER, id_externo=g.id_externo,
                              conferido=conferido, duplicata_de=duplicata, previsto=not g.real)
             s.add(registro)
             s.flush()
             s.add(Auditoria(ferramenta="worker_pluggy", tabela="gastos", registro_id=registro.id, acao="criar",
                             dados={"data": g.data.isoformat(), "valor": str(g.valor), "descricao": g.descricao,
-                                   "categoria": g.categoria, "forma_pagamento": g.forma_pagamento,
+                                   "categoria": categoria, "forma_pagamento": g.forma_pagamento,
                                    "id_externo": g.id_externo, "conferido": conferido, "duplicata_de": duplicata,
                                    "previsto": not g.real},
                             autor=AUTOR))
             novos += 1
     return novos, len(gastos) - novos
+
+
+def _historico_das_lojas(s, gastos: list[GastoNovo], existentes: dict) -> list[tuple[str, str]]:
+    """(loja, categoria), mais recentes antes: os desta leva com categoria específica do Pluggy que ainda não estão no
+    banco, depois os gravados (com a correção do dono). Uma compra é um voto: parcela prevista não conta. Fica de fora o
+    que a sugestão antiga dava ao "Shopping" genérico."""
+    gravados = s.execute(select(Gasto.descricao, Gasto.categoria).where(
+        Gasto.origem == WORKER, Gasto.desfeito.is_(False), Gasto.previsto.is_(False),
+        Gasto.categoria.not_in(_SEM_HISTORICO)).order_by(Gasto.id.desc()))
+    da_leva = [(g.descricao, g.categoria) for g in reversed(gastos) if g.real and not g.generica
+               and g.id_externo not in existentes and g.categoria not in _SEM_HISTORICO]
+    pares = da_leva + [(d, c) for d, c in gravados]
+    return [(nome_da_loja(d), c) for d, c in pares]
+
+
+def _categoria_da_loja(lojas: list[tuple[str, str]], descricao: str) -> str | None:
+    """A categoria que a mesma loja mais recebeu (empate: a primeira da lista, a mais recente). Marketplace fica de fora."""
+    loja = nome_da_loja(descricao)
+    if _MARKETPLACE.match(_normal(_parte_da_loja(descricao))):
+        return None
+    contagem = Counter(c for outra, c in lojas if mesma_loja(loja, outra))
+    return contagem.most_common(1)[0][0] if contagem else None
 
 
 def _duplicata(s, g: GastoNovo, usados: set[int], primeira: bool) -> int | None:
@@ -515,7 +584,8 @@ def _anotar(bancos: Bancos, inicio: datetime, ok: bool, novos: int, erro: str | 
 
 
 def simular(cliente: ClientePluggy, cfg: ConfigPluggy, dias: int) -> dict:
-    """O que a primeira sincronização gravaria, sem banco. Sai com dado real: não vai para o repo nem para o log."""
+    """O que a primeira sincronização gravaria, sem banco. Sai com dado real: não vai para o repo nem para o log.
+    A categoria é a de `converter`: sem o histórico de lojas que o `gravar` aplica ao "Shopping" genérico."""
     cfg.conferir()
     hoje = datetime.now(cfg.tz).date()
     gastos, fora = ler(cliente, cfg.pluggy_item_ids, hoje - timedelta(days=dias), hoje, cfg.pluggy_nome_banco, cfg.tz)

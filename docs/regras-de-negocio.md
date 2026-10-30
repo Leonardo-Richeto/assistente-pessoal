@@ -1210,6 +1210,14 @@ nem trecho longo; senha, token e chave nunca. Fato medível ainda não registrad
    desfeita junto com as seguintes da mesma compra (compra estornada ou cancelada), com auditoria do worker.
 7. **Categoria sugerida:** uma tabela fixa traduz a categoria do Pluggy para alimentação, combustível, transporte,
    saúde, casa, assinaturas, compras, lazer, educação, transferência ou outros. Sem tradução, vai para "outros".
+   **Aprovado em 2026-10-30 (Leonardo; texto do Opus 5.5):** quando o Pluggy manda só
+   a categoria genérica "Shopping" (`08000000`), a sugestão sai, nesta ordem: (a) a categoria que a mesma loja mais
+   recebeu nos gastos do banco, sem contar "compras" e "outros"; (b) uma palavra do nome da loja (padaria,
+   mercado, açougue, restaurante, lanchonete, sorvete, posto, estacionamento, garagem, farmácia, drogaria e afins); (c) "compras". A mesma loja é o nome
+   depois de "Compra no débito|", sem maiúsculas, acento, espaço, "LTDA" e "ME"; nome cortado pelo banco casa pelo
+   começo (8 letras ou mais). Compra no Mercado Livre, na Amazon, na Shopee ou por intermediário (Mercado Pago, PagSeguro, PicPay, PayPal) não herda categoria de outra compra lá; compra parcelada conta uma vez. Os gastos já
+   gravados com "Shopping" genérico foram recategorizados uma vez, em 2026-10-30, pelo `conferir_gastos` (197, com
+   auditoria), com o sim do Leonardo.
 8. **Conferência, tudo de uma vez:** gasto novo do banco entra "a conferir". O `contexto_inicial` diz quantos há; o
    assistente avisa uma vez na conversa ("5 gastos do Nubank para conferir; quer ver?") e, com o sim, mostra todos
    com a sugestão (`gastos_a_conferir`). O Leonardo corrige só os errados; `conferir_gastos` grava. A mensagem do
@@ -1244,6 +1252,9 @@ nem trecho longo; senha, token e chave nunca. Fato medível ainda não registrad
 | Pix de R$ 50,00 para outra pessoa, mensagem "presente" | gasto R$ 50,00, "transferência", "pix Nubank", pista "presente" |
 | Pix de R$ 500,00 da corrente para a poupança do Leonardo | nada |
 | Compra em 10 parcelas de R$ 89,90, parcela 3 lançada | parcelas 03 a 10, uma por mês, "<descrição> (03/10)" |
+| Débito "PANIF DOM BOSCO LTDA", Pluggy diz "Shopping"; no crédito, "Panif Dom Bosco" já saiu "alimentação" | "alimentação" |
+| Débito "ACOUGUE ESTRELA", Pluggy diz "Shopping", loja sem histórico | "alimentação", pela palavra "açougue" |
+| Débito "MONTE LIBANO", Pluggy diz "Shopping", sem histórico nem palavra | "compras"; corrigida uma vez, a próxima já sai certa |
 | "Gastei 120 no mercado" com o do Nubank já gravado | não grava; "Já veio do Nubank: R$ 120,00 em 20/10. É o mesmo?" |
 
 ### Não faz
