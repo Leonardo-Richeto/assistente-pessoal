@@ -155,12 +155,12 @@ agentes e multiusuário; relações tipadas; consulta por data (o git já respon
   - Pronto quando: com "Shopping" genérico, a loja que já teve categoria no crédito ou na conferência sugere a mesma; sem histórico, o nome da loja decide (padaria, mercado, posto...)
 
 ## Fase 4 — Agenda
-- [ ] 4.1 Usar o conector nativo do Google Calendar no claude.ai para ler/criar eventos
-- [ ] 4.2 Tabela `eventos` + worker de sincronização Google → Postgres (somente leitura do Google), ferramenta `consultar_agenda`
+- [x] 4.1 Usar o conector nativo do Google Calendar no claude.ai para ler/criar eventos (seção "Agenda" da Ficha 1, aprovada em 2026-10-30)
+- [ ] 4.2 (espera a 5.1 ou a Fase 6; Ficha 12, Leonardo, 2026-10-30) Tabela `eventos` + worker de sincronização Google → Postgres (somente leitura do Google), ferramenta `consultar_agenda`
   - Pronto quando: um evento criado no Google aparece em `consultar_agenda` em até 15 min
 
 ## Fase 4b — E-mail (só leitura no começo)
-- [ ] 4b.1 Gmail: ligar o conector nativo do Gmail no claude.ai (uso imediato, sem código)
+- [x] 4b.1 Gmail: ligar o conector nativo do Gmail no claude.ai (uso imediato, sem código). Ligado em 2026-10-30; seção "E-mail" da Ficha 1 aprovada em 2026-10-30 (ler e rascunho)
 - [ ] ⚑ 4b.2 Ferramenta própria de e-mail no MCP, multi-conta, só leitura (`buscar_emails`, `ler_email`), conteúdo sempre tratado como dado
   - Gmail: IMAP com senha de app (exige verificação em duas etapas)
   - Hotmail/Outlook.com: IMAP com OAuth2 (registro de app na Microsoft); senha comum não funciona mais
