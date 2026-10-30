@@ -71,6 +71,22 @@ bash "$APP/scripts/verificar.sh" >/dev/null || falha "verificar.sh falhou na ori
 ANTES="$(contagens)"
 log "contagens na origem:"; printf '%s\n' "$ANTES" | sed 's/^/  /'
 
+iniciado() { docker inspect -f '{{.State.StartedAt}}' "$(dc ps -q "$1" | tr -d '\r')"; }
+INICIO_SERVIDOR="$(iniciado servidor)"
+log "backup diário (--retencao): o servidor não pode parar"
+bash "$APP/scripts/exportar.sh" --retencao --destino "$BASE/diario" || falha "exportar.sh --retencao falhou."
+[ "$(iniciado servidor)" = "$INICIO_SERVIDOR" ] || falha "o backup diário reiniciou o servidor."
+ls "$BASE/diario"/assistente-*.tar.age >/dev/null 2>&1 || falha "o backup diário não gerou pacote."
+[ -z "$(echo "select datname from pg_database where datname like 'conferencia_backup_%'" | psql_dono)" ] \
+  || falha "o banco temporário da conferência ficou para trás."
+
+log "reinício semanal (scripts/reiniciar.sh): servidor reinicia, Postgres não"
+INICIO_POSTGRES="$(iniciado postgres)"
+bash "$APP/scripts/reiniciar.sh" || falha "reiniciar.sh falhou."
+[ "$(iniciado servidor)" != "$INICIO_SERVIDOR" ] || falha "reiniciar.sh não reiniciou o servidor."
+[ "$(iniciado postgres)" = "$INICIO_POSTGRES" ] || falha "reiniciar.sh reiniciou o Postgres."
+bash "$APP/scripts/verificar.sh" >/dev/null || falha "verificar.sh falhou depois do reinício."
+
 log "exportando (congelar)"
 bash "$APP/scripts/exportar.sh" --congelar --destino "$BASE/pacotes" || falha "exportar.sh falhou."
 PACOTE="$(ls -1 "$BASE/pacotes"/assistente-*.tar.age | tail -n 1)"

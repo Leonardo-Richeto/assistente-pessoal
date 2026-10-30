@@ -9,7 +9,8 @@
 # Cria a árvore de ASSISTENTE_HOME (padrão /srv/assistente: a pasta acima de app/):
 #   app/ .env backups/ logs/ vault/ data/{postgres,paperless,tailscale,sessoes/oauth}
 # Liga app/.env -> ../.env (para `docker compose` sem --env-file) e instala o timer do backup
-# diário (scripts/exportar.sh --retencao), que só é ligado com AGE_DESTINATARIO no .env.
+# diário (scripts/exportar.sh --retencao), que só é ligado com AGE_DESTINATARIO no .env, e o do
+# reinício semanal (scripts/reiniciar.sh, terça às 03:00).
 #
 # NÃO faz: tailscale up, .env, chaves do age, config do Syncthing. Próximos passos no fim.
 set -u
@@ -213,6 +214,27 @@ if [ -f "$HOME_DIR/.env" ] && grep -Eq '^AGE_DESTINATARIO=age1' "$HOME_DIR/.env"
   run systemctl enable --now "${UNIDADE}.timer"
 else
   echo "Timer instalado mas DESLIGADO: falta AGE_DESTINATARIO no $HOME_DIR/.env. Depois de preencher, rode este script de novo."
+fi
+
+# --- 7. Reinício semanal ---------------------------------------------------------------------
+
+# Terça às 03:00 (Leonardo, 2026-10-30); outra instância às 03:05. O backup diário não reinicia nada.
+REINICIO="$(basename "$HOME_DIR")-reinicio"
+HORA_REINICIO=03:00; [ "$REINICIO" = "assistente-reinicio" ] || HORA_REINICIO=03:05
+info "Timer do reinício semanal ${REINICIO} (terça ${HORA_REINICIO}, scripts/reiniciar.sh)"
+REINICIO_SRV="$(sed -e "s#<usuario>#${USUARIO}#g" -e "s#<home>#${HOME_DIR}#g" "$APP/deploy/systemd/assistente-reinicio.service")"
+REINICIO_TIMER="$(sed "s#03:00#${HORA_REINICIO}#g" "$APP/deploy/systemd/assistente-reinicio.timer")"
+if [ "$REINICIO" != "assistente-reinicio" ]; then
+  REINICIO_SRV="$(printf '%s\n' "$REINICIO_SRV" | sed "s#^Description=.*#Description=Reinicio semanal de $(basename "$HOME_DIR")#")"
+  REINICIO_TIMER="$(printf '%s\n' "$REINICIO_TIMER" | sed "s#do assistente#de $(basename "$HOME_DIR")#")"
+fi
+gravar_arquivo "/etc/systemd/system/${REINICIO}.service" "$REINICIO_SRV"
+gravar_arquivo "/etc/systemd/system/${REINICIO}.timer" "$REINICIO_TIMER"
+run systemctl daemon-reload
+if [ -f "$HOME_DIR/.env" ]; then
+  run systemctl enable --now "${REINICIO}.timer"
+else
+  echo "Timer instalado mas DESLIGADO: falta o $HOME_DIR/.env. Depois de preencher, rode este script de novo."
 fi
 
 # --- Próximos passos -------------------------------------------------------------------------

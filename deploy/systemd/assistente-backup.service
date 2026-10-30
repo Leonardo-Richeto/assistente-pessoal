@@ -9,5 +9,5 @@ Type=oneshot
 User=<usuario>
 Environment=ASSISTENTE_HOME=<home>
 ExecStart=/bin/bash <home>/app/scripts/exportar.sh --retencao
-# O servidor fica parado durante o dump (alguns segundos) e volta sozinho no fim.
+# Nada para durante o backup; o reinicio semanal e outro timer (assistente-reinicio).
 TimeoutStartSec=1h

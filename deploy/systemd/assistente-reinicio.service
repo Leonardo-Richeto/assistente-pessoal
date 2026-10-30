@@ -1,0 +1,12 @@
+[Unit]
+Description=Reinicio semanal do assistente (scripts/reiniciar.sh)
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# <usuario> e <home> sao trocados pelo scripts/preparar_host.sh.
+User=<usuario>
+Environment=ASSISTENTE_HOME=<home>
+ExecStart=/bin/bash <home>/app/scripts/reiniciar.sh
+TimeoutStartSec=15min

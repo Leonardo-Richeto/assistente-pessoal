@@ -136,8 +136,14 @@ imagem_postgres() {
 # tar de uma pasta de data/ lida como root num container: estado do Tailscale e das sessões
 # pode ter dono root ou o uid do container, que o usuário do host não lê.
 tar_data_criar() {  # <subpasta de data/> > saída.tar
+  # Backup com os serviços ligados: arquivo mudado ou sumido durante a leitura (log do Tailscale,
+  # sessão OAuth renovada) dá código 1 no GNU tar e não é falha.
+  local rc=0
   docker run --rm -i --user 0 --entrypoint tar -v "$(caminho_docker "$HOME_DIR/data"):/d:ro" \
-    "$(imagem_postgres)" -C /d --numeric-owner -cf - "$1"
+    "$(imagem_postgres)" -C /d --numeric-owner --warning=no-file-changed --warning=no-file-removed \
+    --ignore-failed-read -cf - "$1" || rc=$?
+  [ "$rc" -le 1 ] || return "$rc"
+  [ "$rc" -eq 0 ] || aviso "data/$1 mudou durante a cópia (normal com o servidor ligado)."
 }
 
 tar_data_extrair() {  # < entrada.tar   (extrai dentro de data/, preservando donos e permissões)
@@ -250,8 +256,9 @@ esperar_saudavel() {  # <serviço> [segundos]
   done
 }
 
-psql_dono() {  # SQL pela entrada; saída sem alinhamento, colunas separadas por TAB
-  dc exec -T postgres sh -c 'psql -X -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At -F "	"' \
+psql_dono() {  # SQL pela entrada; saída sem alinhamento, colunas separadas por TAB. BANCO=<nome> troca o banco.
+  dc exec -T -e BANCO="${BANCO:-}" postgres \
+    sh -c 'psql -X -q -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "${BANCO:-$POSTGRES_DB}" -At -F "	"' \
     | tr -d '\r'
 }
 
@@ -264,6 +271,35 @@ from pg_class c join pg_namespace n on n.oid = c.relnamespace
 where n.nspname = 'public' and c.relkind in ('r', 'p')
 order by c.relname;
 SQL
+}
+
+# Contagens tiradas do próprio dump: restaura num banco temporário, conta e apaga. Com o servidor
+# ligado durante o backup, contar no banco vivo daria números de outro instante.
+BANCO_CONFERENCIA=""
+SCHEMA_DO_DUMP=""
+contagens_do_dump() {  # <banco.dump> <saída.tsv>; põe a versão do schema do dump em SCHEMA_DO_DUMP
+  local dump="$1" destino="$2" saida sobra
+  # Sobra de um backup morto no meio (o pid muda a cada rodada).
+  while IFS= read -r sobra; do
+    [ -n "$sobra" ] && BANCO_CONFERENCIA="$sobra" apagar_banco_conferencia
+  done < <(echo "select datname from pg_database where datname like 'conferencia\_backup\_%'" | psql_dono)
+  BANCO_CONFERENCIA="conferencia_backup_$$"
+  apagar_banco_conferencia
+  dc exec -T -e BANCO="$BANCO_CONFERENCIA" postgres sh -c 'createdb -U "$POSTGRES_USER" "$BANCO"' >/dev/null \
+    || { aviso "não consegui criar o banco $BANCO_CONFERENCIA."; return 1; }
+  dc exec -T -e BANCO="$BANCO_CONFERENCIA" postgres \
+    sh -c 'pg_restore -U "$POSTGRES_USER" -d "$BANCO" --exit-on-error --no-owner --no-privileges' <"$dump" >/dev/null \
+    || { aviso "o dump não restaurou no banco $BANCO_CONFERENCIA."; apagar_banco_conferencia; return 1; }
+  saida="$(BANCO="$BANCO_CONFERENCIA" contagens)" || { apagar_banco_conferencia; return 1; }
+  SCHEMA_DO_DUMP="$(echo "select version_num from alembic_version" | BANCO="$BANCO_CONFERENCIA" psql_dono 2>/dev/null | head -n 1)"
+  apagar_banco_conferencia
+  printf '%s\n' "$saida" >"$destino"
+}
+
+apagar_banco_conferencia() {
+  [ -n "$BANCO_CONFERENCIA" ] || return 0
+  dc exec -T -e BANCO="$BANCO_CONFERENCIA" postgres \
+    sh -c 'dropdb -U "$POSTGRES_USER" --if-exists --force "$BANCO"' >/dev/null 2>&1 || true
 }
 
 versao_schema() { echo "select version_num from alembic_version" | psql_dono 2>/dev/null | head -n 1; }

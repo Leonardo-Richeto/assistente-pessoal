@@ -59,7 +59,7 @@ O timer só é ligado com `AGE_DESTINATARIO` preenchido; preencha e rode o scrip
   do disco). Aponte para o HD externo montado.
 - Retenção: o mais novo de cada um dos 7 últimos dias e de cada uma das 4 últimas semanas ISO (como
   `restic --keep-daily 7 --keep-weekly 4`). Só arquivos com o nome exato do exportar são apagados.
-- O servidor fica parado durante o dump (segundos) e volta sozinho, mesmo se o backup falhar.
+- No backup diário nada para: o pg_dump copia com o servidor ligado. Só a migração (`--congelar`) para os serviços.
 - Conferir: `systemctl list-timers assistente-backup.timer` e `journalctl -u assistente-backup -n 30`.
 
 ## Formas de transferência

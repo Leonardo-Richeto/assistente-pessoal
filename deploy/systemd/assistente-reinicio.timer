@@ -1,0 +1,9 @@
+[Unit]
+Description=Reinicio semanal do assistente as tercas 03:00
+
+[Timer]
+OnCalendar=Tue *-*-* 03:00:00
+# Sem Persistent: reinicio perdido (i7 desligado) nao roda atrasado de dia.
+
+[Install]
+WantedBy=timers.target

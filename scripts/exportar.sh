@@ -8,9 +8,10 @@
 #   scripts/exportar.sh --congelar         # migração: deixa tudo parado, menos o Postgres
 #   scripts/exportar.sh --retencao         # backup diário: mantém 7 diários e 4 semanais
 #
-# Para os serviços que gravam (servidor, Tailscale e o que vier), com o Postgres ligado, e:
+# No backup diário, nada para: o pg_dump tira uma foto consistente com o servidor ligado. Só
+# --congelar (migração) para os serviços que gravam (servidor, Tailscale e o que vier). Gera:
 #   banco.dump      pg_dump -Fc (tabelas, dados, índices, sequences, GRANTs, alembic_version)
-#   contagens.tsv   linhas por tabela, para o importar conferir
+#   contagens.tsv   linhas por tabela do próprio dump (restaurado num banco temporário), para o importar conferir
 #   vault.tar       <home>/vault inteiro, com o .git
 #   sessoes.tar     <home>/data/sessoes (login OAuth e, no futuro, outras sessões)
 #   tailscale.tar   <home>/data/tailscale (identidade do nó; o importar só usa se pedirem)
@@ -18,7 +19,7 @@
 #   manifesto.json  commit, versão do schema, data, máquina, arquivos e contagens
 #   SHA256SUMS      hash de cada arquivo acima
 # Nunca copia data/postgres. Sem a chave privada, nada do pacote é legível.
-# Os serviços voltam ao estado anterior no fim, mesmo com erro (menos com --congelar).
+# Com --congelar, os serviços ficam parados no fim; se der erro, voltam ao estado anterior.
 source "$(dirname "$0")/lib.sh"
 
 DESTINO=""
@@ -60,6 +61,7 @@ limpar() {
   local codigo=$?
   rm -rf "$TMP"
   rm -f "${PARCIAL:-}"
+  apagar_banco_conferencia
   if [ "${#PARADOS[@]}" -gt 0 ]; then
     if [ "$CONGELAR" -eq 1 ] && [ "$codigo" -eq 0 ]; then
       log "congelado: ficam parados ${PARADOS[*]}. Nada mais é gravado nesta máquina."
@@ -74,16 +76,18 @@ trap limpar EXIT
 trap 'exit 130' INT TERM
 mkdir -p "$TMP" || falha "não consegui criar $TMP."
 
-# --- 1. Postgres de pé; o resto parado ---------------------------------------------------------
+# --- 1. Postgres de pé; o resto parado só na migração ------------------------------------------
 dc_quieto up -d --no-build postgres || falha "não consegui subir o Postgres (docker compose up -d postgres)."
 esperar_saudavel postgres || falha "o Postgres não está saudável."
 
-while IFS= read -r s; do
-  [ -n "$s" ] && [ "$s" != postgres ] && PARADOS+=("$s")
-done < <(dc ps --status running --services 2>/dev/null | tr -d '\r')
-if [ "${#PARADOS[@]}" -gt 0 ]; then
-  log "parando quem grava: ${PARADOS[*]}"
-  dc_quieto stop "${PARADOS[@]}" || falha "não consegui parar ${PARADOS[*]}."
+if [ "$CONGELAR" -eq 1 ]; then
+  while IFS= read -r s; do
+    [ -n "$s" ] && [ "$s" != postgres ] && PARADOS+=("$s")
+  done < <(dc ps --status running --services 2>/dev/null | tr -d '\r')
+  if [ "${#PARADOS[@]}" -gt 0 ]; then
+    log "parando quem grava: ${PARADOS[*]}"
+    dc_quieto stop "${PARADOS[@]}" || falha "não consegui parar ${PARADOS[*]}."
+  fi
 fi
 
 # --- 2. Banco ------------------------------------------------------------------------------------
@@ -93,15 +97,18 @@ dc exec -T postgres sh -c 'pg_dump -Fc -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >"
 [ -s "$TMP/banco.dump" ] || falha "o dump saiu vazio."
 ITENS="$(dc exec -T postgres pg_restore --list <"$TMP/banco.dump" 2>/dev/null | grep -c ' TABLE DATA ')"
 [ "${ITENS:-0}" -ge 1 ] || falha "pg_restore --list não achou dados de tabela no dump."
-contagens >"$TMP/contagens.tsv" || falha "não consegui contar as linhas."
+contagens_do_dump "$TMP/banco.dump" "$TMP/contagens.tsv" || falha "não consegui contar as linhas do dump."
 [ -s "$TMP/contagens.tsv" ] || falha "contagem vazia: o banco não tem tabelas?"
-SCHEMA="$(versao_schema)"
+SCHEMA="$SCHEMA_DO_DUMP"
 [ -n "$SCHEMA" ] || falha "sem alembic_version no banco: a migração nunca rodou?"
 
 # --- 3. Arquivos --------------------------------------------------------------------------------
 if ! pasta_vazia "$HOME_DIR/vault"; then
   log "vault"
-  tar -C "$HOME_DIR" -cf "$TMP/vault.tar" vault || falha "tar do vault falhou."
+  # Com o servidor e o Syncthing ligados, arquivo mudado durante a leitura dá código 1 no GNU tar: não é falha.
+  rc=0; tar -C "$HOME_DIR" -cf "$TMP/vault.tar" vault || rc=$?
+  [ "$rc" -le 1 ] || falha "tar do vault falhou."
+  [ "$rc" -eq 0 ] || aviso "o vault mudou durante a cópia (normal com o servidor ligado)."
 fi
 for sub in sessoes tailscale; do
   if ! pasta_vazia "$HOME_DIR/data/$sub"; then

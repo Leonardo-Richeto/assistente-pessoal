@@ -599,6 +599,34 @@ Tika 0,3 GB, Gotenberg 0,15 GB). **Antes:** a chave pública do age (a mesma do 
       Esperado: `0` (a Nathalia não vê), e pelo app "me mostra o último documento que entrou" traz o `entrada-teste`.
       Apague o documento de teste como `admin` na interface web (P7), se quiser.
 
+### Backup sem parar e reinício semanal (2026-10-30)
+
+Desde 2026-10-30 o backup diário não para o servidor: o `pg_dump` copia com tudo ligado, e as contagens do pacote
+saem do próprio dump, restaurado num banco temporário (`conferencia_backup_*`, apagado no fim). Só a migração
+(`--congelar`) para os serviços. O reinício virou um timer próprio, `assistente-reinicio`, toda terça às 03:00
+(a instância da Nathalia às 03:05). Ele reinicia os serviços ligados, menos o Postgres; o Tailscale reinicia logo
+depois do servidor, porque usa a rede do container dele (sem isso, o Funnel cai).
+
+No i7, uma vez, nas duas instâncias:
+```bash
+cd /srv/assistente/app && git pull
+sudo bash scripts/preparar_host.sh                                   # instala assistente-reinicio
+cd /srv/assistente-nathalia/app && git pull
+sudo ASSISTENTE_HOME=/srv/assistente-nathalia bash scripts/preparar_host.sh
+systemctl list-timers 'assistente*'   # backup 03:15 e 03:25; reinício terça 03:00 e 03:05
+```
+Conferir o backup sem parar (o horário de início do servidor não pode mudar):
+```bash
+cd /srv/assistente/app
+docker inspect -f '{{.State.StartedAt}}' "$(docker compose ps -q servidor)"
+sudo systemctl start assistente-backup && journalctl -u assistente-backup -n 15 --no-pager
+docker inspect -f '{{.State.StartedAt}}' "$(docker compose ps -q servidor)"   # igual ao de antes
+```
+Conferir o reinício: `sudo systemctl start assistente-reinicio && journalctl -u assistente-reinicio -n 10 --no-pager`
+(esperado: "feito: servidor workers tailscale de pé"; na da Nathalia, sem `workers`). Depois, confira o Funnel com
+`bash scripts/verificar.sh`; se ele ainda não responder, espere até ~20 min sem recriar. Ensaio no Mac:
+`scripts/testes/ensaio_migracao.sh` cobre o backup e o reinício, mas sem Tailscale.
+
 ### Cofre (2b.3a) — Vaultwarden no i7
 
 Ficha 11: um Vaultwarden só do Leonardo, só pela tailnet (nó Tailscale `cofre`, HTTPS do Serve, nunca Funnel), projeto
