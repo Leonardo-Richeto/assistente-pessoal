@@ -599,6 +599,19 @@ Tika 0,3 GB, Gotenberg 0,15 GB). **Antes:** a chave pública do age (a mesma do 
       Esperado: `0` (a Nathalia não vê), e pelo app "me mostra o último documento que entrou" traz o `entrada-teste`.
       Apague o documento de teste como `admin` na interface web (P7), se quiser.
 
+### Atualizar as instâncias (`scripts/atualizar.sh`, desde 2026-10-30)
+
+Cada instância tem o próprio clone (`/srv/assistente/app`, `/srv/assistente-nathalia/app`); um `git pull` numa não
+muda a outra. Depois do push, no i7, como o usuário comum:
+```bash
+bash /srv/assistente/app/scripts/atualizar.sh          # todas, a do Leonardo primeiro
+bash /srv/assistente/app/scripts/atualizar.sh --so assistente   # só a do Leonardo (testar antes)
+```
+Por instância: `git pull --ff-only`, `preparar_host.sh` com sudo só se mudou timer, `docker compose up -d --build` e
+`verificar.sh`. Se uma falhar, as seguintes ficam como estavam; rodar de novo refaz a que falhou. O último commit que
+passou fica em `<home>/.atualizado`; sem ele (a primeira vez), sobe tudo e roda o `preparar_host.sh`.
+Paperless e cofre não sobem por aqui (o script avisa se `paperless/` ou `cofre/` mudaram).
+
 ### Backup sem parar e reinício semanal (2026-10-30)
 
 Desde 2026-10-30 o backup diário não para o servidor: o `pg_dump` copia com tudo ligado, e as contagens do pacote
@@ -607,12 +620,11 @@ saem do próprio dump, restaurado num banco temporário (`conferencia_backup_*`,
 (a instância da Nathalia às 03:05). Ele reinicia os serviços ligados, menos o Postgres; o Tailscale reinicia logo
 depois do servidor, porque usa a rede do container dele (sem isso, o Funnel cai).
 
-No i7, uma vez, nas duas instâncias:
+No i7, uma vez. Esta é a primeira vez do `atualizar.sh`: o da instância do Leonardo ainda não existe no clone, então
+o primeiro `git pull` é à mão:
 ```bash
-cd /srv/assistente/app && git pull
-sudo bash scripts/preparar_host.sh                                   # instala assistente-reinicio
-cd /srv/assistente-nathalia/app && git pull
-sudo ASSISTENTE_HOME=/srv/assistente-nathalia bash scripts/preparar_host.sh
+cd /srv/assistente/app && git pull --ff-only
+bash scripts/atualizar.sh             # as duas instâncias; roda o preparar_host.sh (sudo), que instala o reinício
 systemctl list-timers 'assistente*'   # backup 03:15 e 03:25; reinício terça 03:00 e 03:05
 ```
 Conferir o backup sem parar (o horário de início do servidor não pode mudar):
