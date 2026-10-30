@@ -177,8 +177,11 @@ for d in "$HOME_DIR" "$HOME_DIR/backups" "$HOME_DIR/logs" "$HOME_DIR/vault" "$HO
   run install -d -m 0750 -o "$USUARIO" -g "$GRUPO" "$d"
 done
 # O Postgres e o Tailscale cuidam dos donos das próprias pastas; o servidor roda com uid 1000.
-run install -d -m 0700 -o root -g root "$HOME_DIR/data/postgres"
-run install -d -m 0700 -o root -g root "$HOME_DIR/data/tailscale"
+# Só cria: o entrypoint do Postgres passa a pasta para o usuário dele na primeira subida. Rodar install -d de
+# novo numa pasta que já existe devolve o dono a root e o Postgres de pé perde o acesso (2026-10-30).
+for d in "$HOME_DIR/data/postgres" "$HOME_DIR/data/tailscale"; do
+  if [ -d "$d" ]; then echo "ok (já existe, dono mantido): $d"; else run install -d -m 0700 -o root -g root "$d"; fi
+done
 run install -d -m 0700 -o 1000 -g 1000 "$HOME_DIR/data/sessoes/oauth"
 
 if [ "$APP" = "$HOME_DIR/app" ]; then
