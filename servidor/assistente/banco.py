@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import and_, func, select
 from sqlalchemy.exc import IntegrityError
 
+from . import saude_consulta
 from .db import Bancos
 from .modelos import Atividade, Auditoria, Chamada, Gasto, NotaDesatualizada, Ponto, Sessao
 from .registro import anotar_auditoria, identidade
@@ -99,7 +100,8 @@ NotaVault = Annotated[str | None, Field(
 # como escrita de fora (linha `escrever` a mais); test_registro.py confere as listas.
 LEITURAS_BANCO = {"consultar_gastos", "listar_categorias_gasto", "gastos_a_conferir", "conciliar_gastos",
                   "consultar_ponto", "consultar_atividades", "consultar_auditoria", "consultar_chamadas",
-                  "consultar_desatualizadas", "consultar_sessoes"}
+                  "consultar_desatualizadas", "consultar_sessoes", "consultar_saude", "resumo_saude",
+                  "resumo_periodo"}
 ESCRITAS_BANCO = {"registrar_gasto", "conferir_gastos", "registrar_ponto", "registrar_atividade", "desfazer_registro",
                   "vincular_nota", "marcar_desatualizada"}
 DIAS_PARECIDO = 3  # gasto manual x gasto do banco: mesmo valor, até 3 dias de diferença (Ficha 10, regra 14)
@@ -470,6 +472,102 @@ def criar_servidor_banco(bancos: Bancos, tz: ZoneInfo, nome: str = "Leonardo") -
              "tags": a.tags.split(",") if a.tags else [], "nota_vault": a.nota_vault}
             for a in regs
         ]
+
+    # ---------------- Saúde (Ficha 15) e resumo do período (Ficha 16) ----------------
+
+    def _periodo(inicio: date, fim: date) -> None:
+        if fim < inicio:
+            raise ToolError("A data final é anterior à inicial.")
+        if (fim - inicio).days + 1 > saude_consulta.MAX_DIAS:
+            raise ToolError(f"Período longo demais: até {saude_consulta.MAX_DIAS} dias por consulta.")
+
+    @mcp.tool(annotations=LEITURA)
+    def consultar_saude(
+        inicio: date,
+        fim: date,
+        metrica: Annotated[saude_consulta.Metrica, Field(description=(
+            "sono (uma noite por dia em que acordou, com as fases), treinos (a lista), ou um total por dia: passos, "
+            "energia_ativa (kcal), distancia (km), frequencia_cardiaca, frequencia_repouso, variabilidade (ms), "
+            "oxigenio (%), vo2max"))],
+    ) -> dict:
+        """Dados do app Saúde (Apple Watch) no período, por dia ou por treino. Datas inclusivas, até 400 dias. Só quando o dono perguntar de saúde, sono ou treino."""
+        _periodo(inicio, fim)
+        with bancos.leitura() as s:
+            if metrica == "sono":
+                itens = saude_consulta.noites(s, inicio, fim, tz)
+            elif metrica == "treinos":
+                itens = saude_consulta.treinos(s, inicio, fim, tz)
+            else:
+                itens = saude_consulta.por_dia(s, metrica, inicio, fim, tz)
+        unidade = {"sono": "horas", "treinos": None}[metrica] if metrica in ("sono", "treinos") \
+            else saude_consulta.METRICAS[metrica][2]
+        return {"metrica": metrica, "unidade": unidade, "periodo": {"inicio": inicio.isoformat(), "fim": fim.isoformat()},
+                "itens": itens}
+
+    @mcp.tool(annotations=LEITURA)
+    def resumo_saude(inicio: date, fim: date) -> dict:
+        """Resumo da saúde no período: sono (média e fases), treinos (quantos, tipos, duração, energia), passos por dia, frequência em repouso e VO2máx. Até 400 dias."""
+        _periodo(inicio, fim)
+        with bancos.leitura() as s:
+            return {"periodo": {"inicio": inicio.isoformat(), "fim": fim.isoformat()},
+                    **saude_consulta.resumo(s, inicio, fim, tz)}
+
+    @mcp.tool(annotations=LEITURA)
+    def resumo_periodo(inicio: date, fim: date) -> dict:
+        """Totais do período numa chamada: gastos, horas de ponto, diário, saúde e dias desde o último treino, ponto e registro. Até 400 dias."""
+        _periodo(inicio, fim)
+        de, ate = _intervalo(inicio, fim, tz)
+        hoje = _agora().date()
+        with bancos.leitura() as s:
+            gastos = s.scalars(select(Gasto).where(Gasto.data >= inicio, Gasto.data <= fim,
+                                                   Gasto.desfeito.is_(False))).all()
+            pontos = s.scalars(select(Ponto).where(Ponto.momento >= de, Ponto.momento < ate,
+                                                   Ponto.desfeito.is_(False)).order_by(Ponto.momento)).all()
+            atividades = s.scalars(select(Atividade).where(Atividade.momento >= de, Atividade.momento < ate,
+                                                           Atividade.desfeito.is_(False))).all()
+            saude = None
+            if saude_consulta.tem_dados(s):
+                r = saude_consulta.resumo(s, inicio, fim, tz)
+                saude = {"sono_media_horas": r["sono"]["media_horas"] if r["sono"] else None,
+                         "noites": r["sono"]["noites"] if r["sono"] else 0,
+                         "treinos": r["treinos"]["quantidade"],
+                         "passos_media_por_dia": r["passos"]["media_por_dia"] if r["passos"] else None}
+            treino = saude_consulta.ultimo_treino(s, tz)
+            ultimo_ponto = s.scalar(select(func.max(Ponto.momento)).where(Ponto.desfeito.is_(False)))
+            ultima_atividade = s.scalar(select(func.max(Atividade.momento)).where(Atividade.desfeito.is_(False)))
+        por_categoria: dict[str, Decimal] = defaultdict(Decimal)
+        for g in gastos:
+            por_categoria[g.categoria] += g.valor
+        por_tag: dict[str, int] = defaultdict(int)
+        for a in atividades:
+            for tag in (a.tags.split(",") if a.tags else []):
+                por_tag[tag] += 1
+        horas = horas_por_dia(list(pontos), tz)
+
+        def desde(dia: date | None, **extra) -> dict | None:
+            return None if dia is None else {"data": dia.isoformat(), "dias": (hoje - dia).days, **extra}
+
+        def dia_local(m: datetime | None) -> date | None:
+            # Ponto e diário gravam a hora local; o SQLite (testes) a devolve sem fuso.
+            if m is None:
+                return None
+            return (m if m.tzinfo else m.replace(tzinfo=tz)).astimezone(tz).date()
+
+        return {
+            "periodo": {"inicio": inicio.isoformat(), "fim": fim.isoformat()},
+            "gastos": {"total": str(sum((g.valor for g in gastos), Decimal("0"))), "quantidade": len(gastos),
+                       "por_categoria": {k: str(v) for k, v in sorted(por_categoria.items(), key=lambda kv: -kv[1])},
+                       "a_conferir": sum(1 for g in gastos if not g.conferido)},
+            "ponto": {"total_horas": round(sum(horas.values()), 2), "dias_trabalhados": sum(1 for h in horas.values() if h)},
+            "diario": {"registros": len(atividades), "por_tag": dict(sorted(por_tag.items(), key=lambda kv: -kv[1]))},
+            "saude": saude,
+            # Contado até hoje, não até o fim do período: é o que o Treinador (Fase 9) vai cobrar.
+            "dias_desde_o_ultimo": {
+                "treino": desde(treino["data"], tipo=treino["tipo"]) if treino else None,
+                "ponto": desde(dia_local(ultimo_ponto)),
+                "registro_do_diario": desde(dia_local(ultima_atividade)),
+            },
+        }
 
     # ---------------- Vínculo com a nota do vault ----------------
 

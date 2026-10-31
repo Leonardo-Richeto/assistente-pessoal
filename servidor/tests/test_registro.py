@@ -538,6 +538,8 @@ CLASSIFICACAO_REVISADA = {
     "marcar_desatualizada": ESCREVE,  # grava a marca no banco; não mexe na nota
     "consultar_desatualizadas": LE,
     "consultar_sessoes": LE,  # lê a tabela sessoes (Passo 11); sem comandos
+    # Fichas 15 e 16: leem as tabelas de saúde e o banco pela conexão de leitura; sem rota, ECG nem perfil
+    "consultar_saude": LE, "resumo_saude": LE, "resumo_periodo": LE,
 }
 
 

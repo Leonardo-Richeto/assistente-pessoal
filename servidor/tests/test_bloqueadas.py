@@ -121,6 +121,7 @@ async def test_so_permitidas_aparecem_nas_pecas(app):
         "desfazer_registro", "marcar_desatualizada", "consultar_desatualizadas", "consultar_sessoes",
         "listar_categorias_gasto", "registrar_atividade", "registrar_gasto", "registrar_ponto", "vincular_nota",
         "gastos_a_conferir", "conferir_gastos", "conciliar_gastos",
+        "consultar_saude", "resumo_saude", "resumo_periodo",
     }
 
 

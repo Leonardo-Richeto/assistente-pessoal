@@ -57,10 +57,10 @@ frases curtas. Todas as datas e horas são do fuso America/Sao_Paulo.
 
 ## O que você tem
 Você usa o conector "Assistente". Ele tem três áreas:
-- Banco (gastos, ponto, diário): registrar_gasto, consultar_gastos, listar_categorias_gasto,
+- Banco (gastos, ponto, diário, saúde): registrar_gasto, consultar_gastos, listar_categorias_gasto,
   gastos_a_conferir, conferir_gastos, conciliar_gastos, registrar_ponto, consultar_ponto, registrar_atividade, consultar_atividades, vincular_nota,
   marcar_desatualizada, consultar_desatualizadas, desfazer_registro, consultar_auditoria,
-  consultar_chamadas, consultar_sessoes.
+  consultar_chamadas, consultar_sessoes, consultar_saude, resumo_saude, resumo_periodo.
 - Vault (notas): buscar_vault, ler_nota, notas_recentes, contexto_inicial, escrever_nota, historico_nota, restaurar_nota,
   vault_search_notes, vault_read_note, vault_read_multiple_notes,
   vault_read_note_lines, vault_list_directory, vault_get_note_outline, vault_get_notes_info,
@@ -136,7 +136,13 @@ desfazer_registro, escrever_nota e restaurar_nota, preencha o parâmetro modelo 
 Quanto gastou, quantas horas trabalhou, o que fez: consulte as ferramentas consultar_*.
 Nunca responda número de memória nem some de cabeça: use o total que a ferramenta devolve.
 Diga o período consultado. Para "hoje", "esta semana" e "este mês", calcule as datas no
-fuso America/Sao_Paulo. Para ver o que foi gravado ou desfeito, use consultar_auditoria.
+fuso America/Sao_Paulo.
+"Como foi a semana" ou "como foi o mês": resumo_periodo, numa chamada só. Para o detalhe,
+use as consultar_*.
+Sono, treino, passos e coração: resumo_saude para o período; consultar_saude para o dia a
+dia ou a lista de treinos. Use só quando o dono perguntar de saúde. No resumo_periodo, fale
+da saúde só se o dono perguntar. Não copie dado de saúde para nota do vault nem para o diário.
+Para ver o que foi gravado ou desfeito, use consultar_auditoria.
 Para ver de onde veio cada chamada (app, sessão, modelo declarado), use consultar_chamadas.
 Para ver o que foi feito no Claude Code (sessões de programação, por projeto e máquina), use consultar_sessoes.
 Use só consultar_sessoes, do conector Assistente: não responda por outro histórico de sessões ou
@@ -1674,3 +1680,101 @@ tipos. Lido em fluxo em 12 s no Mac. Contagem por tipo de treino ou de amostra �
    Tirar a origem da chave juntaria amostras do iPhone e do relógio com o mesmo valor e a mesma hora.
 5. O último `export.zip` guardado em `importados/` não entra no backup: o banco já tem tudo.
 
+
+---
+
+## Ficha 15 — Consultar a saúde no chat
+
+- **Status:** aprovada (Leonardo, 2026-10-31, respostas 1, 2 e 4). Origem: `PLANO.md` 5b.3.
+- **Por quê:** os dados do app Saúde entram no banco desde 2026-10-31 (Ficha 14), mas sem consulta o chat não os vê.
+- **Onde vive:** `servidor/assistente/saude_consulta.py`; ferramentas `consultar_saude` e `resumo_saude` em
+  `servidor/assistente/banco.py`, pela conexão de leitura.
+
+### Regra
+
+1. **Só a pedido:** o Claude consulta a saúde quando o dono pergunta de saúde, sono ou treino. A saúde não entra no
+   `contexto_inicial` nem vai para o vault ou o diário.
+2. **O que o Claude vê:** totais por dia e a lista de treinos, com a distância. Ficam fora as rotas GPS (mostram a
+   casa e os trajetos), os eletrocardiogramas e o bloco "Me" (data de nascimento e sexo). Nunca a amostra crua.
+3. **`resumo_saude(inicio, fim)`:** sono (média por noite, menor, maior e fases), treinos (quantos, por tipo,
+   duração e energia), passos por dia, frequência cardíaca em repouso e o último VO2máx. Sem os anéis (Leonardo,
+   2026-10-31).
+4. **`consultar_saude(inicio, fim, metrica)`:** `sono` (uma noite por linha), `treinos` (a lista) ou um total por
+   dia de passos, energia ativa, distância, frequência cardíaca, frequência em repouso, variabilidade, oxigênio ou
+   VO2máx. Escolhas que mudam o número:
+   - Soma do dia: vale a fonte com o maior total (o relógio e o iPhone contam os mesmos passos).
+   - Sono: a noite é a do dia em que o dono acordou (o que termina entre 12:00 da véspera e 12:00 do dia). Vale a
+     fonte com mais horas dormidas; trechos sobrepostos não somam duas vezes, nem dentro de uma fase. Numa noite
+     com fases, o trecho "sem fase" repete o mesmo sono com outro rótulo e não conta. Uma soneca à tarde conta para
+     a noite seguinte; um sono que passa do meio-dia fica partido entre os dois dias.
+   - VO2máx: o último medido até o fim do período, mesmo antes dele (o relógio só mede em caminhada ou corrida na
+     rua).
+   - Treino em português (musculação, caminhada, corrida...).
+5. **Até 400 dias por consulta.** Datas no fuso America/Sao_Paulo.
+6. **Só a instância do Leonardo tem dado.** Na da Nathalia, as ferramentas existem e voltam vazias.
+
+### Exemplos
+
+| Pergunta | Ferramenta | Resposta |
+|---|---|---|
+| "Como dormi esta semana?" | `resumo_saude` | média, menor e maior noite, fases |
+| "Quantos treinos fiz em outubro?" | `resumo_saude` | quantidade e tipos |
+| "Meus passos de ontem" | `consultar_saude` com `passos` | o total do dia e a fonte |
+| "Por onde corri sábado?" | nenhuma | a rota GPS não fica disponível no chat |
+
+### Não faz
+
+- Não mostra rota GPS, eletrocardiograma nem data de nascimento.
+- Não cobra hábito (Fase 9) nem avisa nada sozinho.
+
+### Cenário de teste
+
+1. Sono com duas fontes e trechos sobrepostos: conta a fonte maior, sem somar duas vezes.
+2. Passos do relógio e do iPhone no mesmo dia: vale o maior total.
+3. Treino com energia e distância nas estatísticas: aparece em português e com os números.
+4. Período invertido ou acima de 400 dias: recusado.
+
+---
+
+## Ficha 16 — Resumo de um período
+
+- **Status:** aprovada (Leonardo, 2026-10-31, resposta 3). Origem: `PLANO.md` 5.2.
+- **Por quê:** "como foi a semana?" hoje pede três ou quatro chamadas, e cada uma traz a lista inteira. Uma chamada
+  com os totais gasta menos e é a base do Treinador (Fase 9).
+- **Onde vive:** ferramenta `resumo_periodo` em `servidor/assistente/banco.py`, pela conexão de leitura.
+
+### Regra
+
+1. **`resumo_periodo(inicio, fim)`** devolve, sem listas de registros:
+   - gastos: total, quantidade, soma por categoria e quantos estão a conferir;
+   - ponto: total de horas e dias trabalhados;
+   - diário: quantos registros e quantos por tag;
+   - saúde: sono médio, noites, treinos e passos médios por dia (vazio se a instância não tem dado de saúde).
+2. **Dias desde o último** treino, ponto e registro do diário, contados até hoje, não até o fim do período.
+3. Os detalhes continuam nas `consultar_*`. Até 400 dias por consulta.
+
+### Exemplos
+
+| Pergunta | Resposta |
+|---|---|
+| "Como foi a semana?" | gastos, horas, diário e saúde da semana, numa chamada |
+| "Faz quanto tempo que não treino?" | `dias_desde_o_ultimo.treino` |
+
+### Não faz
+
+- Não cobra nem compara com meta (Fase 9, Treinador).
+
+### Cenário de teste
+
+1. Semana com gastos, ponto, diário e treino: os totais batem com as `consultar_*`.
+2. Instância sem dado de saúde: `saude` vazio.
+3. Último treino há 4 dias: `dias` = 4, mesmo com o período terminando antes.
+
+---
+
+### Mudança das Fichas 15 e 16 na Ficha 1 — status: aprovada nas respostas de 2026-10-31, aplicada no texto acima
+
+Em "O que você tem", a linha do Banco ganha "saúde" e as ferramentas `consultar_saude`, `resumo_saude` e
+`resumo_periodo`. Em "Consultas", duas regras novas: "como foi a semana" vai pelo `resumo_periodo`; saúde vai pelo
+`resumo_saude` e pelo `consultar_saude`, só a pedido, e não é copiada para o vault nem para o diário. O Leonardo
+confere o texto ao colar no Projeto.
