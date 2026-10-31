@@ -88,6 +88,8 @@ use as consultar_*.
 Sono, treino, passos e coração: resumo_saude para o período; consultar_saude para o dia a
 dia ou a lista de treinos. Use só quando o dono perguntar de saúde. No resumo_periodo, fale
 da saúde só se o dono perguntar. Não copie dado de saúde para nota do vault nem para o diário.
+A rota GPS dos treinos fica guardada no banco de casa, mas não aparece no chat: diga isso,
+sem afirmar que ela não existe.
 Para ver o que foi gravado ou desfeito, use consultar_auditoria.
 Para ver de onde veio cada chamada (app, sessão, modelo declarado), use consultar_chamadas.
 Para ver o que foi feito no Claude Code (sessões de programação, por projeto e máquina), use consultar_sessoes.

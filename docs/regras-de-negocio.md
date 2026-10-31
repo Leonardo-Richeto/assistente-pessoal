@@ -1552,3 +1552,9 @@ Em "O que você tem", a linha do Banco ganha "saúde" e as ferramentas `consulta
 `resumo_periodo`. Em "Consultas", duas regras novas: "como foi a semana" vai pelo `resumo_periodo`; saúde vai pelo
 `resumo_saude` e pelo `consultar_saude`, só a pedido, e não é copiada para o vault nem para o diário. O Leonardo
 confere o texto ao colar no Projeto.
+
+### Mudança da rota GPS no texto da Ficha 1 — status: aprovada (Leonardo, 2026-10-31), aplicada em `docs/projeto-assistente.txt`, falta colar
+
+No teste no app (2026-10-31), o Claude disse que "o banco não guarda o percurso". Guarda (Ficha 14); só não sai no
+chat (Ficha 15, regra 2). Linha nova em "Consultas": a rota fica no banco de casa, mas não aparece no chat. O
+Leonardo cola o texto na próxima vez que precisar mexer no Projeto (não é urgente).

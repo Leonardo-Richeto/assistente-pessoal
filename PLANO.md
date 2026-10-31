@@ -169,13 +169,13 @@ agentes e multiusuário; relações tipadas; consulta por data (o git já respon
 
 ## Fase 5 — Rotinas
 - 5.1 e 5.3 foram para a Fase 9, o Treinador (Leonardo, 2026-10-31).
-- [ ] 5.2 Ferramenta `resumo_periodo(inicio, fim)` que junta gastos, horas e diário num só retorno (economiza chamadas). Base do Treinador. Ficha 16; código no Mac em 2026-10-31
+- [x] 5.2 Ferramenta `resumo_periodo(inicio, fim)` que junta gastos, horas e diário num só retorno (economiza chamadas). Base do Treinador. Ficha 16; no ar e testada pelo app em 2026-10-31
 
 ## Fase 5b — Saúde (Apple Watch / app Saúde) — ideia aprovada para planejar, 2026-10-17
-- [ ] 5b.1 Importar o histórico pelo `export.zip` do app Saúde (sem endpoint novo): tabelas de amostras, treinos e sono + migração; importação idempotente. **Guardar todas as amostras** (decisão do Leonardo, 2026-10-17), não só resumos
-  - Código pronto no Mac em 2026-10-31 (Ficha 14 aprovada, calibração com o export real): `assistente/saude.py`, migração 0008, serviço `saude` (pasta de entrada pelo Syncthing). Falta implantar no i7 (`docs/SAUDE.md`)
+- [x] 5b.1 Importar o histórico pelo `export.zip` do app Saúde (sem endpoint novo): tabelas de amostras, treinos e sono + migração; importação idempotente. **Guardar todas as amostras** (decisão do Leonardo, 2026-10-17), não só resumos
+  - Feito em 2026-10-31 (Ficha 14): `assistente/saude.py`, migração 0008, serviço `saude` (pasta de entrada pelo Syncthing). No ar no i7; 1º export importado e consultado pelo app
 - [ ] ⚑ 5b.2 (espera o Tailscale no iPhone; Ficha 14, calibração, item 5) Endpoint só de ingestão (token próprio, só escrita, limite de chamadas) para a automação diária do app Atalhos do iOS
-- [ ] 5b.3 (Ficha 15; código no Mac em 2026-10-31) Ferramentas `consultar_saude` / `resumo_saude(periodo)`; comentários sobre treino ou sono vão para o vault ligados por id
+- [x] 5b.3 (Ficha 15; no ar e testada pelo app em 2026-10-31) Ferramentas `consultar_saude` / `resumo_saude(periodo)`; comentários sobre treino ou sono vão para o vault ligados por id
 - [ ] 5b.4 (Ideia, Leonardo, 2026-10-31) Diário de treino: check diário do treino gastando poucos tokens. Caminho a decidir na ficha (ex.: marcação curta no chat, ou Atalho do iOS no endpoint da 5b.2, sem passar pelo modelo). O treino do Apple Watch vem da 5b.1; por isso treino e estudo ainda não entram como atividade
 - Fora: app pago de exportação (premissa de não pagar nada além do Pro). Dado de saúde nunca vai para o vault nem para o GitHub.
 
