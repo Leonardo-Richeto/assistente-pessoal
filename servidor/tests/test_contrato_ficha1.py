@@ -26,6 +26,11 @@ NAO_FERRAMENTA = {
     "parece_com",  # campo de gastos_a_conferir
     "aviso_pluggy",  # campo de contexto_inicial (Ficha 10, regra 15)
 }
+# Ferramentas dos conectores nativos do Google no claude.ai (mudanças da 4.1 e da 4b.1): não são deste servidor.
+CONECTORES_NATIVOS = {
+    "list_events", "search_events", "get_event", "create_event", "update_event",  # Google Calendar
+    "search_threads", "get_thread", "get_message", "create_draft",  # Gmail
+}
 
 
 def _texto_do_projeto() -> str:
@@ -53,7 +58,9 @@ def test_nomes_que_nao_sao_ferramenta_existem_onde_o_texto_diz():
 async def test_toda_ferramenta_citada_existe_e_nao_esta_bloqueada(app):  # noqa: F811
     async with Client(app) as c:
         ferramentas = {t.name: t for t in await c.list_tools()}
-    citadas = _citados() - NAO_FERRAMENTA
+    assert CONECTORES_NATIVOS <= _citados(), "Tire de CONECTORES_NATIVOS o que o texto não cita mais"
+    assert not CONECTORES_NATIVOS & ferramentas.keys(), "Ferramenta nossa com nome de conector nativo"
+    citadas = _citados() - NAO_FERRAMENTA - CONECTORES_NATIVOS
     assert len(citadas) >= 39  # 14 do banco, 22 do vault (7 nossas e 15 do mcpvault) e 3 do Paperless
     faltando = sorted(citadas - ferramentas.keys())
     assert not faltando, f"O texto do Projeto cita ferramenta que o app não tem: {faltando}"

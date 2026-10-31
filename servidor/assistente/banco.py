@@ -34,8 +34,8 @@ TipoRegistro = Literal["gasto", "ponto", "atividade"]
 # "vinculo": desfaz uma troca de nota feita por vincular_nota (id = o que vincular_nota devolveu).
 # "desatualizada": desfaz uma marca de marcar_desatualizada (id = o que ela devolveu).
 TipoDesfazer = Literal["gasto", "ponto", "atividade", "vinculo", "desatualizada"]
-TabelaAuditoria = Literal["gastos", "ponto", "atividades", "notas_desatualizadas", "sessoes", "vault", "paperless",
-                          "ferramenta"]
+TabelaAuditoria = Literal["gastos", "ponto", "atividades", "notas_desatualizadas", "sessoes", "saude_importacoes",
+                          "vault", "paperless", "ferramenta"]
 AcaoAuditoria = Literal["criar", "desfazer", "vincular", "desfazer_vinculo", "conferir", "confirmar", "escrever", "ok",
                         "erro", "cancelado", "negado"]
 # Só o registro (registro.py) lê este parâmetro: valida (^[A-Za-z0-9 ._-]{1,60}$) e grava em

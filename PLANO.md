@@ -156,7 +156,7 @@ agentes e multiusuário; relações tipadas; consulta por data (o git já respon
 
 ## Fase 4 — Agenda
 - [x] 4.1 Usar o conector nativo do Google Calendar no claude.ai para ler/criar eventos (seção "Agenda" da Ficha 1, aprovada em 2026-10-30)
-- [ ] 4.2 (espera a 5.1 ou a Fase 6; Ficha 12, Leonardo, 2026-10-30) Tabela `eventos` + worker de sincronização Google → Postgres (somente leitura do Google), ferramenta `consultar_agenda`
+- [ ] 4.2 (espera a Fase 6 ou a 9; Ficha 12, Leonardo, 2026-10-30 e 2026-10-31; Ficha 12, Leonardo, 2026-10-30) Tabela `eventos` + worker de sincronização Google → Postgres (somente leitura do Google), ferramenta `consultar_agenda`
   - Pronto quando: um evento criado no Google aparece em `consultar_agenda` em até 15 min
 
 ## Fase 4b — E-mail (só leitura no começo)
@@ -168,13 +168,15 @@ agentes e multiusuário; relações tipadas; consulta por data (o git já respon
 - [ ] 4b.3 (Depois) Envio de e-mail, sempre com confirmação explícita
 
 ## Fase 5 — Rotinas
-- [ ] 5.1 Tarefa agendada no claude.ai: resumo da manhã (agenda do dia + gastos de ontem + pendências do diário)
-- [ ] 5.2 Ferramenta `resumo_periodo(inicio, fim)` que junta gastos, horas e diário num só retorno (economiza chamadas)
+- 5.1 e 5.3 foram para a Fase 9, o Treinador (Leonardo, 2026-10-31).
+- [ ] 5.2 Ferramenta `resumo_periodo(inicio, fim)` que junta gastos, horas e diário num só retorno (economiza chamadas). Base do Treinador
 
 ## Fase 5b — Saúde (Apple Watch / app Saúde) — ideia aprovada para planejar, 2026-10-17
 - [ ] 5b.1 Importar o histórico pelo `export.zip` do app Saúde (sem endpoint novo): tabelas de amostras, treinos e sono + migração; importação idempotente. **Guardar todas as amostras** (decisão do Leonardo, 2026-10-17), não só resumos
-- [ ] ⚑ 5b.2 Endpoint só de ingestão (token próprio, só escrita, limite de chamadas) para a automação diária do app Atalhos do iOS
+  - Código pronto no Mac em 2026-10-31 (Ficha 14 aprovada, calibração com o export real): `assistente/saude.py`, migração 0008, serviço `saude` (pasta de entrada pelo Syncthing). Falta implantar no i7 (`docs/SAUDE.md`)
+- [ ] ⚑ 5b.2 (espera o Tailscale no iPhone; Ficha 14, calibração, item 5) Endpoint só de ingestão (token próprio, só escrita, limite de chamadas) para a automação diária do app Atalhos do iOS
 - [ ] 5b.3 Ferramentas `consultar_saude` / `resumo_saude(periodo)`; comentários sobre treino ou sono vão para o vault ligados por id
+- [ ] 5b.4 (Ideia, Leonardo, 2026-10-31) Diário de treino: check diário do treino gastando poucos tokens. Caminho a decidir na ficha (ex.: marcação curta no chat, ou Atalho do iOS no endpoint da 5b.2, sem passar pelo modelo). O treino do Apple Watch vem da 5b.1; por isso treino e estudo ainda não entram como atividade
 - Fora: app pago de exportação (premissa de não pagar nada além do Pro). Dado de saúde nunca vai para o vault nem para o GitHub.
 
 ## Fase 6 — WhatsApp (número dedicado)
@@ -245,6 +247,15 @@ para a Fase 6b (fábrica de ferramentas).
 - [ ] 8.4 Canal Telegram (bot oficial, allowlist do Leonardo)
 - [ ] 8.5 Canal Discord (bot, servidor privado)
 - Todos os canais falam com o MESMO servidor MCP; nenhum acesso novo ao banco por fora dele.
+
+## Fase 9 — Treinador: a voz do assistente (Leonardo, 2026-10-31)
+Um direcionador que cobra o Leonardo para ficar na linha, como um treinador. Fica para o fim porque depende de
+canais e dados que ainda não existem: 5.2 (`resumo_periodo`), Fase 5b (saúde e treino), Fase 6 (WhatsApp e avisos
+da 6.4), fonte de investimentos (ainda sem item) e mais de um meio de enviar a mensagem. Rascunho: Ficha 13.
+- [ ] 9.1 (era 5.1) Resumo da manhã todo dia às 06:30: agenda do dia, gastos de ontem e pendências (Ficha 13, rascunho)
+- [ ] 9.2 (era 5.3) Cobranças: hábito parado há tempo demais (treino, estudo, iFood demais, sem investir) vira uma
+  linha que cobra. Fonte no banco e limite por hábito; ficha própria antes (Ficha 13 § Depois)
+- [ ] 9.3 Meios de envio: WhatsApp (6.4) e outros; escolher por mensagem. Ficha antes
 
 ## Melhorias anotadas (Leonardo, 2026-10-18)
 Vieram da análise do vault de 2026-10-18. O lado do vault já está feito (D4 de `decisoes-do-vault`): campo

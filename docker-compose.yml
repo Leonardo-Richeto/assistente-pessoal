@@ -15,6 +15,7 @@
 #   (nenhum)    Postgres + migração + servidor MCP em 127.0.0.1:${PORTA_HOST}
 #   tailscale   + nó Tailscale "${TS_NOME}" com Funnel para o servidor (só na produção)
 #   pluggy      + worker dos gastos do banco (Ficha 10; só a instância do Leonardo)
+#   saude       + pasta de entrada do app Saúde do iPhone (Ficha 14; só a instância do Leonardo)
 #
 # Imagens com versão e digest fixos (multi-arch: amd64 e arm64). Para atualizar: troque a tag
 # e o digest juntos (docker buildx imagetools inspect <imagem>:<tag>) e leia o changelog.
@@ -135,6 +136,24 @@ services:
       TZ: America/Sao_Paulo
     # Mesmo motivo do servidor: DNS fixo para achar api.pluggy.ai mesmo com o resolv.conf do host atrasado.
     dns: [1.1.1.1, 8.8.8.8]
+    depends_on:
+      migracao: { condition: service_completed_successfully }
+
+  # Pasta de entrada do app Saúde (Ficha 14): a cada 5 min, importa cada export.zip que o Syncthing trouxer e o
+  # move para importados/, onde fica só o último. Só com o perfil `saude`. Passo a passo: docs/SAUDE.md.
+  saude:
+    build: ./servidor
+    profiles: ["saude"]
+    restart: unless-stopped
+    command: ["python", "-m", "assistente.saude", "vigiar", "/entrada", "/importados"]
+    # Só a conexão de escrita, que nas tabelas de saúde só insere; nada de vault nem de login. Não usa a internet.
+    environment:
+      DATABASE_URL_ESCRITA: postgresql+psycopg://assistente_escrita:${SENHA_ESCRITA}@postgres/assistente
+      TZ: America/Sao_Paulo
+    volumes:
+      # Dono: uid 1000 (o Syncthing e o container), para o container tirar o arquivo da entrada.
+      - ${ASSISTENTE_HOME}/data/saude/entrada:/entrada
+      - ${ASSISTENTE_HOME}/data/saude/importados:/importados
     depends_on:
       migracao: { condition: service_completed_successfully }
 

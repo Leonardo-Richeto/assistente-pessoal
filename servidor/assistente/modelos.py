@@ -8,7 +8,7 @@ Para um dado novo, crie o modelo aqui e gere a migração com
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import JSON, Boolean, Date, DateTime, Index, Integer, Numeric, String, Text, func, text
+from sqlalchemy import JSON, Boolean, Date, DateTime, Float, Index, Integer, Numeric, String, Text, func, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -157,7 +157,8 @@ class Auditoria(Base):
     momento: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     # Nome da ferramenta; `<nome invalido>` se o nome pedido não for só letras, números e `_`.
     ferramenta: Mapped[str] = mapped_column(String(60))
-    # Banco: gastos | ponto | atividades | notas_desatualizadas | sessoes (uma linha por importação, Passo 11).
+    # Banco: gastos | ponto | atividades | notas_desatualizadas | sessoes (uma linha por importação, Passo 11) |
+    # saude_importacoes (uma linha por importação do app Saúde, Ficha 14).
     # Peças: vault | paperless. Outro nome: ferramenta.
     tabela: Mapped[str] = mapped_column(String(60))
     # Banco: id do gasto, ponto, atividade ou marca. Linha ok | erro | cancelado | negado depois de uma
@@ -200,3 +201,119 @@ class Chamada(Base):
     duracao_ms: Mapped[int] = mapped_column(Integer)
     # Linha de `auditoria` da chamada: `escrever` (peças), `negado` sem `escrever`, ou `criar`/`desfazer` (banco).
     auditoria_id: Mapped[int | None]
+
+
+# Saúde do Apple Watch (Ficha 14). Tudo vem do app Saúde do iPhone: é dado, nunca instrução. Só INSERT e SELECT
+# (migração 0008); a mesma amostra não entra duas vezes (`chave`, sha256 dos campos que a identificam). Datas em UTC.
+# Dado de saúde fica só no banco de casa: nunca no vault, no GitHub nem em log com valor.
+
+
+class SaudeImportacao(Base):
+    """Uma importação do `export.zip` do app Saúde (Ficha 14, regra 6). Só contagens; nenhum valor de amostra."""
+
+    __tablename__ = "saude_importacoes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    inicio: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    fim: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ok: Mapped[bool] = mapped_column(Boolean)
+    # Nome do arquivo, sem a pasta.
+    arquivo: Mapped[str] = mapped_column(String(200))
+    # `ExportDate` do XML.
+    data_export: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Bloco "Me" do XML (data de nascimento, sexo, tipo sanguíneo...), como veio (calibração, item 3).
+    perfil: Mapped[dict | None] = mapped_column(JSON)
+    # Por tabela: novos e repetidos; e os elementos que o importador não conhece, por nome.
+    contagens: Mapped[dict] = mapped_column(JSON)
+    # Motivo curto da falha, sem valor de saúde.
+    erro: Mapped[str | None] = mapped_column(String(300))
+
+
+class _Saude:
+    id: Mapped[int] = mapped_column(primary_key=True)
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    chave: Mapped[str] = mapped_column(String(64), unique=True)
+    importacao_id: Mapped[int | None] = mapped_column(Integer)
+    desfeito: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+
+
+class SaudeAmostra(_Saude, Base):
+    """Uma amostra (`Record`): frequência cardíaca, passos, sono... Valor numérico em `valor`; de categoria em `valor_texto`."""
+
+    __tablename__ = "saude_amostras"
+    __table_args__ = (Index("ix_saude_amostras_tipo_inicio", "tipo", "inicio"),)
+
+    # Ex.: HKQuantityTypeIdentifierHeartRate, HKCategoryTypeIdentifierSleepAnalysis.
+    tipo: Mapped[str] = mapped_column(String(100))
+    valor: Mapped[float | None] = mapped_column(Float)
+    valor_texto: Mapped[str | None] = mapped_column(String(120))
+    unidade: Mapped[str | None] = mapped_column(String(40))
+    inicio: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    fim: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    criado_no_aparelho: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # App ou aparelho que gravou (sourceName), a versão dele e a descrição do aparelho sem o endereço de memória.
+    origem: Mapped[str] = mapped_column(String(120))
+    versao_origem: Mapped[str | None] = mapped_column(String(60))
+    aparelho: Mapped[str | None] = mapped_column(Text)
+    metadados: Mapped[dict | None] = mapped_column(JSON)
+    # Variabilidade cardíaca: [[bpm, hora], ...] batida a batida, como veio.
+    batidas: Mapped[list | None] = mapped_column(JSON)
+
+
+class SaudeTreino(_Saude, Base):
+    """Um treino (`Workout`) com estatísticas, eventos, zonas e as amostras que vieram dentro dele."""
+
+    __tablename__ = "saude_treinos"
+    __table_args__ = (Index("ix_saude_treinos_inicio", "inicio"),)
+
+    # Ex.: HKWorkoutActivityTypeTraditionalStrengthTraining.
+    tipo: Mapped[str] = mapped_column(String(100))
+    inicio: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    fim: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    duracao: Mapped[float | None] = mapped_column(Float)
+    unidade_duracao: Mapped[str | None] = mapped_column(String(20))
+    criado_no_aparelho: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    origem: Mapped[str] = mapped_column(String(120))
+    versao_origem: Mapped[str | None] = mapped_column(String(60))
+    aparelho: Mapped[str | None] = mapped_column(Text)
+    metadados: Mapped[dict | None] = mapped_column(JSON)
+    # Listas de objetos com os atributos como vieram (WorkoutStatistics, WorkoutEvent, WorkoutZoneGroup, Record).
+    estatisticas: Mapped[list] = mapped_column(JSON)
+    eventos: Mapped[list] = mapped_column(JSON)
+    zonas: Mapped[list] = mapped_column(JSON)
+    amostras: Mapped[list] = mapped_column(JSON)
+
+
+class SaudeRota(_Saude, Base):
+    """Rota GPS de um treino (arquivo .gpx do export). Mostra a casa e os trajetos: nunca sai do banco de casa."""
+
+    __tablename__ = "saude_rotas"
+
+    # `chave` do treino dono da rota (vazio se o export não ligar a rota a um treino).
+    treino_chave: Mapped[str | None] = mapped_column(String(64), index=True)
+    inicio: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    fim: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    quantidade: Mapped[int] = mapped_column(Integer)
+    # [[hora ISO, lat, lon, altitude, velocidade, rumo, precisão horizontal, precisão vertical], ...]
+    pontos: Mapped[list] = mapped_column(JSON)
+
+
+class SaudeAnel(_Saude, Base):
+    """Resumo diário dos anéis (`ActivitySummary`). O dia de hoje pode vir de novo, mais cheio: vira linha nova."""
+
+    __tablename__ = "saude_aneis"
+
+    data: Mapped[date] = mapped_column(Date, index=True)
+    # Atributos como vieram (activeEnergyBurned, appleExerciseTime, appleStandHours e as metas).
+    valores: Mapped[dict] = mapped_column(JSON)
+
+
+class SaudeEcg(_Saude, Base):
+    """Eletrocardiograma do relógio (CSV do export): cabeçalho como veio e as amostras em µV."""
+
+    __tablename__ = "saude_ecg"
+
+    registrado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Linhas "rótulo,valor" do começo do CSV (nome, nascimento, classificação, sintomas, taxa de amostragem...).
+    cabecalho: Mapped[dict] = mapped_column(JSON)
+    amostras: Mapped[list] = mapped_column(JSON)

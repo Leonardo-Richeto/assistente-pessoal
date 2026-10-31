@@ -183,6 +183,10 @@ for d in "$HOME_DIR/data/postgres" "$HOME_DIR/data/tailscale"; do
   if [ -d "$d" ]; then echo "ok (já existe, dono mantido): $d"; else run install -d -m 0700 -o root -g root "$d"; fi
 done
 run install -d -m 0700 -o 1000 -g 1000 "$HOME_DIR/data/sessoes/oauth"
+# Saúde (Ficha 14): a entrada recebe o export.zip pelo Syncthing (uid 1000) e o container (uid 1000) o tira de lá.
+for d in "$HOME_DIR/data/saude" "$HOME_DIR/data/saude/entrada" "$HOME_DIR/data/saude/importados"; do
+  run install -d -m 0700 -o 1000 -g 1000 "$d"
+done
 
 if [ "$APP" = "$HOME_DIR/app" ]; then
   if [ -L "$APP/.env" ]; then
