@@ -37,7 +37,7 @@ from typing import Any, BinaryIO, Iterator
 from xml.etree import ElementTree as ET
 from xml.parsers import expat
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
@@ -53,6 +53,10 @@ MAX_MEMBRO = 8 * 1024**3  # 8 GB descompactados por arquivo do zip (o XML real t
 MAX_MEMBROS = 50_000
 MAX_CSV = 10 * 1024 * 1024  # um eletrocardiograma real tem ~120 KB
 PAUSA_VIGIA_S = 300
+# Amostra de antes do último export entrando como nova: a origem pode ter sido renomeada, e a chave usa o nome dela
+# (decisão do Leonardo, 2026-10-31: avisar no log). Aviso a partir de 100 amostras e 1% das amostras do arquivo.
+AVISO_ANTIGAS_MINIMO = 100
+AVISO_ANTIGAS_FRACAO = 0.01
 ESPERA_MAXIMA_S = 6 * 3600  # falha do banco: tenta de novo com espera dobrando até 6 h
 PARADO_S = 120
 GPX = "{http://www.topografix.com/GPX/1/1}"
@@ -300,11 +304,17 @@ def _conferir_zip(z: zipfile.ZipFile) -> None:
 # --- gravação -------------------------------------------------------------------------------------------------
 
 
+def _utc(m: datetime) -> datetime:
+    # O SQLite (testes) devolve sem fuso o que gravou em UTC; o Postgres devolve com fuso.
+    return m.replace(tzinfo=timezone.utc) if m.tzinfo is None else m.astimezone(timezone.utc)
+
+
 class _Gravador:
     """Junta linhas por tabela e grava em lotes com INSERT ... ON CONFLICT (chave) DO NOTHING."""
 
-    def __init__(self, s: Session, importacao_id: int):
-        self.s, self.importacao_id = s, importacao_id
+    def __init__(self, s: Session, importacao_id: int, corte: datetime | None = None):
+        self.s, self.importacao_id, self.corte = s, importacao_id, corte
+        self.antigas = 0  # amostras novas com início antes de `corte` (data do último export importado)
         self.dialeto = postgresql if s.get_bind().dialect.name == "postgresql" else sqlite
         self.filas: dict[type, list[dict]] = {}
         self.contagens: dict[str, dict[str, int]] = {}
@@ -322,8 +332,12 @@ class _Gravador:
         # executemany com o mesmo comando (o SQLAlchemy junta em INSERTs de várias linhas e reaproveita o comando
         # compilado); o RETURNING só traz as linhas que entraram, e assim conta as novas.
         tabela = modelo.__table__
-        comando = self.dialeto.insert(tabela).on_conflict_do_nothing(index_elements=["chave"]).returning(tabela.c.id)
-        novos = len(self.s.connection().execute(comando, fila).all())
+        comando = self.dialeto.insert(tabela).on_conflict_do_nothing(index_elements=["chave"]).returning(
+            tabela.c.id, *([tabela.c.inicio] if modelo is SaudeAmostra else []))
+        linhas = self.s.connection().execute(comando, fila).all()
+        novos = len(linhas)
+        if modelo is SaudeAmostra and self.corte is not None:
+            self.antigas += sum(1 for linha in linhas if _utc(linha.inicio) < self.corte)
         conta = self.contagens.setdefault(modelo.__tablename__, {"novos": 0, "repetidos": 0})
         conta["novos"] += novos
         conta["repetidos"] += len(fila) - novos
@@ -398,9 +412,10 @@ def importar(caminho: Path, engine: Engine) -> dict:
         except (zipfile.BadZipFile, EOFError, zlib.error):
             raise Recusa("o zip está corrompido") from None
         imp = SaudeImportacao(inicio=inicio, fim=inicio, ok=False, arquivo=_texto(caminho.name, 200), contagens={})
+        corte = s.scalar(select(func.max(SaudeImportacao.data_export)).where(SaudeImportacao.ok.is_(True)))
         s.add(imp)
         s.flush()
-        g = _Gravador(s, imp.id)
+        g = _Gravador(s, imp.id, _utc(corte) if corte else None)
         desconhecidos: Counter = Counter()
         try:
             extra, rotas = _ler_xml(z, nome_xml, g, desconhecidos)
@@ -409,8 +424,13 @@ def importar(caminho: Path, engine: Engine) -> dict:
             raise Recusa("o XML do app Saúde está quebrado") from None
         except (zipfile.BadZipFile, EOFError, zlib.error):  # CRC errado ou zip cortado no meio da leitura
             raise Recusa("o zip está corrompido") from None
-        contagens = {"tabelas": g.terminar(), "desconhecidos": dict(desconhecidos),
-                     "descartados": extra["descartados"]}
+        tabelas = g.terminar()
+        contagens = {"tabelas": tabelas, "desconhecidos": dict(desconhecidos), "descartados": extra["descartados"],
+                     "amostras_antigas_novas": g.antigas}
+        amostras = tabelas.get("saude_amostras", {"novos": 0, "repetidos": 0})
+        if g.antigas >= max(AVISO_ANTIGAS_MINIMO, AVISO_ANTIGAS_FRACAO * (amostras["novos"] + amostras["repetidos"])):
+            log.warning("saude: %d amostras de antes do último export entraram como novas; se o relógio ou o iPhone "
+                        "mudou de nome, elas podem repetir as antigas com outra origem (Ficha 14)", g.antigas)
         imp.ok, imp.fim, imp.contagens = True, datetime.now(timezone.utc), contagens
         imp.data_export, imp.perfil = extra["data_export"], extra["perfil"]
         s.add(Auditoria(ferramenta="saude_importar", tabela="saude_importacoes", registro_id=imp.id, acao="criar",

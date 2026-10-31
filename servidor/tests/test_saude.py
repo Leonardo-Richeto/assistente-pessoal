@@ -464,3 +464,28 @@ def test_log_e_auditoria_sem_valor_de_saude(tmp_path, url, monkeypatch, sem_espe
         assert "98765" not in json.dumps(a.dados)
     for i in _todos(url, SaudeImportacao):
         assert "98765" not in json.dumps(i.contagens) + (i.erro or "")
+
+
+def test_origem_renomeada_gera_aviso(tmp_path, url, monkeypatch, caplog):
+    # O relógio mudou de nome: o export novo reescreve as amostras antigas com a origem nova, e elas entram de novo.
+    monkeypatch.setattr(saude, "AVISO_ANTIGAS_MINIMO", 1)
+    engine = create_engine(url)
+    primeira = saude.importar(montar(tmp_path), engine)
+    assert primeira["amostras_antigas_novas"] == 0  # sem export anterior, não há o que comparar
+    renomeado = xml().replace("Apple Watch de Teste", "Relogio Novo")
+    with caplog.at_level("WARNING", logger="assistente.saude"):
+        r = saude.importar(montar(tmp_path, nome="b.zip", conteudo_xml=renomeado), engine)
+    assert r["amostras_antigas_novas"] == 3  # frequência cardíaca, sono e variabilidade, do relógio
+    assert "3 amostras de antes do último export" in caplog.text
+
+
+def test_amostra_nova_de_verdade_nao_gera_aviso(tmp_path, url, monkeypatch, caplog):
+    monkeypatch.setattr(saude, "AVISO_ANTIGAS_MINIMO", 1)
+    engine = create_engine(url)
+    saude.importar(montar(tmp_path), engine)
+    nova = ('<Record type="HKQuantityTypeIdentifierStepCount" sourceName="iPhone" unit="count" '
+            'startDate="2026-11-05 20:00:00 -0300" endDate="2026-11-05 20:10:00 -0300" value="500"/>')
+    with caplog.at_level("WARNING", logger="assistente.saude"):
+        r = saude.importar(montar(tmp_path, nome="b.zip", conteudo_xml=xml(amostras=nova)), engine)
+    assert r["tabelas"]["saude_amostras"]["novos"] == 1 and r["amostras_antigas_novas"] == 0
+    assert "antes do último export" not in caplog.text

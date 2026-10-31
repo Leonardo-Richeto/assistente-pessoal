@@ -1668,4 +1668,9 @@ tipos. Lido em fluxo em 12 s no Mac. Contagem por tipo de treino ou de amostra �
 ### Decisões do Leonardo (2026-10-31)
 
 1. Ficha aprovada. 2. O iPhone ainda não tem Tailscale. 3. Export real no Mac para calibrar, fora do repo.
+4. Revisor (2026-10-31): a `chave` da amostra usa o nome da origem. Se o relógio ou o iPhone mudar de nome e o
+   export reescrever as amostras antigas, elas entram de novo. Fica assim, com aviso: a importação conta as amostras
+   novas de antes do último export (`amostras_antigas_novas`) e avisa no log a partir de 100 e de 1% do arquivo.
+   Tirar a origem da chave juntaria amostras do iPhone e do relógio com o mesmo valor e a mesma hora.
+5. O último `export.zip` guardado em `importados/` não entra no backup: o banco já tem tudo.
 
