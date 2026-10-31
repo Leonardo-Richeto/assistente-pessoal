@@ -254,7 +254,7 @@ printf '/dev/disk/by-id/<ata-do-HD> {\n    spindown_time = 120\n}\n' | sudo tee 
       de pé). No claude.ai: Configurações → Conectores → adicionar conector personalizado `https://assistente.<tailnet>.ts.net/mcp`
       e entrar com o Google. No Projeto "Assistente": trocar o conector do Mac pelo novo. Depois remova o conector
       de teste. **Nas instruções do Projeto, troque o texto inteiro** pelo texto atual da Ficha 1 (com a Ficha 5):
-      o bloco "Texto proposto" de `docs/regras-de-negocio.md`, com "o dono" trocado por "Leonardo" e a 1ª frase
+      o arquivo `docs/projeto-assistente.txt` (antes, o bloco "Texto proposto" da Ficha 1), com "o dono" trocado por "Leonardo" e a 1ª frase
       "Você é o assistente pessoal do Leonardo, dono deste Projeto." Tem as Fichas 3, 4 e 5, ainda não coladas.
       **Suba o servidor da 2b e cole o texto no mesmo momento.** O texto novo cita ferramentas que só existem na 2b
       (`buscar_vault`, `ler_nota`, `escrever_nota`...). O servidor da 2b recusa `vault_write_note` sem `mode`, que o

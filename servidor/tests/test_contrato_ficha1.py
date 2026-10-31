@@ -1,4 +1,4 @@
-"""Contrato do texto do Projeto "Assistente" (ficha 1, docs/regras-de-negocio.md) com o servidor (Passo 8e).
+"""Contrato do texto do Projeto "Assistente" (ficha 1; o texto em docs/projeto-assistente.txt) com o servidor (Passo 8e).
 
 O texto não roda no pytest. O que dá para testar: todo nome de ferramenta citado nele existe no app e não está
 bloqueado. O app é o de verdade (criar_app) com as peças falsas de test_bloqueadas.py (nomes reais da versão
@@ -14,8 +14,8 @@ from fastmcp import Client
 from assistente import banco, servidor
 from test_bloqueadas import app  # noqa: F401 (fixture)
 
-FICHAS = Path(__file__).parent.parent.parent / "docs" / "regras-de-negocio.md"
-TITULO = "### Texto proposto (colar no Projeto)"
+# O texto do Projeto fica sozinho, para copiar inteiro; a Ficha 1 aponta para ele.
+TEXTO = Path(__file__).parent.parent.parent / "docs" / "projeto-assistente.txt"
 # Palavra minúscula com `_` no meio: é como o texto escreve nome de ferramenta.
 NOME = re.compile(r"\b[a-z]+(?:_[a-z]+)+\b")
 # Citados no texto com `_` que não são ferramenta, cada um conferido abaixo no lugar certo.
@@ -34,9 +34,7 @@ CONECTORES_NATIVOS = {
 
 
 def _texto_do_projeto() -> str:
-    fichas = FICHAS.read_text(encoding="utf-8")
-    depois = fichas[fichas.index(TITULO) + len(TITULO):]
-    return depois.split("```")[1]  # o primeiro bloco de código depois do título
+    return TEXTO.read_text(encoding="utf-8")
 
 
 def _citados() -> set[str]:
