@@ -725,10 +725,10 @@ no loopback enquanto não houver administrador; a porta da rede de casa só liga
       FOTOS_HOME="$H" bash fotos/scripts/preparar.sh   # conferência ok
       ```
       Para apagar o teste: `docker compose -p fotos-teste down` e `rm -rf ~/fotos-teste`.
-- [ ] F1. IP do i7 na rede de casa: `ip -4 -br addr` no i7 (a interface de rede, não `tailscale0` nem `docker0`).
+- [x] F1. (2026-11-22) IP do i7 na rede de casa: `ip -4 -br addr` no i7 (a interface de rede, não `tailscale0` nem `docker0`).
       Confira no roteador que esse IP está reservado para o i7; sem reserva, o IP pode mudar e o app do iPhone perde
       o Immich.
-- [ ] F2. Estado e `.env` no i7:
+- [x] F2. (2026-11-22) Estado e `.env` no i7:
       ```bash
       sudo mkdir -p /srv/fotos && sudo chown "$USER": /srv/fotos && chmod 700 /srv/fotos
       cd /srv/assistente/app && git pull
@@ -736,16 +736,49 @@ no loopback enquanto não houver administrador; a porta da rede de casa só liga
       sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=$(openssl rand -hex 24)|" /srv/fotos/.env
       nano /srv/fotos/.env   # ENDERECO_LAN=<IP do F1>
       ```
-- [ ] F3. Logo depois do F2 (até haver administrador, qualquer usuário do i7 alcança o loopback), subir só no
+- [x] F3. (2026-11-22) Logo depois do F2 (até haver administrador, qualquer usuário do i7 alcança o loopback), subir só no
       loopback e criar o administrador pelo túnel SSH, do Mac:
       ```bash
       FOTOS_HOME=/srv/fotos bash fotos/scripts/preparar.sh     # no i7; para pedindo o administrador
       ssh -o ExitOnForwardFailure=yes -L 18040:127.0.0.1:8040 <i7>   # no Mac; abra http://127.0.0.1:18040 e crie a conta
       ```
-- [ ] F4. Ligar a porta da rede de casa:
+- [x] F4. (2026-11-22: responde no IP de casa, não pelo IP do Tailscale; disco 10%) Ligar a porta da rede de casa:
       ```bash
       FOTOS_HOME=/srv/fotos bash fotos/scripts/preparar.sh     # liga <IP>:2283 e confere
       ```
       No Mac, no Wi-Fi de casa, abra `http://<IP do i7>:2283`. Pelo IP do Tailscale do i7 (`tailscale ip -4`), a
       porta 2283 não pode responder.
 - [ ] F5. Medir a RAM (`docker stats --no-stream`) com o ML parado. A medida com o ML rodando entra na 10.3.
+
+#### Janela semanal do ML (10.3)
+
+`fotos/scripts/ml.sh janela` liga o ML, põe na fila só o que falta (busca, rostos, texto nas fotos; depois duplicatas
+e agrupamento de rostos), espera esvaziar e desliga, sempre. O timer `fotos-ml` roda no domingo às 00:30, com
+limite de 150 min (até 03:00, antes dos backups). Com o ML parado, as fotos novas falham nas filas do ML; a janela
+limpa essas falhas e processa tudo de novo (comportamento lido no código do Immich v3.4.2, `smart-info.service.ts`).
+A rota `PUT /api/jobs/{fila}` é a única que põe "só o que falta" na fila e está marcada como obsoleta: confira ao
+atualizar o Immich.
+
+- [ ] M1. Chave da API: no Immich, foto do perfil → Configurações da conta → Chaves de API → Nova chave, nome
+      `ml-semanal`, permissões **só** `job.create` e `queue.read`. Copie a chave e ponha no `.env` pelo editor (fora
+      do histórico do shell):
+      ```bash
+      cd /srv/assistente/app && git pull
+      nano /srv/fotos/.env   # IMMICH_API_KEY=<chave>
+      FOTOS_HOME=/srv/fotos bash fotos/scripts/ml.sh estado   # esperado: "0 pendentes, 0 com falha; ML parado"
+      ```
+- [ ] M2. Timer:
+      ```bash
+      cd /srv/assistente/app/fotos/deploy/systemd
+      sed -e "s#<usuario>#$USER#g" -e "s#<app>#/srv/assistente/app#g" -e "s#<fotos_home>#/srv/fotos#g" fotos-ml.service \
+        | sudo tee /etc/systemd/system/fotos-ml.service >/dev/null
+      sudo cp fotos-ml.timer /etc/systemd/system/ && sudo systemctl daemon-reload
+      sudo systemctl enable --now fotos-ml.timer && systemctl list-timers fotos-ml.timer
+      ```
+- [ ] M3. Primeira janela à mão (baixa a imagem e os modelos do ML, ~2 GB; com a biblioteca vazia, termina logo).
+      Num segundo terminal, durante a rodada, meça a RAM com o ML ligado (fecha o F5):
+      ```bash
+      sudo systemctl start fotos-ml.service; journalctl -u fotos-ml -n 15 --no-pager   # esperado: "janela feita", "ML desligado"
+      docker stats --no-stream --format '{{.Name}} {{.MemUsage}}' | grep fotos         # no 2º terminal, com o ML ligado
+      FOTOS_HOME=/srv/fotos bash fotos/scripts/conferir.sh                              # esperado: ok (ML parado)
+      ```

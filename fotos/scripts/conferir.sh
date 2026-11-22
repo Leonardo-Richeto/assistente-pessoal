@@ -19,9 +19,9 @@ responde "$base" || problema "o Immich não responde em $base/api/server/ping."
 # Ficha 17, regra 2: sem nó Tailscale nem Funnel para as fotos.
 [ ! -e "$FOTOS_APP/deploy/serve.json" ] || problema "fotos/deploy/serve.json existe: as fotos ficam só na rede de casa."
 dc config --services 2>/dev/null | tr -d '\r' | grep -qx tailscale && problema "serviço tailscale no compose das fotos (Ficha 17, regra 2)."
-# A janela semanal (PLANO 10.3) liga o ML com FOTOS_JANELA_ML=1; fora dela, ML ligado é problema.
-if [ "${FOTOS_JANELA_ML:-0}" != 1 ] && ml_rodando; then
-  problema "o ML está ligado fora da janela semanal (Ficha 17, regra 6): docker compose -p $(valor_env COMPOSE_PROJECT_NAME) stop immich-machine-learning."
+# Fora da janela do ml.sh (semanal ou a da importação), ML ligado é problema.
+if ml_rodando && ! janela_em_andamento; then
+  problema "o ML está ligado fora da janela (Ficha 17, regra 6): FOTOS_HOME=$HOME_DIR fotos/scripts/ml.sh desligar."
 fi
 uso="$(df -P "$HOME_DIR/data/biblioteca" | awk 'NR==2 {gsub("%", "", $5); print $5}')"
 # FOTOS_LIMITE_DISCO só para teste num disco já cheio (Mac); na produção vale o 85% da Ficha 17.

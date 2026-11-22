@@ -1,0 +1,11 @@
+[Unit]
+Description=Janela do ML do Immich no domingo as 00:30 (ate 03:00, antes dos backups)
+
+[Timer]
+OnCalendar=Sun *-*-* 00:30:00
+# Sem Persistent: se o i7 estava desligado no domingo, a janela fica para o domingo seguinte (fora do horario dos
+# backups e do uso).
+Persistent=false
+
+[Install]
+WantedBy=timers.target

@@ -13,6 +13,8 @@ descobrir_home() {
   HOME_DIR="$(absoluto "$FOTOS_HOME")"
   HOME_DIR="${HOME_DIR%/}"
   ENV_FILE="$HOME_DIR/.env"
+  # PID da janela do ML em andamento (ml.sh janela); a conferência aceita o ML ligado só com ela viva.
+  MARCA_JANELA="$HOME_DIR/ml-janela.pid"
 }
 
 OBRIGATORIAS=(FOTOS_HOME COMPOSE_PROJECT_NAME DB_PASSWORD)
@@ -94,5 +96,7 @@ conferir_porta() {
     return 1
   fi
 }
+
+janela_em_andamento() { [ -s "$MARCA_JANELA" ] && kill -0 "$(cat "$MARCA_JANELA")" 2>/dev/null; }
 
 ml_rodando() { [ -n "$(dc --profile ml ps -q --status running --status restarting immich-machine-learning 2>/dev/null | tr -d '\r')" ]; }

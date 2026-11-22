@@ -1,0 +1,13 @@
+[Unit]
+Description=Janela semanal do ML do Immich (fotos/scripts/ml.sh janela, Ficha 17 regra 6)
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# <usuario>, <app> e <fotos_home> sao trocados na instalacao (docs/IMPLANTACAO.md, "Fotos (10)").
+User=<usuario>
+Environment=FOTOS_HOME=<fotos_home>
+ExecStart=/bin/bash <app>/fotos/scripts/ml.sh janela
+# 150 min de janela + subir e descer o ML.
+TimeoutStartSec=170min

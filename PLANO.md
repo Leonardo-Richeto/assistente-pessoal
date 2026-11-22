@@ -265,10 +265,12 @@ Docker Compose próprio em `fotos/`, estado em `/srv/fotos` no SSD, só na rede 
 - [ ] ⚑ 10.2 `fotos/`: Immich (server, ML, Postgres, Redis) com versão fixa e rede própria, porta no IP de casa do i7
   e no loopback. Medir a RAM com o ML parado e rodando. Pronto: abre pelo navegador no Wi-Fi de casa; pelo IP do
   Tailscale do i7, não
-  (2026-11-22: `fotos/` escrito, Immich v3.4.2; roteiro em `docs/IMPLANTACAO.md` "Fotos (10)"; teste no Mac ok, RAM sem ML ~1,9 GB; falta F1–F5 no i7)
+  (2026-11-22: `fotos/` escrito, Immich v3.4.2; roteiro em `docs/IMPLANTACAO.md` "Fotos (10)"; teste no Mac ok, RAM sem ML ~1,9 GB; no ar no i7 em 2026-11-22, F1–F4 ok; falta a RAM no i7, F5)
 - [ ] 10.3 ML semanal (Ficha 17, regra 6): timer no host liga o container de ML no domingo 00:30, dispara os jobs
   só do que falta pela API, espera a fila esvaziar (limite 03:00) e desliga. Conferir antes como o Immich trata
   envio com o ML parado (não verificado em 2026-11-22)
+  (2026-11-22: `fotos/scripts/ml.sh` e timer `fotos-ml` escritos, laço testado no Mac com API e docker falsos;
+  envio com o ML parado lido no código: a tarefa falha e a janela refaz; falta M1–M3 no i7)
 - [ ] 10.4 Backup às 04:05 (biblioteca incremental + banco, cifrado), conferência às 07:10 e ensaio de restauração no Mac
 - [ ] 10.5 Takeout do Google Fotos do Leonardo importado pelo `immich-go`; contagem conferida (Ficha 17, regra 9a)
 - [ ] 10.6 iPhone do Leonardo no app do Immich, no Wi-Fi de casa (sem VPN); revisar as duplicatas
