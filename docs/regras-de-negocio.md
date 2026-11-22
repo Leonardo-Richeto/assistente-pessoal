@@ -1637,3 +1637,5 @@ Leonardo cola o texto na próxima vez que precisar mexer no Projeto (não é urg
 10. Sem VPN ligada nos aparelhos: o Tailscale fica só no i7, onde é necessário (Funnel da Anthropic e cofre). O
     Immich vai para a rede de casa ("como todos os outros"); o cofre continua na tailnet, com a cópia offline do app
     (Leonardo, 2026-11-22). Sem "VPN On Demand".
+11. Backup: o nosso backup copia o dump do banco que o Immich faz às 02:00; o backup Yucca do Immich fica desligado
+    (Leonardo, 2026-11-22).

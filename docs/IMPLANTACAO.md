@@ -748,7 +748,7 @@ no loopback enquanto não houver administrador; a porta da rede de casa só liga
       ```
       No Mac, no Wi-Fi de casa, abra `http://<IP do i7>:2283`. Pelo IP do Tailscale do i7 (`tailscale ip -4`), a
       porta 2283 não pode responder.
-- [ ] F5. Medir a RAM (`docker stats --no-stream`) com o ML parado. A medida com o ML rodando entra na 10.3.
+- [x] F5. (2026-11-22, i7, biblioteca vazia: server 696 MiB, Postgres 244 MiB, Valkey 16 MiB; ML ocioso 190 MiB) Medir a RAM (`docker stats --no-stream`) com o ML parado. A medida com o ML rodando entra na 10.3.
 
 #### Janela semanal do ML (10.3)
 
@@ -759,7 +759,7 @@ limpa essas falhas e processa tudo de novo (comportamento lido no código do Imm
 A rota `PUT /api/jobs/{fila}` é a única que põe "só o que falta" na fila e está marcada como obsoleta: confira ao
 atualizar o Immich.
 
-- [ ] M1. Chave da API: no Immich, foto do perfil → Configurações da conta → Chaves de API → Nova chave, nome
+- [x] M1. (2026-11-22; a 1ª chave saiu sem `queue.read` e deu 403: confira as duas) Chave da API: no Immich, foto do perfil → Configurações da conta → Chaves de API → Nova chave, nome
       `ml-semanal`, permissões **só** `job.create` e `queue.read`. Copie a chave e ponha no `.env` pelo editor (fora
       do histórico do shell):
       ```bash
@@ -767,7 +767,7 @@ atualizar o Immich.
       nano /srv/fotos/.env   # IMMICH_API_KEY=<chave>
       FOTOS_HOME=/srv/fotos bash fotos/scripts/ml.sh estado   # esperado: "0 pendentes, 0 com falha; ML parado"
       ```
-- [ ] M2. Timer:
+- [x] M2. (2026-11-22: próxima em 2026-11-29 00:30) Timer:
       ```bash
       cd /srv/assistente/app/fotos/deploy/systemd
       sed -e "s#<usuario>#$USER#g" -e "s#<app>#/srv/assistente/app#g" -e "s#<fotos_home>#/srv/fotos#g" fotos-ml.service \
@@ -775,10 +775,55 @@ atualizar o Immich.
       sudo cp fotos-ml.timer /etc/systemd/system/ && sudo systemctl daemon-reload
       sudo systemctl enable --now fotos-ml.timer && systemctl list-timers fotos-ml.timer
       ```
-- [ ] M3. Primeira janela à mão (baixa a imagem e os modelos do ML, ~2 GB; com a biblioteca vazia, termina logo).
+- [x] M3. (2026-11-22: imagem e subida em ~1 min, "janela feita", "ML desligado", conferir ok) Primeira janela à mão (baixa a imagem e os modelos do ML, ~2 GB; com a biblioteca vazia, termina logo).
       Num segundo terminal, durante a rodada, meça a RAM com o ML ligado (fecha o F5):
       ```bash
       sudo systemctl start fotos-ml.service; journalctl -u fotos-ml -n 15 --no-pager   # esperado: "janela feita", "ML desligado"
       docker stats --no-stream --format '{{.Name}} {{.MemUsage}}' | grep fotos         # no 2º terminal, com o ML ligado
       FOTOS_HOME=/srv/fotos bash fotos/scripts/conferir.sh                              # esperado: ok (ML parado)
+      ```
+
+#### Backup das fotos (10.4)
+
+`fotos/scripts/exportar.sh --retencao`, todo dia às 04:05, em `/srv/backup-hd/fotos`, cifrado com a chave pública do
+age do assistente. Duas partes: o pacote `fotos-AAAAMMDD-HHMM.tar.age` (o dump do banco que o Immich faz às 02:00, o
+`.env` e o índice dos originais; 7 diários e 4 semanais) e `arquivos/`, um `.age` por original, incremental. O que
+sai da biblioteca vai para `removidas/AAAA-MM-DD/` e fica 30 dias. Miniaturas e vídeos convertidos ficam de fora (o
+Immich refaz). O backup Yucca do próprio Immich fica desligado (Leonardo, 2026-11-22). A conferência às 07:10 acusa
+backup com mais de 26 h.
+
+- [ ] B1. `.env` e leitura da biblioteca:
+      ```bash
+      cd /srv/assistente/app && git pull
+      printf '\n%s\nBACKUP_DESTINO=/srv/backup-hd/fotos\n' "$(grep '^AGE_DESTINATARIO=' /srv/assistente/.env)" >> /srv/fotos/.env
+      grep -E '^(AGE_DESTINATARIO|BACKUP_DESTINO)=' /srv/fotos/.env          # esperado: age1... e /srv/backup-hd/fotos
+      ls -la /srv/fotos/data/biblioteca /srv/fotos/data/biblioteca/backups    # o usuário comum precisa ler (r)
+      ```
+- [ ] B2. Primeiro dump do banco agora (o automático é às 02:00) e primeiro backup à mão:
+      ```bash
+      K="$(sed -n 's/^IMMICH_API_KEY=//p' /srv/fotos/.env)"
+      curl -s -X POST -H "x-api-key: $K" -H 'Content-Type: application/json' -d '{"name":"backup-database"}' \
+        http://127.0.0.1:8040/api/jobs; unset K
+      sleep 20; ls -la /srv/fotos/data/biblioteca/backups                      # esperado: immich-db-backup-*.sql.gz
+      FOTOS_HOME=/srv/fotos bash fotos/scripts/exportar.sh --retencao          # esperado: "feito: ... 0 originais"
+      ```
+- [ ] B3. Timers do backup e da conferência:
+      ```bash
+      cd /srv/assistente/app/fotos/deploy/systemd
+      for f in fotos-backup.service fotos-conferir.service; do
+        sed -e "s#<usuario>#$USER#g" -e "s#<app>#/srv/assistente/app#g" -e "s#<fotos_home>#/srv/fotos#g" "$f" \
+          | sudo tee "/etc/systemd/system/$f" >/dev/null
+      done
+      sudo cp fotos-backup.timer fotos-conferir.timer /etc/systemd/system/ && sudo systemctl daemon-reload
+      sudo systemctl enable --now fotos-backup.timer fotos-conferir.timer
+      sudo systemctl start fotos-conferir.service && journalctl -u fotos-conferir -n 5 --no-pager   # esperado: ok
+      ```
+- [ ] B4. Ensaio de restauração no Mac, num Terminal do Mac, com a identidade do age (a mesma do C8 do cofre).
+      Agora, com a biblioteca vazia, prova o pacote e o banco; repita depois da importação (10.5) e antes de apagar
+      qualquer coisa do Google (Ficha 17, regra 9b). Sem o `age` no Mac (`brew install age`), cada original passa
+      por um `docker run`: use `--amostra 200`.
+      ```bash
+      rsync -a leonardo@i7:/srv/backup-hd/fotos/ ~/fotos-ensaio/
+      bash fotos/scripts/ensaiar_restauracao.sh ~/fotos-ensaio --chave <identidade-age.txt>   # esperado: "ensaio ok"
+      rm -rf ~/fotos-ensaio
       ```

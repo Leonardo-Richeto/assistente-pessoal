@@ -1,0 +1,10 @@
+[Unit]
+Description=Backup diario das fotos as 04:05 (depois do cofre e do dump do Immich das 02:00)
+
+[Timer]
+OnCalendar=*-*-* 04:05:00
+Persistent=true
+RandomizedDelaySec=3min
+
+[Install]
+WantedBy=timers.target

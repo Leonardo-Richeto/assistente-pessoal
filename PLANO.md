@@ -262,16 +262,18 @@ da 6.4), fonte de investimentos (ainda sem item) e mais de um meio de enviar a m
 Sair do Google Fotos (~12 GB) e liberar o iPhone, com as repetidas achadas. Regras: Ficha 17 (aprovada em 2026-11-22). Projeto
 Docker Compose próprio em `fotos/`, estado em `/srv/fotos` no SSD, só na rede de casa (sem Tailscale, 2026-11-22).
 - [x] 10.1 (2026-11-22) Ficha 17 aprovada; o acervo cabe no SSD com folga (Leonardo)
-- [ ] ⚑ 10.2 `fotos/`: Immich (server, ML, Postgres, Redis) com versão fixa e rede própria, porta no IP de casa do i7
+- [x] ⚑ 10.2 `fotos/`: Immich (server, ML, Postgres, Redis) com versão fixa e rede própria, porta no IP de casa do i7
   e no loopback. Medir a RAM com o ML parado e rodando. Pronto: abre pelo navegador no Wi-Fi de casa; pelo IP do
   Tailscale do i7, não
-  (2026-11-22: `fotos/` escrito, Immich v3.4.2; roteiro em `docs/IMPLANTACAO.md` "Fotos (10)"; teste no Mac ok, RAM sem ML ~1,9 GB; no ar no i7 em 2026-11-22, F1–F4 ok; falta a RAM no i7, F5)
-- [ ] 10.3 ML semanal (Ficha 17, regra 6): timer no host liga o container de ML no domingo 00:30, dispara os jobs
+  (2026-11-22: `fotos/` escrito, Immich v3.4.2; roteiro em `docs/IMPLANTACAO.md` "Fotos (10)"; teste no Mac ok, RAM sem ML ~1,9 GB; no ar no i7 em 2026-11-22, F1–F5 ok; RAM sem fotos ~1,15 GB com o ML ocioso; a RAM do ML trabalhando sai na 1ª janela com fotos, 10.5)
+- [x] 10.3 ML semanal (Ficha 17, regra 6): timer no host liga o container de ML no domingo 00:30, dispara os jobs
   só do que falta pela API, espera a fila esvaziar (limite 03:00) e desliga. Conferir antes como o Immich trata
   envio com o ML parado (não verificado em 2026-11-22)
   (2026-11-22: `fotos/scripts/ml.sh` e timer `fotos-ml` escritos, laço testado no Mac com API e docker falsos;
-  envio com o ML parado lido no código: a tarefa falha e a janela refaz; falta M1–M3 no i7)
+  envio com o ML parado lido no código: a tarefa falha e a janela refaz; M1–M3 ok no i7 em 2026-11-22, timer na próxima em 2026-11-29 00:30)
 - [ ] 10.4 Backup às 04:05 (biblioteca incremental + banco, cifrado), conferência às 07:10 e ensaio de restauração no Mac
+  (2026-11-22: `exportar.sh`, `ensaiar_restauracao.sh` e timers escritos, testados no Mac com biblioteca falsa; o dump
+  do banco é o do Immich às 02:00, Yucca desligado; falta B1–B4 no i7, `docs/IMPLANTACAO.md` "Backup das fotos")
 - [ ] 10.5 Takeout do Google Fotos do Leonardo importado pelo `immich-go`; contagem conferida (Ficha 17, regra 9a)
 - [ ] 10.6 iPhone do Leonardo no app do Immich, no Wi-Fi de casa (sem VPN); revisar as duplicatas
 - [ ] 10.7 Conta da Nathalia, o Takeout e o iPhone dela

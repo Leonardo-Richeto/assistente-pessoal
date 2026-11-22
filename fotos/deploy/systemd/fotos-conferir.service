@@ -1,0 +1,12 @@
+[Unit]
+Description=Conferencia diaria das fotos (Ficha 17 regra 8: no ar, so rede de casa, ML parado, disco, backup)
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# <usuario>, <app> e <fotos_home> sao trocados na instalacao (docs/IMPLANTACAO.md, "Fotos (10)").
+User=<usuario>
+Environment=FOTOS_HOME=<fotos_home>
+ExecStart=/bin/bash <app>/fotos/scripts/conferir.sh
+TimeoutStartSec=5min

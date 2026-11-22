@@ -1,0 +1,15 @@
+[Unit]
+Description=Backup diario das fotos (fotos/scripts/exportar.sh --retencao, Ficha 17 regra 7)
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# <usuario>, <app> e <fotos_home> sao trocados na instalacao (docs/IMPLANTACAO.md, "Fotos (10)").
+User=<usuario>
+Environment=FOTOS_HOME=<fotos_home>
+ExecStart=/bin/bash <app>/fotos/scripts/exportar.sh --retencao
+# A primeira rodada depois da importacao cifra a biblioteca inteira (~12 GB); as outras, so o que entrou.
+TimeoutStartSec=6h
+Nice=10
+IOSchedulingClass=idle

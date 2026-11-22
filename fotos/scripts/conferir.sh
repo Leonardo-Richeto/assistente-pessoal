@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Conferência das fotos (Ficha 17, regra 8). Sai com erro se achar: Immich fora do ar; sem administrador; porta
 # fora do loopback e do IP da rede de casa; Immich na interface do Tailscale ou no Funnel; ML ligado fora da janela;
-# perfil ml no .env; disco da biblioteca acima de 85%. A idade do último backup entra com o backup (PLANO 10.4).
+# perfil ml no .env; disco da biblioteca acima de 85%; último backup com mais de 26 h.
 #
 #   FOTOS_HOME=/srv/fotos fotos/scripts/conferir.sh
 source "$(dirname "$0")/comum.sh"
@@ -27,6 +27,17 @@ uso="$(df -P "$HOME_DIR/data/biblioteca" | awk 'NR==2 {gsub("%", "", $5); print 
 # FOTOS_LIMITE_DISCO só para teste num disco já cheio (Mac); na produção vale o 85% da Ficha 17.
 limite="${FOTOS_LIMITE_DISCO:-85}"
 [ -n "$uso" ] && [ "$uso" -le "$limite" ] || problema "disco da biblioteca com ${uso:-?}% de uso (limite $limite%)."
+# Último backup (Ficha 17, regra 8): só depois que o backup rodou com --retencao uma vez (a pasta tem .instancia).
+destino="$(valor_env BACKUP_DESTINO)"; destino="${destino:-$HOME_DIR/backups}"
+if [ -f "$destino/.instancia" ]; then
+  ultimo="$(ls -1t "$destino"/fotos-*.tar.age 2>/dev/null | head -n 1)"
+  if [ -z "$ultimo" ]; then
+    problema "nenhum backup em $destino."
+  else
+    idade_h=$(( ( $(date +%s) - $(stat -c %Y "$ultimo" 2>/dev/null || stat -f %m "$ultimo") ) / 3600 ))
+    [ "$idade_h" -le 26 ] || problema "o último backup ($(basename "$ultimo")) tem ${idade_h} h."
+  fi
+fi
 linha="$(conferir_porta)" || erros=1
 log "$linha; disco: ${uso:-?}%"
 [ "$erros" -eq 0 ] || { aviso "Ficha 17 violada (veja acima)."; exit 1; }
