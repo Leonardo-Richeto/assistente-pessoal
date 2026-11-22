@@ -1,0 +1,121 @@
+# Fotos e vídeos (Ficha 17, PLANO Fase 10): Immich só pela tailnet. Projeto próprio, fora do compose do assistente,
+# do Paperless e do cofre. Banco e fila ficam na rede interna, sem saída. Roteiro: docs/IMPLANTACAO.md, "Fotos (10)".
+# Base: o docker-compose.yml oficial do Immich v3.4.2 (github.com/immich-app/immich/releases).
+#
+# Todo o estado fica em ${FOTOS_HOME}:
+#   ${FOTOS_HOME}/.env               configuração (fora do git; modelo em fotos/.env.example)
+#   ${FOTOS_HOME}/data/biblioteca    originais, miniaturas, vídeos convertidos e os dumps do banco que o Immich faz
+#   ${FOTOS_HOME}/data/postgres      dados internos do Postgres (nunca copiar crus entre máquinas)
+#   ${FOTOS_HOME}/data/modelos       modelos do ML (baixados na primeira rodada; dá para apagar e baixar de novo)
+#   ${FOTOS_HOME}/data/tailscale     identidade do nó Tailscale "${TS_NOME}"
+#
+# Rodar sempre pelos scripts de fotos/scripts (eles passam o .env de fora do repositório).
+# Perfis (COMPOSE_PROFILES no .env): tailscale = nó com Serve (só na produção; nunca Funnel).
+# O ML tem o perfil "ml" e NÃO entra no COMPOSE_PROFILES: fica parado e só sobe na janela semanal (Ficha 17,
+# regra 6) ou na importação inicial.
+# Imagens com versão e digest fixos. Para atualizar: leia as notas da versão (o Immich muda o compose às vezes),
+# troque a tag e o digest juntos (server e ML na MESMA versão) e rode fotos/scripts/conferir.sh depois.
+
+name: ${COMPOSE_PROJECT_NAME:-fotos}
+
+services:
+  immich-server:
+    image: ghcr.io/immich-app/immich-server:v3.4.2@sha256:fc880c1bf665b4aab1e74c15e56ab871225989cd546536e6b77e771869af06bd
+    restart: unless-stopped
+    environment:
+      DB_HOSTNAME: database
+      DB_USERNAME: postgres
+      DB_DATABASE_NAME: immich
+      DB_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD no .env}
+      REDIS_HOSTNAME: redis
+      # Configuração no repositório (fotos/deploy/immich-config.json). Com o arquivo, a tela de administração não
+      # muda nada: o repositório é a fonte.
+      IMMICH_CONFIG_FILE: /config/immich-config.json
+      IMMICH_LOG_LEVEL: log
+      TZ: America/Sao_Paulo
+    volumes:
+      - ${FOTOS_HOME:?defina FOTOS_HOME no .env}/data/biblioteca:/data
+      - ./deploy/immich-config.json:/config/immich-config.json:ro
+    # Só o loopback do host (túnel SSH, conferência, immich-go). De fora, só pelo Tailscale.
+    ports:
+      - "127.0.0.1:${PORTA_HOST:-8040}:2283"
+    networks: [interna, saida]
+    # Mesmo motivo do cofre: DNS fixo para o Tailscale, que divide a rede deste container.
+    dns: [1.1.1.1, 8.8.8.8]
+    depends_on:
+      redis: { condition: service_healthy }
+      database: { condition: service_healthy }
+    healthcheck:
+      disable: false
+
+  # Parado fora da janela semanal (perfil "ml"). Precisa de saída só para baixar os modelos na primeira vez.
+  immich-machine-learning:
+    image: ghcr.io/immich-app/immich-machine-learning:v3.4.2@sha256:739405742a79bd7447227c553bb62ed5491aa36acf00bc667af7f9c93b6fae91
+    profiles: ["ml"]
+    restart: "no"
+    environment:
+      MACHINE_LEARNING_MODEL_REVISION: v2
+      # Descarrega o modelo da RAM depois de 5 min sem uso (padrão do Immich, escrito para ficar à vista).
+      MACHINE_LEARNING_MODEL_TTL: "300"
+      TZ: America/Sao_Paulo
+    volumes:
+      - ${FOTOS_HOME}/data/modelos:/cache
+    networks: [interna, saida]
+    healthcheck:
+      disable: false
+
+  redis:
+    image: docker.io/valkey/valkey:9@sha256:418652cfb58ef879d4978c33553735d7147016032d5aefaa14c828e611eb9dfd
+    restart: unless-stopped
+    networks: [interna]
+    healthcheck:
+      test: redis-cli ping | grep -q PONG || exit 1
+
+  database:
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0@sha256:bcf63357191b76a916ae5eb93464d65c07511da41e3bf7a8416db519b40b1c23
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_USER: postgres
+      POSTGRES_DB: immich
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    volumes:
+      - ${FOTOS_HOME}/data/postgres:/var/lib/postgresql/data
+    shm_size: 128mb
+    networks: [interna]
+    healthcheck:
+      disable: false
+
+  # Nó Tailscale próprio. Serve (HTTPS da tailnet) para o Immich; sem AllowFunnel no serve.json.
+  tailscale:
+    image: tailscale/tailscale:v1.104.1@sha256:87c55d6be56ad85b3d8bceca5f87f73de288c609131460dd1be1874c250cc41d
+    profiles: ["tailscale"]
+    restart: unless-stopped
+    network_mode: service:immich-server
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      TS_HOSTNAME: ${TS_NOME:-fotos}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: "true"
+      TS_SERVE_CONFIG: /config/serve.json
+      TS_ENABLE_HEALTH_CHECK: "true"
+      TS_LOCAL_ADDR_PORT: 127.0.0.1:9002
+    volumes:
+      - ${FOTOS_HOME}/data/tailscale:/var/lib/tailscale
+      - ./deploy/serve.json:/config/serve.json:ro
+    # Saudável só se o tailscaled responde E o Immich é alcançável pela rede que o Tailscale enxerga (se o server
+    # for recriado sozinho, o Tailscale fica na rede antiga e o Serve dá 502).
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9002/healthz && wget -q -O /dev/null http://127.0.0.1:2283/api/server/ping"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    depends_on:
+      immich-server: { condition: service_started }
+
+networks:
+  # Banco e fila: sem saída para a internet.
+  interna:
+    internal: true
+  saida: {}

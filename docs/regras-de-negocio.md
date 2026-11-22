@@ -1558,3 +1558,77 @@ confere o texto ao colar no Projeto.
 No teste no app (2026-10-31), o Claude disse que "o banco não guarda o percurso". Guarda (Ficha 14); só não sai no
 chat (Ficha 15, regra 2). Linha nova em "Consultas": a rota fica no banco de casa, mas não aparece no chat. O
 Leonardo cola o texto na próxima vez que precisar mexer no Projeto (não é urgente).
+
+---
+
+## Ficha 17 — Fotos e vídeos no Immich
+
+- **Status:** aprovada (Leonardo, 2026-11-22, respostas no chat). Proposta do Opus 5.5. Origem: pedido do Leonardo de 2026-11-22: tirar as fotos do Google
+  Fotos (~12 GB) e do iPhone para o i7, liberar espaço e achar as repetidas. Plano: `PLANO.md` Fase 10.
+- **Onde vive:** pasta `fotos/` (projeto Docker Compose próprio, como `paperless/` e `cofre/`), estado em
+  `/srv/fotos` no SSD, backup em `/srv/backup-hd/fotos`.
+
+### Regra
+
+1. **Duas contas:** Leonardo (administrador) e Nathalia, cada um com a própria biblioteca. Um vê a foto do outro só
+   em álbum que o dono compartilhar pelo app.
+2. **Só pela tailnet.** Nó Tailscale próprio (`fotos`), HTTPS do Tailscale (Serve) e **nunca** Funnel. O app do
+   iPhone precisa do Tailscale ligado (mesma dependência da 5b.2).
+3. **Entrada do Google Fotos:** Google Takeout importado pelo `immich-go`, que lê os `.json` do Takeout e mantém
+   data, local e álbum de cada foto.
+4. **Entrada do iPhone:** app do Immich, backup automático das fotos novas, só no Wi-Fi.
+5. **Repetidas:**
+   - Arquivo igual byte a byte: o Immich recusa no envio (confere o checksum). Nada a fazer.
+   - Foto parecida (a cópia comprimida pelo Google, rajada, print repetido): a verificação semanal acha os pares e
+     mostra na tela de duplicatas. **O dono escolhe qual fica.** Nada é apagado sozinho.
+   - Foto removida vai para a lixeira do Immich e fica 30 dias.
+6. **Processamento pesado uma vez por semana:** reconhecimento de rosto, busca por texto e detecção de duplicatas
+   rodam no domingo, das 00:30 até acabar a fila ou até as 03:00. Fora dessa janela, o container de ML fica parado.
+   - Na hora do envio roda só o leve: miniatura e leitura de data e local. Sem isso a foto não aparece.
+   - Vídeo: converte só o que o navegador não toca. O HEVC do iPhone fica como veio.
+   - Exceção: na importação inicial, o processamento roda inteiro numa janela que o Leonardo marca.
+7. **Backup diário às 04:05**, cifrado com a mesma chave pública do age, no HD de 500 GB. A biblioteca entra de
+   forma incremental (só arquivo novo); o banco do Immich entra inteiro. Foto removida continua no backup por 30
+   dias. Ensaio de restauração no Mac antes de apagar qualquer coisa do Google ou do iPhone.
+8. **Conferência diária às 07:10:** Immich de pé, último backup ok, ML parado fora da janela e disco abaixo de 85%.
+9. **Apagar do Google e do iPhone** só depois de: (a) contagem do Takeout igual à do Immich, menos as repetidas
+   exatas; (b) ensaio de restauração ok; (c) 7 backups diários seguidos ok. Quem apaga é o Leonardo, à mão.
+   Aviso: com Fotos do iCloud ligado, apagar no iPhone apaga também no iCloud e nos outros aparelhos.
+10. **O assistente não lê as fotos nesta fase.** Buscar foto pelo chat fica para ficha própria.
+
+### Exemplos
+
+- O Leonardo tira 40 fotos na quarta. O app envia no Wi-Fi de casa; elas aparecem na linha do tempo na hora, sem
+  rosto marcado. No domingo, os rostos e as duplicatas aparecem.
+- A mesma foto veio do Takeout (comprimida pelo Google) e do iPhone (original). A tela de duplicatas mostra o par;
+  o Leonardo fica com a original.
+
+### Não faz
+
+- Não apaga foto sozinho, nem a repetida.
+- Não manda foto para nuvem nenhuma.
+- Não abre o Immich na internet (Funnel).
+- Não deixa o ML ligado o tempo todo.
+
+### Cenário de teste
+
+1. Enviar a mesma foto duas vezes: a segunda é recusada e a biblioteca tem uma.
+2. Enviar uma foto com o ML parado: ela aparece com miniatura; no domingo, ganha rosto e busca.
+3. Login da Nathalia não mostra foto do Leonardo fora de álbum compartilhado.
+4. Fora da tailnet, o endereço do Immich não responde.
+5. Restaurar o backup no Mac: mesma contagem de fotos e álbuns.
+
+### Decisões do Leonardo (2026-11-22)
+
+1. Ferramenta: Immich.
+2. A Nathalia também usa.
+3. Duas cópias bastam para apagar do Google: o SSD e o HD de backup. Risco anotado: as duas ficam na mesma máquina,
+   e o HD está com o SMART 184 em FAILING_NOW (`docs/inventario.md`).
+4. O processamento pesado roda uma vez por semana, não o tempo todo.
+5. Ficha aprovada e janela de domingo, 00:30 às 03:00, aprovada.
+6. Tamanho: cabe no SSD com folga (Leonardo); não precisa medir antes.
+7. A Fase 10 vem antes da 6.1 (desenho do WhatsApp).
+8. Mapa ligado: o navegador pede ao `tiles.immich.cloud` o mapa das regiões vistas; revela a região, não a foto.
+   Risco aceito (Leonardo, 2026-11-22).
+9. Vídeo HEVC fica como veio, sem conversão para H.264, mesmo que um navegador sem suporte não toque (Leonardo,
+   2026-11-22). Muda só se alguém não conseguir ver um vídeo.

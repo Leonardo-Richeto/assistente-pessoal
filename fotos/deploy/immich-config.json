@@ -1,0 +1,32 @@
+{
+  "ffmpeg": {
+    "transcode": "required",
+    "acceptedVideoCodecs": ["h264", "hevc"],
+    "acceptedContainers": ["mov", "ogg", "webm"],
+    "threads": 2
+  },
+  "job": {
+    "backgroundTask": { "concurrency": 2 },
+    "faceDetection": { "concurrency": 1 },
+    "metadataExtraction": { "concurrency": 2 },
+    "smartSearch": { "concurrency": 1 },
+    "thumbnailGeneration": { "concurrency": 2 },
+    "videoConversion": { "concurrency": 1 }
+  },
+  "machineLearning": {
+    "enabled": true,
+    "urls": ["http://immich-machine-learning:3003"],
+    "availabilityChecks": { "enabled": true, "interval": 30000, "timeout": 2000 }
+  },
+  "newVersionCheck": { "enabled": false },
+  "server": { "publicUsers": false },
+  "storageTemplate": {
+    "enabled": true,
+    "hashVerificationEnabled": true,
+    "template": "{{y}}/{{y}}-{{MM}}/{{filename}}"
+  },
+  "trash": { "enabled": true, "days": 30 },
+  "backup": {
+    "database": { "enabled": true, "cronExpression": "0 02 * * *", "keepLastAmount": 14 }
+  }
+}

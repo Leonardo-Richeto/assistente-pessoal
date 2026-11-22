@@ -14,6 +14,7 @@ A sequência de **teste no MacBook → produção no i7** está em `docs/IMPLANT
 4. Sem pressa, quando houver mais tempo: testes de isolamento da Nathalia (Ficha 8, item 3), Claude dela (1b.3),
    iPhone e Windows no Syncthing (2.2), inventário do i5 (1.1).
 5. Por último: compartilhar documento entre o Leonardo e a Nathalia (2.5).
+6. Fotos (Fase 10, Ficha 17) antes da 6.1, o desenho do WhatsApp (Leonardo, 2026-11-22).
 
 ---
 
@@ -256,6 +257,22 @@ da 6.4), fonte de investimentos (ainda sem item) e mais de um meio de enviar a m
 - [ ] 9.2 (era 5.3) Cobranças: hábito parado há tempo demais (treino, estudo, iFood demais, sem investir) vira uma
   linha que cobra. Fonte no banco e limite por hábito; ficha própria antes (Ficha 13 § Depois)
 - [ ] 9.3 Meios de envio: WhatsApp (6.4) e outros; escolher por mensagem. Ficha antes
+
+## Fase 10 — Fotos e vídeos (Immich) (Leonardo, 2026-11-22)
+Sair do Google Fotos (~12 GB) e liberar o iPhone, com as repetidas achadas. Regras: Ficha 17 (aprovada em 2026-11-22). Projeto
+Docker Compose próprio em `fotos/`, estado em `/srv/fotos` no SSD, só pela tailnet.
+- [x] 10.1 (2026-11-22) Ficha 17 aprovada; o acervo cabe no SSD com folga (Leonardo)
+- [ ] ⚑ 10.2 `fotos/`: Immich (server, ML, Postgres, Redis) com versão fixa, rede própria e nó Tailscale `fotos` só
+  com Serve. Medir a RAM com o ML parado e rodando. Pronto: abre pelo navegador na tailnet, Funnel recusado
+  (2026-11-22: `fotos/` escrito, Immich v3.4.2; roteiro em `docs/IMPLANTACAO.md` "Fotos (10)"; teste no Mac ok, RAM sem ML ~1,9 GB; falta F1–F5 no i7)
+- [ ] 10.3 ML semanal (Ficha 17, regra 6): timer no host liga o container de ML no domingo 00:30, dispara os jobs
+  só do que falta pela API, espera a fila esvaziar (limite 03:00) e desliga. Conferir antes como o Immich trata
+  envio com o ML parado (não verificado em 2026-11-22)
+- [ ] 10.4 Backup às 04:05 (biblioteca incremental + banco, cifrado), conferência às 07:10 e ensaio de restauração no Mac
+- [ ] 10.5 Takeout do Google Fotos do Leonardo importado pelo `immich-go`; contagem conferida (Ficha 17, regra 9a)
+- [ ] 10.6 iPhone do Leonardo no app do Immich (depende do Tailscale no iPhone, como a 5b.2); revisar as duplicatas
+- [ ] 10.7 Conta da Nathalia, o Takeout e o iPhone dela
+- [ ] 10.8 O Leonardo apaga do Google e do iPhone, depois dos critérios da Ficha 17, regra 9
 
 ## Melhorias anotadas (Leonardo, 2026-10-18)
 Vieram da análise do vault de 2026-10-18. O lado do vault já está feito (D4 de `decisoes-do-vault`): campo
