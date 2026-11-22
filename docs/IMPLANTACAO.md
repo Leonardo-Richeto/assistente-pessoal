@@ -836,40 +836,49 @@ confere que cada foto do banco tem o original no backup.
 
 #### Importação do Google Fotos (10.5)
 
-Pelo `immich-go` v0.32.0 (github.com/simulot/immich-go), **no Mac**, lendo os `.zip` do Takeout sem descompactar e
-enviando pela rede de casa para `http://<IP do i7>:2283`. Ele lê os `.json` do Takeout (data, local, álbuns). O ML
-não roda durante o envio; depois, uma janela longa processa tudo. **Antes:** os `.zip` baixados no Mac (~12 GB; o
-Mac tinha 27 GB livres em 2026-11-22) e o Mac no Wi-Fi de casa.
+Pelo `immich-go` v0.32.0 (github.com/simulot/immich-go), **no i7**, lendo o `.zip` do Takeout sem descompactar e
+enviando para `http://127.0.0.1:8040`. Ele lê os `.json` do Takeout (data, local, álbuns). O `.zip` fica em `/srv/fotos/takeout`, no SSD, fora da biblioteca (não entra no backup). O ML
+não roda durante o envio; depois, uma janela longa processa tudo. O `.zip` é baixado no Mac e copiado para o i7.
 
-- [ ] I1. Baixar todos os `takeout-*.zip` do e-mail do Google para uma pasta só (ex.: `~/takeout/`); conferir que
-      não falta nenhuma parte (`ls -la ~/takeout/`; o e-mail diz quantas são).
-- [ ] I2. Instalar o immich-go (binário do GitHub, conferindo o checksum da release):
+- [ ] I1. Baixar no Mac e copiar para o i7 (Leonardo, 2026-11-22: mais fácil que o link no `curl`). Em
+      takeout.google.com/manage, "Baixar" cada parte (links até 2026-11-29). Depois, no Terminal do Mac:
       ```bash
-      cd ~/Downloads && V=v0.32.0
-      curl -fLO https://github.com/simulot/immich-go/releases/download/$V/immich-go_Darwin_arm64.tar.gz
+      ssh leonardo@i7 'mkdir -p /srv/fotos/takeout'
+      rsync -a --progress ~/Downloads/takeout-*.zip leonardo@i7:/srv/fotos/takeout/
+      ls -la ~/Downloads/takeout-*.zip; ssh leonardo@i7 'ls -la /srv/fotos/takeout'   # mesmos tamanhos nos dois
+      ```
+      Apague as cópias do Mac (`rm ~/Downloads/takeout-*.zip`) só depois do teste do `unzip` no I2.
+- [ ] I2. Instalar o immich-go no i7 (binário do GitHub, conferindo o checksum da release) e o `tmux`, para o envio
+      não cair se a sessão SSH fechar; antes, o teste do `.zip` copiado:
+      ```bash
+      sudo apt install -y tmux unzip
+      cd /srv/fotos/takeout && for z in takeout-*.zip; do unzip -tq "$z"; done   # esperado: "No errors detected" em cada
+      mkdir -p ~/immich-go && cd ~/immich-go && V=v0.32.0
+      curl -fLO https://github.com/simulot/immich-go/releases/download/$V/immich-go_Linux_x86_64.tar.gz
       curl -fLO https://github.com/simulot/immich-go/releases/download/$V/checksums.txt
-      grep immich-go_Darwin_arm64.tar.gz checksums.txt | shasum -a 256 -c -     # esperado: OK
-      tar -xzf immich-go_Darwin_arm64.tar.gz immich-go && xattr -d com.apple.quarantine immich-go 2>/dev/null; ./immich-go version
+      grep immich-go_Linux_x86_64.tar.gz checksums.txt | sha256sum -c -     # esperado: OK
+      tar -xzf immich-go_Linux_x86_64.tar.gz immich-go && ./immich-go version
       ```
 - [ ] I3. Chave da API **só para a importação**, na conta do Leonardo: nome `importacao-google`, permissões
       `asset.read`, `asset.statistics`, `asset.update`, `asset.upload`, `asset.copy`, `asset.delete`,
       `asset.download`, `album.create`, `album.read`, `albumAsset.create`, `server.about`, `stack.create`,
       `tag.asset`, `tag.create`, `user.read` (lista da documentação do immich-go). Sem `job.*`: o ML já está parado,
       então não precisa pausar filas (`--pause-immich-jobs=false`). Apague a chave no fim (I8).
-- [ ] I4. Ensaio sem enviar nada. Ponha a chave numa variável sem gravar no histórico (`read -s K`):
+- [ ] I4. Ensaio sem enviar nada, dentro do `tmux` (`tmux new -s importacao`; se a sessão SSH cair, `tmux attach -t
+      importacao`). A chave vai numa variável, fora do histórico:
       ```bash
       read -s K   # cole a chave e Enter
-      ~/Downloads/immich-go upload from-google-photos --server=http://<IP do i7>:2283 --api-key="$K" \
-        --pause-immich-jobs=false --dry-run ~/takeout/takeout-*.zip
+      ~/immich-go/immich-go upload from-google-photos --server=http://127.0.0.1:8040 --api-key="$K" \
+        --pause-immich-jobs=false --dry-run /srv/fotos/takeout/takeout-*.zip
       ```
       Anote o resumo (fotos, vídeos, álbuns, ignorados). Se reclamar da versão do servidor, pare: o immich-go
       v0.32.0 saiu antes do Immich v3.4.2.
-- [ ] I5. Envio de verdade (no Wi-Fi, ~12 GB):
+- [ ] I5. Envio de verdade, no mesmo `tmux`:
       ```bash
-      ~/Downloads/immich-go upload from-google-photos --server=http://<IP do i7>:2283 --api-key="$K" \
-        --pause-immich-jobs=false --on-errors=continue --session-tag ~/takeout/takeout-*.zip; unset K
+      ~/immich-go/immich-go upload from-google-photos --server=http://127.0.0.1:8040 --api-key="$K" \
+        --pause-immich-jobs=false --on-errors=continue --session-tag /srv/fotos/takeout/takeout-*.zip; unset K
       ```
-      Compare o resumo com o do I4 (Ficha 17, regra 9a). O resumo e o log ficam na saída do comando: guarde-os.
+      Compare o resumo com o do I4 (Ficha 17, regra 9a) e guarde a saída.
 - [ ] I6. Janela longa do ML, no i7 (rostos, busca, texto e duplicatas de todo o acervo), e a RAM com o ML
       trabalhando:
       ```bash
@@ -882,5 +891,5 @@ Mac tinha 27 GB livres em 2026-11-22) e o Mac no Wi-Fi de casa.
       Confira no Immich: rostos em "Pessoas", a busca por texto ("praia") e Utilitários → Duplicatas.
 - [ ] I7. O backup das 04:05 cifra o acervo inteiro na primeira noite (até 6 h). No dia seguinte: `journalctl -u
       fotos-backup -n 5` e o ensaio do B4 de novo, com `--amostra 200`.
-- [ ] I8. Apagar a chave `importacao-google` no Immich e os `.zip` do Mac só depois do I7 (o Google continua com
-      tudo até a 10.8).
+- [ ] I8. Só depois do I7: apagar a chave `importacao-google` no Immich e o `.zip` (`rm -r /srv/fotos/takeout`). O
+      Google continua com tudo até a 10.8.
