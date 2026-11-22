@@ -22,11 +22,12 @@ ui:
   timezone: America/Sao_Paulo
   time_format: 24hour
 
-# Ficha 18, regra 4: OpenVINO na CPU (o i7-6700 é Skylake, suportado). A GPU integrada fica para depois de medir.
+# Ficha 18, regra 4: OpenVINO na GPU integrada do i7 (HD 530, Skylake, suportado). Na CPU, o detector usava ~54% de
+# um núcleo (26 ms por análise, medido em 2026-11-22). Precisa do GPU_DRI no .env: sem GPU (Mac), troque para CPU.
 detectors:
   ov:
     type: openvino
-    device: CPU
+    device: GPU
 model:
   width: 300
   height: 300

@@ -903,7 +903,8 @@ roteador (o MAC da interface em uso) e ~1,5 GB livres para a imagem.
 
 A senha da câmera vai no `.env` já no formato de URL (`#` vira `%23`). IP e senha nunca entram no repositório.
 
-- [ ] C0. Teste no Mac (o Frigate grava num `~/cameras-teste`; disco do Mac acima de 85%: `CAMERAS_LIMITE_DISCO=95`):
+- [x] C0. (2026-11-22: ok, imagem, gravação e Mibo ao mesmo tempo; o detector era CPU. Para repetir no Mac, troque
+      `device: GPU` por `CPU` no `config.yml`) Teste no Mac (o Frigate grava num `~/cameras-teste`; disco do Mac acima de 85%: `CAMERAS_LIMITE_DISCO=95`):
       ```bash
       H=~/cameras-teste && mkdir -p "$H"
       sed -e "s|^CAMERAS_HOME=.*|CAMERAS_HOME=$H|" -e 's|^COMPOSE_PROJECT_NAME=.*|COMPOSE_PROJECT_NAME=cameras-teste|' \
