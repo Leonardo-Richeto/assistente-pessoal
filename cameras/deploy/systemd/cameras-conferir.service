@@ -1,0 +1,12 @@
+[Unit]
+Description=Conferencia diaria da camera (Ficha 18 regra 7: no ar, gravando, portas, disco)
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# <usuario>, <app> e <cameras_home> sao trocados na instalacao (docs/IMPLANTACAO.md, "Câmera (11)").
+User=<usuario>
+Environment=CAMERAS_HOME=<cameras_home>
+ExecStart=/bin/bash <app>/cameras/scripts/conferir.sh
+TimeoutStartSec=5min

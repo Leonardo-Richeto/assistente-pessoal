@@ -893,3 +893,50 @@ não roda durante o envio; depois, uma janela longa processa tudo. O `.zip` é b
       fotos-backup -n 5` e o ensaio do B4 de novo, com `--amostra 200`.
 - [ ] I8. Só depois do I7: apagar a chave `importacao-google` no Immich e o `.zip` (`rm -r /srv/fotos/takeout`). O
       Google continua com tudo até a 10.8.
+
+### Câmera (11) — Frigate no i7
+
+Ficha 18: Frigate grava a câmera da frente no SSD (`/srv/cameras`), 5 dias contínuos e 30 dias dos trechos com
+pessoa, vídeo e áudio sem converter. Projeto Docker Compose próprio (`cameras/`). Painel só na porta 8971, com login
+e HTTPS de certificado próprio, no loopback e no IP de casa do i7. **Antes:** IP da câmera reservado no DHCP do
+roteador (o MAC da interface em uso) e ~1,5 GB livres para a imagem.
+
+A senha da câmera vai no `.env` já no formato de URL (`#` vira `%23`). IP e senha nunca entram no repositório.
+
+- [ ] C0. Teste no Mac (o Frigate grava num `~/cameras-teste`; disco do Mac acima de 85%: `CAMERAS_LIMITE_DISCO=95`):
+      ```bash
+      H=~/cameras-teste && mkdir -p "$H"
+      sed -e "s|^CAMERAS_HOME=.*|CAMERAS_HOME=$H|" -e 's|^COMPOSE_PROJECT_NAME=.*|COMPOSE_PROJECT_NAME=cameras-teste|' \
+          cameras/.env.example > "$H/.env" && chmod 600 "$H/.env"
+      open -e "$H/.env"   # CAMERA_IP=<IP da câmera> e CAMERA_SENHA=<senha no formato de URL>
+      CAMERAS_HOME="$H" bash cameras/scripts/preparar.sh
+      ```
+      Abra `https://127.0.0.1:8971`, aceite o certificado, entre com o admin e a senha do log. Confira: imagem ao vivo,
+      gravação na linha do tempo, um evento "person" ao passar na frente e o app Mibo abrindo ao vivo ao mesmo tempo
+      (o Frigate abre duas sessões RTSP na câmera). Para apagar o teste:
+      `docker compose -p cameras-teste down` e `rm -rf ~/cameras-teste`.
+- [ ] C1. Estado e `.env` no i7:
+      ```bash
+      sudo mkdir -p /srv/cameras && sudo chown "$USER": /srv/cameras && chmod 700 /srv/cameras
+      cd /srv/assistente/app && git pull
+      cp cameras/.env.example /srv/cameras/.env && chmod 600 /srv/cameras/.env
+      nano /srv/cameras/.env   # CAMERA_IP, CAMERA_SENHA e ENDERECO_LAN=<IP de casa do i7>
+      ```
+- [ ] C2. Subir e conferir:
+      ```bash
+      CAMERAS_HOME=/srv/cameras bash cameras/scripts/preparar.sh
+      ```
+      Troque a senha do admin na tela (Configurações → Usuários) e guarde no cofre. Se a senha inicial se perder
+      (o log some quando o container é recriado), ponha `auth: {reset_admin_password: true}` no `config.yml` do
+      repositório, rode o `preparar.sh`, pegue a senha nova no log e tire a linha. No Mac, no Wi-Fi de casa, abra
+      `https://<IP do i7>:8971`.
+- [ ] C3. Conferência diária às 07:15:
+      ```bash
+      for u in cameras-conferir.service cameras-conferir.timer; do
+        sed -e "s|<usuario>|$USER|" -e "s|<app>|/srv/assistente/app|" -e "s|<cameras_home>|/srv/cameras|" \
+            cameras/deploy/systemd/$u | sudo tee /etc/systemd/system/$u >/dev/null
+      done
+      sudo systemctl daemon-reload && sudo systemctl enable --now cameras-conferir.timer
+      sudo systemctl start cameras-conferir.service && journalctl -u cameras-conferir -n 5 --no-pager
+      ```
+- [ ] C4. Medir a RAM e a CPU (`docker stats --no-stream`) e anotar no PLANO (11.2).

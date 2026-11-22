@@ -1,0 +1,90 @@
+# Frigate 0.18.2 da câmera da frente (Ficha 18). Fonte: o repositório. O preparar.sh copia este arquivo para
+# ${CAMERAS_HOME}/config/config.yml a cada rodada: mudança feita pela tela do Frigate se perde na próxima.
+# {FRIGATE_CAMERA_IP} e {FRIGATE_CAMERA_SENHA} vêm do .env pelo docker-compose.yml.
+
+# Sem esta chave, o Frigate trata o arquivo como 0.13 e o regrava (migração): a conferência acusaria diferença.
+version: 0.18-0
+
+mqtt:
+  enabled: false
+
+# Sem aviso de versão nova (não consulta a internet por isso).
+telemetry:
+  version_check: false
+
+# Login na porta 8971 (o admin e a senha saem no log na primeira subida) e HTTPS com certificado próprio.
+auth:
+  enabled: true
+tls:
+  enabled: true
+
+ui:
+  timezone: America/Sao_Paulo
+  time_format: 24hour
+
+# Ficha 18, regra 4: OpenVINO na CPU (o i7-6700 é Skylake, suportado). A GPU integrada fica para depois de medir.
+detectors:
+  ov:
+    type: openvino
+    device: CPU
+model:
+  width: 300
+  height: 300
+  input_tensor: nhwc
+  input_pixel_format: bgr
+  path: /openvino-model/ssdlite_mobilenet_v2.xml
+  labelmap_path: /openvino-model/coco_91cl_bkgr.txt
+
+# Duas sessões RTSP na câmera (principal e secundário); o Frigate lê pelo restream local. Sem porta 8554 publicada.
+go2rtc:
+  streams:
+    frente:
+      - rtsp://admin:{FRIGATE_CAMERA_SENHA}@{FRIGATE_CAMERA_IP}:554/cam/realmonitor?channel=1&subtype=0
+    frente_sub:
+      - rtsp://admin:{FRIGATE_CAMERA_SENHA}@{FRIGATE_CAMERA_IP}:554/cam/realmonitor?channel=1&subtype=1
+
+cameras:
+  frente:
+    ffmpeg:
+      # Ficha 18, regra 3: vídeo e áudio (AAC) copiados como vêm da câmera, sem converter.
+      output_args:
+        record: preset-record-generic-audio-copy
+      inputs:
+        - path: rtsp://127.0.0.1:8554/frente
+          input_args: preset-rtsp-restream
+          roles: [record]
+        - path: rtsp://127.0.0.1:8554/frente_sub
+          input_args: preset-rtsp-restream
+          roles: [detect]
+    live:
+      streams:
+        Principal: frente
+        Secundario: frente_sub
+    detect:
+      enabled: true
+      fps: 5
+    # Ficha 18, regra 4: só pessoa.
+    objects:
+      track: [person]
+    review:
+      alerts:
+        labels: [person]
+    # Ficha 18, regra 3: 5 dias de gravação contínua; trechos com pessoa por 30 dias.
+    record:
+      enabled: true
+      continuous:
+        days: 5
+      alerts:
+        retain:
+          days: 30
+          mode: motion
+      detections:
+        retain:
+          days: 30
+          mode: motion
+    snapshots:
+      enabled: true
+      retain:
+        default: 30
+    timestamp_style:
+      format: "%d/%m/%Y %H:%M:%S"

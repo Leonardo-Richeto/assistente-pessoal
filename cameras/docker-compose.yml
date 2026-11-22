@@ -1,0 +1,37 @@
+# Câmera da frente (Ficha 18, PLANO Fase 11): Frigate grava a câmera Intelbras no SSD do i7. Projeto próprio, fora
+# do compose do assistente, das fotos, do Paperless e do cofre. Roteiro: docs/IMPLANTACAO.md, "Câmera (11)".
+#
+# Todo o estado fica em ${CAMERAS_HOME}:
+#   ${CAMERAS_HOME}/.env          configuração e senha da câmera (fora do git; modelo em cameras/.env.example)
+#   ${CAMERAS_HOME}/config        config.yml (copiado do repositório pelo preparar.sh), banco SQLite e usuários
+#   ${CAMERAS_HOME}/gravacoes     gravações e fotos dos eventos; o Frigate apaga sozinho (Ficha 18, regra 3)
+#
+# Rodar sempre pelos scripts de cameras/scripts (eles passam o .env de fora do repositório).
+# A porta da rede de casa fica em docker-compose.lan.yml, junto só com ENDERECO_LAN no .env.
+# Sem portas do go2rtc (8554 e 8555) e sem a porta 5000 (sem login): só a 8971, com login e HTTPS próprio.
+# Imagem com versão e digest fixos. Para atualizar: leia as notas da versão (o Frigate muda o config.yml às vezes),
+# troque a tag e o digest juntos e rode cameras/scripts/preparar.sh depois.
+
+name: ${COMPOSE_PROJECT_NAME:-cameras}
+
+services:
+  frigate:
+    image: ghcr.io/blakeblackshear/frigate:0.18.2@sha256:fd60f99ffd4eb6c42360ed4e14953e270586f239309ab3983e55b2e97ffac09a
+    restart: unless-stopped
+    # Uma câmera detectando no stream secundário: 256 MB sobram (docs do Frigate, "Calculating required shm-size").
+    shm_size: 256mb
+    environment:
+      TZ: America/Sao_Paulo
+      # O config.yml lê estas duas como {FRIGATE_CAMERA_IP} e {FRIGATE_CAMERA_SENHA}: IP e senha ficam fora do git.
+      FRIGATE_CAMERA_IP: ${CAMERA_IP:?defina CAMERA_IP no .env}
+      FRIGATE_CAMERA_SENHA: ${CAMERA_SENHA:?defina CAMERA_SENHA no .env}
+    volumes:
+      - ${CAMERAS_HOME:?defina CAMERAS_HOME no .env}/config:/config
+      - ${CAMERAS_HOME}/gravacoes:/media/frigate
+      - type: tmpfs  # trechos em gravação antes de irem para o disco (recomendação do Frigate)
+        target: /tmp/cache
+        tmpfs:
+          size: 1000000000
+    # Loopback do host (túnel SSH e conferência). A rede de casa entra pelo docker-compose.lan.yml.
+    ports:
+      - "127.0.0.1:${PORTA_HOST:-8971}:8971"

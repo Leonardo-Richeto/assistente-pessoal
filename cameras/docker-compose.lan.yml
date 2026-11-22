@@ -1,0 +1,5 @@
+# Porta do Frigate na rede de casa (Ficha 18, regra 5). Só no IP do i7 na rede local: não responde pela internet.
+services:
+  frigate:
+    ports:
+      - "${ENDERECO_LAN:?defina ENDERECO_LAN no .env}:${PORTA_LAN:-8971}:8971"

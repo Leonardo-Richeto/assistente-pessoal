@@ -1639,3 +1639,70 @@ Leonardo cola o texto na próxima vez que precisar mexer no Projeto (não é urg
     (Leonardo, 2026-11-22). Sem "VPN On Demand".
 11. Backup: o nosso backup copia o dump do banco que o Immich faz às 02:00; o backup Yucca do Immich fica desligado
     (Leonardo, 2026-11-22).
+
+### Mudança proposta da regra 2: acervo fora de casa (2026-11-22)
+
+- **Status:** aprovada (Leonardo, 2026-11-22: opção A e texto). Implementar depois da 10.6, não agora (Leonardo,
+  2026-11-22).
+- **Texto novo da regra 2:** o Immich responde na rede de casa, no loopback e na interface do Tailscale do i7. Fora de
+  casa, o Leonardo liga o Tailscale do iPhone à mão para ver o acervo e desliga depois. Sem "VPN On Demand" e sem
+  Funnel: nada na internet. O backup automático continua só no Wi-Fi de casa.
+- **Muda na decisão 10:** o Tailscale passa a existir no iPhone, desligado por padrão.
+- **Descartados:** Tailscale sempre ligado (bateria, dados móveis) e Funnel (acervo exposto na internet).
+- **Cenário de teste novo:** com o Tailscale do iPhone ligado e fora do Wi-Fi de casa, o app abre o acervo; com ele
+  desligado, não abre; pela internet, não abre.
+
+## Ficha 18 — Gravação da câmera no i7 (Frigate)
+
+- **Status:** aprovada (Leonardo, 2026-11-22: 5 dias de contínuo e 30 de pessoa; aumentar se a medida real deixar). Proposta do Opus 5.5. Origem: pedido do Leonardo de 2026-11-22: a câmera Intelbras (app Mibo)
+  não tem cartão nem plano de nuvem; gravar no i7 por algum tempo. Plano: `PLANO.md` Fase 11.
+- **Onde vive:** pasta `cameras/` (projeto Docker Compose próprio, como `fotos/`), gravações em `/srv/cameras` no SSD.
+- **Câmera:** Intelbras iM5 SC, na frente de casa, apontada para o portão e a rua (Leonardo, 2026-11-22).
+- **Verificado em 2026-11-22:** a câmera entrega RTSP na rede de casa: H.264 1920×1080 com áudio AAC (`ffprobe` no Mac).
+
+### Regra
+
+1. **Ferramenta:** Frigate, com o go2rtc embutido. O i7 abre duas sessões com a câmera (stream principal e
+   secundário) e repassa às telas do painel.
+2. **O app Mibo continua funcionando.** O i7 só lê o vídeo; não muda nada na câmera.
+3. **Gravação contínua por 5 dias** e **trechos com pessoa por 30 dias**, no SSD (~110 GB, estimativa). Depois disso, o Frigate apaga sozinho.
+   O vídeo e o áudio são copiados como vêm da câmera, sem converter. O áudio é gravado (Leonardo, 2026-11-22).
+4. **Detecção só de pessoa**, no stream secundário (baixa resolução), na CPU ou na GPU integrada do i7.
+5. **Acesso:** painel com login na rede de casa; pelo Tailscale num passo próprio (11.4). Nada na internet, sem Funnel.
+6. **Sem backup.** A gravação é temporária; perder o SSD perde só os últimos dias.
+7. **Teto de disco:** a conferência diária avisa se `/srv/cameras` passar de 80 GB (5 dias a ~5,3 GB por dia medidos, com folga para o dobro e os eventos) ou o SSD passar de 85%.
+8. **Senha da câmera** fica no `.env` do i7. IP e senha nunca entram no repo.
+9. **O assistente não vê as gravações nesta fase.** Alerta no WhatsApp fica para ficha própria (Fase 6).
+
+### Exemplos
+
+- Alguém passa na frente da câmera na terça às 14:00. No domingo, o trecho contínuo já foi apagado; o trecho marcado
+  como pessoa continua por 30 dias.
+- O Leonardo abre o painel pelo celular no Wi-Fi de casa e vê a câmera ao vivo e a linha do tempo.
+
+### Não faz
+
+- Não manda vídeo para nuvem nenhuma.
+- Não abre o painel na internet.
+- Não guarda gravação no backup nem no HD de 500 GB.
+- Não reconhece rosto nem placa.
+
+### Cenário de teste
+
+1. Com a câmera ligada, o painel mostra o vídeo ao vivo e grava arquivos em `/srv/cameras`.
+2. Uma pessoa passa na frente: aparece um evento "person" com o trecho gravado.
+3. O app Mibo continua abrindo a câmera ao vivo com o Frigate ligado.
+4. O painel abre pelo IP de casa e pelo Tailscale do i7; pela internet, não.
+5. Depois de 5 dias, a gravação contínua mais antiga some e o evento continua.
+
+### Decisões em aberto
+
+1. Nenhuma. Rever os dias depois de uma semana de gravação real (11.3).
+
+### Decisões do Leonardo (2026-11-22)
+
+1. A câmera fica na frente de casa, apontada para o portão e a rua.
+2. Grava o áudio.
+3. Prazos: 5 dias de contínuo e 30 de pessoa no SSD; sem compra de HD agora. 1 minuto medido de dia deu ~0,49 Mbps
+   (~5,3 GB por dia); com a densidade real de uma semana, aumentar se couber.
+4. SSD do i7 em 2026-11-22: 221 GB, 146 GB livres (31% usado).
