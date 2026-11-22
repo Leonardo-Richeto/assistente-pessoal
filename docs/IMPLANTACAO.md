@@ -916,14 +916,14 @@ A senha da câmera vai no `.env` já no formato de URL (`#` vira `%23`). IP e se
       gravação na linha do tempo, um evento "person" ao passar na frente e o app Mibo abrindo ao vivo ao mesmo tempo
       (o Frigate abre duas sessões RTSP na câmera). Para apagar o teste:
       `docker compose -p cameras-teste down` e `rm -rf ~/cameras-teste`.
-- [ ] C1. Estado e `.env` no i7:
+- [x] C1. (2026-11-22) Estado e `.env` no i7:
       ```bash
       sudo mkdir -p /srv/cameras && sudo chown "$USER": /srv/cameras && chmod 700 /srv/cameras
       cd /srv/assistente/app && git pull
       cp cameras/.env.example /srv/cameras/.env && chmod 600 /srv/cameras/.env
       nano /srv/cameras/.env   # CAMERA_IP, CAMERA_SENHA, ENDERECO_LAN=<IP de casa do i7> e GPU_DRI=/dev/dri/renderD128
       ```
-- [ ] C2. Subir e conferir:
+- [x] C2. (2026-11-22) Subir e conferir:
       ```bash
       CAMERAS_HOME=/srv/cameras bash cameras/scripts/preparar.sh
       ```
@@ -931,7 +931,7 @@ A senha da câmera vai no `.env` já no formato de URL (`#` vira `%23`). IP e se
       (o log some quando o container é recriado), ponha `auth: {reset_admin_password: true}` no `config.yml` do
       repositório, rode o `preparar.sh`, pegue a senha nova no log e tire a linha. No Mac, no Wi-Fi de casa, abra
       `https://<IP do i7>:8971`.
-- [ ] C3. Conferência diária às 07:15:
+- [x] C3. (2026-11-22; 1ª rodada acusou o config.yml mudado pela tela, desfeito pelo preparar.sh) Conferência diária às 07:15:
       ```bash
       for u in cameras-conferir.service cameras-conferir.timer; do
         sed -e "s|<usuario>|$USER|" -e "s|<app>|/srv/assistente/app|" -e "s|<cameras_home>|/srv/cameras|" \
@@ -940,4 +940,4 @@ A senha da câmera vai no `.env` já no formato de URL (`#` vira `%23`). IP e se
       sudo systemctl daemon-reload && sudo systemctl enable --now cameras-conferir.timer
       sudo systemctl start cameras-conferir.service && journalctl -u cameras-conferir -n 5 --no-pager
       ```
-- [ ] C4. Medir a RAM e a CPU (`docker stats --no-stream`) e anotar no PLANO (11.2).
+- [x] C4. (2026-11-22: ~1 GB de RAM; CPU 91% de um núcleo → 53% com a GPU no detector) Medir a RAM e a CPU (`docker stats --no-stream`) e anotar no PLANO (11.2).

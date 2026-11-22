@@ -285,10 +285,11 @@ Docker Compose próprio em `fotos/`, estado em `/srv/fotos` no SSD, só na rede 
 Gravar a câmera Intelbras (app Mibo) no i7, sem cartão e sem plano de nuvem. Regras: Ficha 18 (aprovada em 2026-11-22). Projeto
 Docker Compose próprio em `cameras/`, gravações em `/srv/cameras` no SSD.
 - [x] 11.0 (2026-11-22) RTSP testado no Mac: H.264 1920×1080 com áudio AAC
-- [ ] 11.1 (2026-11-22: Ficha 18 aprovada; falta a reserva) IP da câmera reservado no DHCP do roteador
-- [ ] 11.2 `cameras/`: Frigate 0.18.2 com digest fixo, senha no `.env`, porta 8971 no loopback e no IP de casa,
-  conferência diária às 07:15. Medir a RAM e a CPU (2026-11-22: escrito; falta o teste no Mac e a subida no i7, roteiro
-  em `docs/IMPLANTACAO.md` "Câmera (11)")
+- [x] 11.1 (2026-11-22) Ficha 18 aprovada; IP da câmera reservado no DHCP do roteador
+- [x] 11.2 `cameras/`: Frigate 0.18.2 com digest fixo, senha no `.env`, porta 8971 no loopback e no IP de casa,
+  conferência diária às 07:15. Medir a RAM e a CPU (2026-11-22: no ar no i7, C0–C4 ok; GPU integrada decodificando
+  (vaapi) e detectando (OpenVINO GPU); Frigate com ~1 GB de RAM e ~53% de um núcleo, antes 91% com o detector na CPU;
+  o movimento pesa ~28%. Mudança na tela do Frigate se perde no preparar.sh: o repositório é a fonte)
 - [ ] 11.3 Depois de 7 dias: medir a densidade real (GB por dia) e rever os prazos da Ficha 18
 - [ ] 11.4 Painel pelo Tailscale (nó próprio com Serve, como o cofre; sem Funnel)
 - [ ] 11.5 Aviso ativo quando a conferência falhar (hoje só fica no journal, como nas fotos); junto com os avisos da 6.4
