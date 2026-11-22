@@ -706,49 +706,46 @@ A senha mestra não tem recuperação (sem e-mail): esquecida, o cofre só volta
 
 ### Fotos (10) — Immich no i7
 
-Ficha 17: Immich do Leonardo e da Nathalia, só pela tailnet (nó Tailscale `fotos`, HTTPS do Serve, nunca Funnel),
-projeto Docker Compose próprio (`fotos/`), estado em `/srv/fotos` no SSD. O ML fica parado e só sobe na janela semanal
-(10.3). Backup e conferência por timer entram na 10.4. **Antes:** uma auth key nova da Tailscale e ~2 GB livres
-para as imagens.
+Ficha 17: Immich do Leonardo e da Nathalia, só na rede de casa (IP do i7 na rede local e loopback; sem Tailscale e
+sem Funnel), projeto Docker Compose próprio (`fotos/`), estado em `/srv/fotos` no SSD. O ML fica parado e só sobe na
+janela semanal (10.3). Backup e conferência por timer entram na 10.4. **Antes:** ~2 GB livres para as imagens e o
+IP do i7 fixo na rede de casa (reserva no DHCP do roteador).
 
 **Primeiro administrador:** no Immich, quem abre a página primeiro vira administrador. Por isso o `preparar.sh` sobe só
-no loopback enquanto não houver administrador, e o Tailscale só liga na segunda rodada.
+no loopback enquanto não houver administrador; a porta da rede de casa só liga na segunda rodada.
 
 - [x] F0. (2026-11-22: ok; RAM sem ML ~1,9 GB) Teste no Mac (uma pasta vazia qualquer como `FOTOS_HOME`, sem Tailscale;
       com o disco do Mac acima de 85%, rode a conferência com `FOTOS_LIMITE_DISCO=95`):
       ```bash
       H=~/fotos-teste && mkdir -p "$H"
       sed -e "s|^FOTOS_HOME=.*|FOTOS_HOME=$H|" -e 's|^COMPOSE_PROJECT_NAME=.*|COMPOSE_PROJECT_NAME=fotos-teste|' \
-          -e "s|^DB_PASSWORD=.*|DB_PASSWORD=$(openssl rand -hex 24)|" -e 's|^COMPOSE_PROFILES=.*|COMPOSE_PROFILES=|' \
-          fotos/.env.example > "$H/.env" && chmod 600 "$H/.env"
+          -e "s|^DB_PASSWORD=.*|DB_PASSWORD=$(openssl rand -hex 24)|" fotos/.env.example > "$H/.env" && chmod 600 "$H/.env"
       FOTOS_HOME="$H" bash fotos/scripts/preparar.sh   # 1ª: para pedindo o administrador
       # crie a conta em http://127.0.0.1:8040 e rode de novo:
       FOTOS_HOME="$H" bash fotos/scripts/preparar.sh   # conferência ok
       ```
       Para apagar o teste: `docker compose -p fotos-teste down` e `rm -rf ~/fotos-teste`.
-- [ ] F1. Auth key do nó: no painel da Tailscale, Settings → Keys → Generate auth key, sem "Reusable" e sem
-      "Ephemeral". Ela vai para o `.env` só no F4, depois do administrador (antes, um `docker compose up` à mão
-      ligaria o Tailscale cedo demais).
+- [ ] F1. IP do i7 na rede de casa: `ip -4 -br addr` no i7 (a interface de rede, não `tailscale0` nem `docker0`).
+      Confira no roteador que esse IP está reservado para o i7; sem reserva, o IP pode mudar e o app do iPhone perde
+      o Immich.
 - [ ] F2. Estado e `.env` no i7:
       ```bash
       sudo mkdir -p /srv/fotos && sudo chown "$USER": /srv/fotos && chmod 700 /srv/fotos
       cd /srv/assistente/app && git pull
       cp fotos/.env.example /srv/fotos/.env && chmod 600 /srv/fotos/.env
       sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=$(openssl rand -hex 24)|" /srv/fotos/.env
+      nano /srv/fotos/.env   # ENDERECO_LAN=<IP do F1>
       ```
-- [ ] F3. Logo depois do F2 (até haver administrador, qualquer usuário do i7 alcança o loopback), subir sem
-      Tailscale e criar o administrador pelo túnel SSH, do Mac:
+- [ ] F3. Logo depois do F2 (até haver administrador, qualquer usuário do i7 alcança o loopback), subir só no
+      loopback e criar o administrador pelo túnel SSH, do Mac:
       ```bash
       FOTOS_HOME=/srv/fotos bash fotos/scripts/preparar.sh     # no i7; para pedindo o administrador
       ssh -o ExitOnForwardFailure=yes -L 18040:127.0.0.1:8040 <i7>   # no Mac; abra http://127.0.0.1:18040 e crie a conta
       ```
-- [ ] F4. Ligar o Tailscale e apagar a auth key do `.env`:
+- [ ] F4. Ligar a porta da rede de casa:
       ```bash
-      nano /srv/fotos/.env   # TS_AUTHKEY (do F1)
-      FOTOS_HOME=/srv/fotos bash fotos/scripts/preparar.sh     # sobe o nó "fotos" e confere
-      sed -i 's|^TS_AUTHKEY=.*|TS_AUTHKEY=|' /srv/fotos/.env
+      FOTOS_HOME=/srv/fotos bash fotos/scripts/preparar.sh     # liga <IP>:2283 e confere
       ```
-      No painel da Tailscale: Machines → `fotos` → **Disable key expiry** (senão o nó sai da tailnet quando a chave
-      vence e o backup do iPhone para sem aviso). Confira `https://fotos.<tailnet>.ts.net` pelo navegador, dentro da
-      tailnet. Fora dela, o endereço não responde.
+      No Mac, no Wi-Fi de casa, abra `http://<IP do i7>:2283`. Pelo IP do Tailscale do i7 (`tailscale ip -4`), a
+      porta 2283 não pode responder.
 - [ ] F5. Medir a RAM (`docker stats --no-stream`) com o ML parado. A medida com o ML rodando entra na 10.3.

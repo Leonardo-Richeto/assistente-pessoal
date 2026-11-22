@@ -260,17 +260,18 @@ da 6.4), fonte de investimentos (ainda sem item) e mais de um meio de enviar a m
 
 ## Fase 10 — Fotos e vídeos (Immich) (Leonardo, 2026-11-22)
 Sair do Google Fotos (~12 GB) e liberar o iPhone, com as repetidas achadas. Regras: Ficha 17 (aprovada em 2026-11-22). Projeto
-Docker Compose próprio em `fotos/`, estado em `/srv/fotos` no SSD, só pela tailnet.
+Docker Compose próprio em `fotos/`, estado em `/srv/fotos` no SSD, só na rede de casa (sem Tailscale, 2026-11-22).
 - [x] 10.1 (2026-11-22) Ficha 17 aprovada; o acervo cabe no SSD com folga (Leonardo)
-- [ ] ⚑ 10.2 `fotos/`: Immich (server, ML, Postgres, Redis) com versão fixa, rede própria e nó Tailscale `fotos` só
-  com Serve. Medir a RAM com o ML parado e rodando. Pronto: abre pelo navegador na tailnet, Funnel recusado
+- [ ] ⚑ 10.2 `fotos/`: Immich (server, ML, Postgres, Redis) com versão fixa e rede própria, porta no IP de casa do i7
+  e no loopback. Medir a RAM com o ML parado e rodando. Pronto: abre pelo navegador no Wi-Fi de casa; pelo IP do
+  Tailscale do i7, não
   (2026-11-22: `fotos/` escrito, Immich v3.4.2; roteiro em `docs/IMPLANTACAO.md` "Fotos (10)"; teste no Mac ok, RAM sem ML ~1,9 GB; falta F1–F5 no i7)
 - [ ] 10.3 ML semanal (Ficha 17, regra 6): timer no host liga o container de ML no domingo 00:30, dispara os jobs
   só do que falta pela API, espera a fila esvaziar (limite 03:00) e desliga. Conferir antes como o Immich trata
   envio com o ML parado (não verificado em 2026-11-22)
 - [ ] 10.4 Backup às 04:05 (biblioteca incremental + banco, cifrado), conferência às 07:10 e ensaio de restauração no Mac
 - [ ] 10.5 Takeout do Google Fotos do Leonardo importado pelo `immich-go`; contagem conferida (Ficha 17, regra 9a)
-- [ ] 10.6 iPhone do Leonardo no app do Immich (depende do Tailscale no iPhone, como a 5b.2); revisar as duplicatas
+- [ ] 10.6 iPhone do Leonardo no app do Immich, no Wi-Fi de casa (sem VPN); revisar as duplicatas
 - [ ] 10.7 Conta da Nathalia, o Takeout e o iPhone dela
 - [ ] 10.8 O Leonardo apaga do Google e do iPhone, depois dos critérios da Ficha 17, regra 9
 

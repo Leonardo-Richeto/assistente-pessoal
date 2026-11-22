@@ -32,28 +32,33 @@ conferir_env() {
   home_env="$(absoluto "$(valor_env FOTOS_HOME)")"
   [ "${home_env%/}" = "$HOME_DIR" ] || falha "FOTOS_HOME do .env ($home_env) não é a pasta do .env ($HOME_DIR)."
   [[ "$(valor_env DB_PASSWORD)" =~ ^[A-Za-z0-9]+$ ]] || falha "DB_PASSWORD só com letras e números (exigência do Immich)."
-  case ",$(valor_env COMPOSE_PROFILES)," in
-    *,tailscale,*) [ -n "$(valor_env TS_NOME)" ] || falha "perfil tailscale ligado sem TS_NOME." ;;
-  esac
+  local lan; lan="$(valor_env ENDERECO_LAN)"
+  [ -z "$lan" ] || [[ "$lan" =~ ^(10|172|192)\.[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+    || falha "ENDERECO_LAN ($lan) não é um IP da rede local (10.x, 172.x ou 192.x)."
   # Ficha 17, regra 6: o ML só sobe na janela semanal, nunca pelo COMPOSE_PROFILES.
   case ",$(valor_env COMPOSE_PROFILES)," in
     *,ml,*) falha "perfil ml no COMPOSE_PROFILES: o ML ficaria ligado o tempo todo (Ficha 17, regra 6)." ;;
   esac
 }
 
+# Com ENDERECO_LAN no .env, junta a porta da rede de casa, salvo FOTOS_SO_LOOPBACK=1 (antes do administrador).
 dc() {
-  docker compose --project-directory "$(caminho_docker "$FOTOS_APP")" \
-    -f "$(caminho_docker "$FOTOS_APP/docker-compose.yml")" --env-file "$(caminho_docker "$ENV_FILE")" "$@"
+  local arquivos=(-f "$(caminho_docker "$FOTOS_APP/docker-compose.yml")")
+  if [ -n "$(valor_env ENDERECO_LAN)" ] && [ "${FOTOS_SO_LOOPBACK:-0}" != 1 ]; then
+    arquivos+=(-f "$(caminho_docker "$FOTOS_APP/docker-compose.lan.yml")")
+  fi
+  docker compose --project-directory "$(caminho_docker "$FOTOS_APP")" "${arquivos[@]}" \
+    --env-file "$(caminho_docker "$ENV_FILE")" "$@"
 }
 
-perfil_tailscale() { case ",$(valor_env COMPOSE_PROFILES)," in *,tailscale,*) return 0 ;; esac; return 1; }
+com_lan() { [ -n "$(valor_env ENDERECO_LAN)" ]; }
 
 porta_host() { local p; p="$(valor_env PORTA_HOST)"; echo "${p:-8040}"; }
 base_local() { echo "http://127.0.0.1:$(porta_host)"; }
 
 criar_pastas() {
   local d
-  for d in biblioteca postgres modelos tailscale; do
+  for d in biblioteca postgres modelos; do
     mkdir -p "$HOME_DIR/data/$d" || falha "não consegui criar $HOME_DIR/data/$d."
   done
   chmod 700 "$HOME_DIR" 2>/dev/null || true
@@ -77,11 +82,15 @@ conferir_porta() {
   local id saida
   id="$(dc ps -q immich-server 2>/dev/null | tr -d '\r' | head -n 1)"
   [ -n "$id" ] || { echo "porta: immich-server parado"; return 1; }
-  saida="$(docker port "$id" 2283/tcp 2>/dev/null | tr -d '\r')"
-  if [ -n "$saida" ] && ! printf '%s\n' "$saida" | grep -vq '^127\.0\.0\.1:'; then
-    echo "porta: $saida (só loopback)"
+  # Só o loopback e, com ENDERECO_LAN, o IP da rede de casa. 0.0.0.0 (todas as interfaces, inclusive a do
+  # Tailscale) é problema.
+  local permitido='^127\.0\.0\.1:'
+  com_lan && permitido="^(127\\.0\\.0\\.1|$(valor_env ENDERECO_LAN | sed 's/\./\\./g')):"
+  saida="$(docker port "$id" 2283/tcp 2>/dev/null | tr -d '\r' | tr '\n' ' ')"
+  if [ -n "$saida" ] && ! printf '%s\n' $saida | grep -Evq "$permitido"; then
+    echo "porta: $saida(loopback e rede de casa)"
   else
-    echo "porta: '${saida:-nenhuma}' (esperado só 127.0.0.1)"
+    echo "porta: '${saida:-nenhuma}' (esperado só 127.0.0.1 e ENDERECO_LAN)"
     return 1
   fi
 }

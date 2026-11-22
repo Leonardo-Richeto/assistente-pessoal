@@ -1572,8 +1572,10 @@ Leonardo cola o texto na próxima vez que precisar mexer no Projeto (não é urg
 
 1. **Duas contas:** Leonardo (administrador) e Nathalia, cada um com a própria biblioteca. Um vê a foto do outro só
    em álbum que o dono compartilhar pelo app.
-2. **Só pela tailnet.** Nó Tailscale próprio (`fotos`), HTTPS do Tailscale (Serve) e **nunca** Funnel. O app do
-   iPhone precisa do Tailscale ligado (mesma dependência da 5b.2).
+2. **Só na rede de casa** (mudança de 2026-11-22, decisão 10). O Immich responde no IP do i7 na rede local e no
+   loopback; não tem nó Tailscale nem Funnel e não responde pela interface do Tailscale do i7. O app do iPhone usa
+   `http://<IP do i7>:2283` e não precisa de VPN. Fora de casa, o Immich não abre; as fotos novas sobem quando o
+   iPhone volta ao Wi-Fi. A porta da rede de casa só liga depois que o administrador existe.
 3. **Entrada do Google Fotos:** Google Takeout importado pelo `immich-go`, que lê os `.json` do Takeout e mantém
    data, local e álbum de cada foto.
 4. **Entrada do iPhone:** app do Immich, backup automático das fotos novas, só no Wi-Fi.
@@ -1607,7 +1609,7 @@ Leonardo cola o texto na próxima vez que precisar mexer no Projeto (não é urg
 
 - Não apaga foto sozinho, nem a repetida.
 - Não manda foto para nuvem nenhuma.
-- Não abre o Immich na internet (Funnel).
+- Não abre o Immich na internet nem na tailnet.
 - Não deixa o ML ligado o tempo todo.
 
 ### Cenário de teste
@@ -1615,7 +1617,7 @@ Leonardo cola o texto na próxima vez que precisar mexer no Projeto (não é urg
 1. Enviar a mesma foto duas vezes: a segunda é recusada e a biblioteca tem uma.
 2. Enviar uma foto com o ML parado: ela aparece com miniatura; no domingo, ganha rosto e busca.
 3. Login da Nathalia não mostra foto do Leonardo fora de álbum compartilhado.
-4. Fora da tailnet, o endereço do Immich não responde.
+4. O Immich responde no IP de casa e no loopback; pelo IP do Tailscale do i7 e pela internet, não.
 5. Restaurar o backup no Mac: mesma contagem de fotos e álbuns.
 
 ### Decisões do Leonardo (2026-11-22)
@@ -1632,3 +1634,6 @@ Leonardo cola o texto na próxima vez que precisar mexer no Projeto (não é urg
    Risco aceito (Leonardo, 2026-11-22).
 9. Vídeo HEVC fica como veio, sem conversão para H.264, mesmo que um navegador sem suporte não toque (Leonardo,
    2026-11-22). Muda só se alguém não conseguir ver um vídeo.
+10. Sem VPN ligada nos aparelhos: o Tailscale fica só no i7, onde é necessário (Funnel da Anthropic e cofre). O
+    Immich vai para a rede de casa ("como todos os outros"); o cofre continua na tailnet, com a cópia offline do app
+    (Leonardo, 2026-11-22). Sem "VPN On Demand".
