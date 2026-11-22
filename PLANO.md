@@ -273,7 +273,7 @@ Docker Compose próprio em `fotos/`, estado em `/srv/fotos` no SSD, só na rede 
   envio com o ML parado lido no código: a tarefa falha e a janela refaz; M1–M3 ok no i7 em 2026-11-22, timer na próxima em 2026-11-29 00:30)
 - [ ] 10.4 Backup às 04:05 (biblioteca incremental + banco, cifrado), conferência às 07:10 e ensaio de restauração no Mac
   (2026-11-22: `exportar.sh`, `ensaiar_restauracao.sh` e timers escritos, testados no Mac com biblioteca falsa; o dump
-  do banco é o do Immich às 02:00, Yucca desligado; falta B1–B4 no i7, `docs/IMPLANTACAO.md` "Backup das fotos")
+  do banco é o do Immich às 02:00, Yucca desligado; B1–B3 ok no i7 em 2026-11-22; falta o ensaio no Mac, B4)
 - [ ] 10.5 Takeout do Google Fotos do Leonardo importado pelo `immich-go`; contagem conferida (Ficha 17, regra 9a)
 - [ ] 10.6 iPhone do Leonardo no app do Immich, no Wi-Fi de casa (sem VPN); revisar as duplicatas
 - [ ] 10.7 Conta da Nathalia, o Takeout e o iPhone dela

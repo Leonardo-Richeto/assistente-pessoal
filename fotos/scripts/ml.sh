@@ -90,7 +90,7 @@ estado() {
 
 case "$MODO" in
   estado) estado; exit 0 ;;
-  desligar) desligar_ml; rm -f "$MARCA_JANELA"; exit 0 ;;
+  desligar) desligar_ml; janela_em_andamento || rm -f "$MARCA_JANELA"; exit 0 ;;
 esac
 
 # janela
@@ -107,8 +107,9 @@ for passada in 1 2; do
   esperar_filas "$limite" "${FILAS_PRIMEIRO[@]}" || { completo=0; break; }
   comando_filas start "${FILAS_DEPOIS[@]}"
   esperar_filas "$limite" "${FILAS_DEPOIS[@]}" || { completo=0; break; }
-  read -r _ falhas < <(contar_filas "${FILAS_ML[@]}") || falhas=0
+  read -r _ falhas < <(contar_filas "${FILAS_ML[@]}") || { aviso "não consegui ler as filas."; completo=0; break; }
   [ "$falhas" -eq 0 ] && break
+  [ "$passada" -eq 2 ] && { aviso "$falhas falhas depois da 2ª passada; ficam para o domingo seguinte."; completo=0; }
   if [ "$passada" -eq 1 ]; then
     log "$falhas falhas na 1ª passada; limpando e tentando de novo"
     comando_filas clear-failed "${FILAS_ML[@]}"

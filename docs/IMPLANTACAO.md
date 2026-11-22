@@ -792,22 +792,28 @@ sai da biblioteca vai para `removidas/AAAA-MM-DD/` e fica 30 dias. Miniaturas e 
 Immich refaz). O backup Yucca do próprio Immich fica desligado (Leonardo, 2026-11-22). A conferência às 07:10 acusa
 backup com mais de 26 h.
 
-- [ ] B1. `.env` e leitura da biblioteca:
+**Travas (revisor, 2026-11-22):** sem a marca `.instancia` (HD desmontado) o backup recusa a pasta; pasta da
+biblioteca ausente ou sem leitura para tudo sem tirar nada do backup; mais de 50 originais sumindo num dia só para
+o backup (remoção de propósito: `FOTOS_ACEITAR_REMOCOES=1`); arquivo que mudou (bytes ou mtime) é cifrado de novo e
+o `.age` velho vai para `removidas/`; dump do Immich com mais de 23 h reprova. O ensaio reprova com erro do psql e
+confere que cada foto do banco tem o original no backup.
+
+- [x] B1. (2026-11-22) `.env` e leitura da biblioteca:
       ```bash
       cd /srv/assistente/app && git pull
       printf '\n%s\nBACKUP_DESTINO=/srv/backup-hd/fotos\n' "$(grep '^AGE_DESTINATARIO=' /srv/assistente/.env)" >> /srv/fotos/.env
       grep -E '^(AGE_DESTINATARIO|BACKUP_DESTINO)=' /srv/fotos/.env          # esperado: age1... e /srv/backup-hd/fotos
       ls -la /srv/fotos/data/biblioteca /srv/fotos/data/biblioteca/backups    # o usuário comum precisa ler (r)
       ```
-- [ ] B2. Primeiro dump do banco agora (o automático é às 02:00) e primeiro backup à mão:
+- [x] B2. (2026-11-22: dump de 18 MB com a biblioteca vazia; `fotos-20261122-1135.tar.age`) Primeiro dump do banco agora (o automático é às 02:00) e primeiro backup à mão:
       ```bash
       K="$(sed -n 's/^IMMICH_API_KEY=//p' /srv/fotos/.env)"
       curl -s -X POST -H "x-api-key: $K" -H 'Content-Type: application/json' -d '{"name":"backup-database"}' \
         http://127.0.0.1:8040/api/jobs; unset K
       sleep 20; ls -la /srv/fotos/data/biblioteca/backups                      # esperado: immich-db-backup-*.sql.gz
-      FOTOS_HOME=/srv/fotos bash fotos/scripts/exportar.sh --retencao          # esperado: "feito: ... 0 originais"
+      FOTOS_HOME=/srv/fotos bash fotos/scripts/exportar.sh --retencao --primeira-vez   # esperado: "feito: ... 0 originais"
       ```
-- [ ] B3. Timers do backup e da conferência:
+- [x] B3. (2026-11-22: conferir ok) Timers do backup e da conferência:
       ```bash
       cd /srv/assistente/app/fotos/deploy/systemd
       for f in fotos-backup.service fotos-conferir.service; do
