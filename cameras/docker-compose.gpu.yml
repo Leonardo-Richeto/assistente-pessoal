@@ -1,0 +1,6 @@
+# GPU integrada do i7 (Intel HD 530, Skylake) para decodificar o vídeo. O Frigate detecta sozinho (hwaccel_args: auto,
+# driver iHD) quando o container enxerga o dispositivo. Só junta com GPU_DRI no .env; no Mac fica vazio.
+services:
+  frigate:
+    devices:
+      - "${GPU_DRI:?defina GPU_DRI no .env}:${GPU_DRI}"

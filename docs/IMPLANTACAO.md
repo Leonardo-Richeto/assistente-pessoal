@@ -920,7 +920,7 @@ A senha da câmera vai no `.env` já no formato de URL (`#` vira `%23`). IP e se
       sudo mkdir -p /srv/cameras && sudo chown "$USER": /srv/cameras && chmod 700 /srv/cameras
       cd /srv/assistente/app && git pull
       cp cameras/.env.example /srv/cameras/.env && chmod 600 /srv/cameras/.env
-      nano /srv/cameras/.env   # CAMERA_IP, CAMERA_SENHA e ENDERECO_LAN=<IP de casa do i7>
+      nano /srv/cameras/.env   # CAMERA_IP, CAMERA_SENHA, ENDERECO_LAN=<IP de casa do i7> e GPU_DRI=/dev/dri/renderD128
       ```
 - [ ] C2. Subir e conferir:
       ```bash

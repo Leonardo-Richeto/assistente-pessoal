@@ -42,12 +42,15 @@ conferir_env() {
   if [[ "$senha" =~ [#@:/{}\ \$\?\&\'\"] ]] || [[ "$senha" =~ %($|[^0-9A-Fa-f]|.$|.[^0-9A-Fa-f]) ]]; then
     falha "CAMERA_SENHA com caractere cru (# @ : / { } \$ ? & aspas ou espaço) ou % solto: use o formato de URL (# vira %23, @ vira %40, \$ vira %24)."
   fi
+  local gpu; gpu="$(valor_env GPU_DRI)"
+  [ -z "$gpu" ] || [ -c "$gpu" ] || falha "GPU_DRI ($gpu) não existe ou não é dispositivo (no i7: /dev/dri/renderD128)."
   [[ "$(valor_env LIMITE_GRAVACOES_GB)" =~ ^[0-9]+$ ]] || falha "LIMITE_GRAVACOES_GB precisa ser um número inteiro."
 }
 
 dc() {
   local arquivos=(-f "$(caminho_docker "$CAMERAS_APP/docker-compose.yml")")
   [ -z "$(valor_env ENDERECO_LAN)" ] || arquivos+=(-f "$(caminho_docker "$CAMERAS_APP/docker-compose.lan.yml")")
+  [ -z "$(valor_env GPU_DRI)" ] || arquivos+=(-f "$(caminho_docker "$CAMERAS_APP/docker-compose.gpu.yml")")
   docker compose --project-directory "$(caminho_docker "$CAMERAS_APP")" "${arquivos[@]}" \
     --env-file "$(caminho_docker "$ENV_FILE")" "$@"
 }

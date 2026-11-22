@@ -7,7 +7,8 @@
 #   ${CAMERAS_HOME}/gravacoes     gravações e fotos dos eventos; o Frigate apaga sozinho (Ficha 18, regra 3)
 #
 # Rodar sempre pelos scripts de cameras/scripts (eles passam o .env de fora do repositório).
-# A porta da rede de casa fica em docker-compose.lan.yml, junto só com ENDERECO_LAN no .env.
+# A porta da rede de casa fica em docker-compose.lan.yml (com ENDERECO_LAN no .env) e a GPU em docker-compose.gpu.yml
+# (com GPU_DRI).
 # Sem portas do go2rtc (8554 e 8555) e sem a porta 5000 (sem login): só a 8971, com login e HTTPS próprio.
 # Imagem com versão e digest fixos. Para atualizar: leia as notas da versão (o Frigate muda o config.yml às vezes),
 # troque a tag e o digest juntos e rode cameras/scripts/preparar.sh depois.
