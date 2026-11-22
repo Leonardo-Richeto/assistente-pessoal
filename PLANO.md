@@ -271,10 +271,11 @@ Docker Compose próprio em `fotos/`, estado em `/srv/fotos` no SSD, só na rede 
   envio com o ML parado (não verificado em 2026-11-22)
   (2026-11-22: `fotos/scripts/ml.sh` e timer `fotos-ml` escritos, laço testado no Mac com API e docker falsos;
   envio com o ML parado lido no código: a tarefa falha e a janela refaz; M1–M3 ok no i7 em 2026-11-22, timer na próxima em 2026-11-29 00:30)
-- [ ] 10.4 Backup às 04:05 (biblioteca incremental + banco, cifrado), conferência às 07:10 e ensaio de restauração no Mac
+- [x] 10.4 Backup às 04:05 (biblioteca incremental + banco, cifrado), conferência às 07:10 e ensaio de restauração no Mac
   (2026-11-22: `exportar.sh`, `ensaiar_restauracao.sh` e timers escritos, testados no Mac com biblioteca falsa; o dump
-  do banco é o do Immich às 02:00, Yucca desligado; B1–B3 ok no i7 em 2026-11-22; falta o ensaio no Mac, B4)
+  do banco é o do Immich às 02:00, Yucca desligado; B1–B4 ok em 2026-11-22)
 - [ ] 10.5 Takeout do Google Fotos do Leonardo importado pelo `immich-go`; contagem conferida (Ficha 17, regra 9a)
+  (roteiro I1–I8 em `docs/IMPLANTACAO.md` "Importação do Google Fotos"; esperando o e-mail do Takeout)
 - [ ] 10.6 iPhone do Leonardo no app do Immich, no Wi-Fi de casa (sem VPN); revisar as duplicatas
 - [ ] 10.7 Conta da Nathalia, o Takeout e o iPhone dela
 - [ ] 10.8 O Leonardo apaga do Google e do iPhone, depois dos critérios da Ficha 17, regra 9

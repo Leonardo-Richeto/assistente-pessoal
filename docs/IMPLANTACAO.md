@@ -824,7 +824,7 @@ confere que cada foto do banco tem o original no backup.
       sudo systemctl enable --now fotos-backup.timer fotos-conferir.timer
       sudo systemctl start fotos-conferir.service && journalctl -u fotos-conferir -n 5 --no-pager   # esperado: ok
       ```
-- [ ] B4. Ensaio de restauração no Mac, num Terminal do Mac, com a identidade do age (a mesma do C8 do cofre).
+- [x] B4. (2026-11-22, biblioteca vazia: ensaio ok depois de restaurar o dump no banco `immich`, como o Immich v3.4.2 faz) Ensaio de restauração no Mac, num Terminal do Mac, com a identidade do age (a mesma do C8 do cofre).
       Agora, com a biblioteca vazia, prova o pacote e o banco; repita depois da importação (10.5) e antes de apagar
       qualquer coisa do Google (Ficha 17, regra 9b). Sem o `age` no Mac (`brew install age`), cada original passa
       por um `docker run`: use `--amostra 200`.
@@ -833,3 +833,54 @@ confere que cada foto do banco tem o original no backup.
       bash fotos/scripts/ensaiar_restauracao.sh ~/fotos-ensaio --chave <identidade-age.txt>   # esperado: "ensaio ok"
       rm -rf ~/fotos-ensaio
       ```
+
+#### Importação do Google Fotos (10.5)
+
+Pelo `immich-go` v0.32.0 (github.com/simulot/immich-go), **no Mac**, lendo os `.zip` do Takeout sem descompactar e
+enviando pela rede de casa para `http://<IP do i7>:2283`. Ele lê os `.json` do Takeout (data, local, álbuns). O ML
+não roda durante o envio; depois, uma janela longa processa tudo. **Antes:** os `.zip` baixados no Mac (~12 GB; o
+Mac tinha 27 GB livres em 2026-11-22) e o Mac no Wi-Fi de casa.
+
+- [ ] I1. Baixar todos os `takeout-*.zip` do e-mail do Google para uma pasta só (ex.: `~/takeout/`); conferir que
+      não falta nenhuma parte (`ls -la ~/takeout/`; o e-mail diz quantas são).
+- [ ] I2. Instalar o immich-go (binário do GitHub, conferindo o checksum da release):
+      ```bash
+      cd ~/Downloads && V=v0.32.0
+      curl -fLO https://github.com/simulot/immich-go/releases/download/$V/immich-go_Darwin_arm64.tar.gz
+      curl -fLO https://github.com/simulot/immich-go/releases/download/$V/checksums.txt
+      grep immich-go_Darwin_arm64.tar.gz checksums.txt | shasum -a 256 -c -     # esperado: OK
+      tar -xzf immich-go_Darwin_arm64.tar.gz immich-go && xattr -d com.apple.quarantine immich-go 2>/dev/null; ./immich-go version
+      ```
+- [ ] I3. Chave da API **só para a importação**, na conta do Leonardo: nome `importacao-google`, permissões
+      `asset.read`, `asset.statistics`, `asset.update`, `asset.upload`, `asset.copy`, `asset.delete`,
+      `asset.download`, `album.create`, `album.read`, `albumAsset.create`, `server.about`, `stack.create`,
+      `tag.asset`, `tag.create`, `user.read` (lista da documentação do immich-go). Sem `job.*`: o ML já está parado,
+      então não precisa pausar filas (`--pause-immich-jobs=false`). Apague a chave no fim (I8).
+- [ ] I4. Ensaio sem enviar nada. Ponha a chave numa variável sem gravar no histórico (`read -s K`):
+      ```bash
+      read -s K   # cole a chave e Enter
+      ~/Downloads/immich-go upload from-google-photos --server=http://<IP do i7>:2283 --api-key="$K" \
+        --pause-immich-jobs=false --dry-run ~/takeout/takeout-*.zip
+      ```
+      Anote o resumo (fotos, vídeos, álbuns, ignorados). Se reclamar da versão do servidor, pare: o immich-go
+      v0.32.0 saiu antes do Immich v3.4.2.
+- [ ] I5. Envio de verdade (no Wi-Fi, ~12 GB):
+      ```bash
+      ~/Downloads/immich-go upload from-google-photos --server=http://<IP do i7>:2283 --api-key="$K" \
+        --pause-immich-jobs=false --on-errors=continue --session-tag ~/takeout/takeout-*.zip; unset K
+      ```
+      Compare o resumo com o do I4 (Ficha 17, regra 9a). O resumo e o log ficam na saída do comando: guarde-os.
+- [ ] I6. Janela longa do ML, no i7 (rostos, busca, texto e duplicatas de todo o acervo), e a RAM com o ML
+      trabalhando:
+      ```bash
+      sudo systemd-run --unit fotos-ml-importacao -p User=$USER -E FOTOS_HOME=/srv/fotos -E FOTOS_ML_MINUTOS=1440 \
+        /bin/bash /srv/assistente/app/fotos/scripts/ml.sh janela
+      FOTOS_HOME=/srv/fotos bash /srv/assistente/app/fotos/scripts/ml.sh estado         # de vez em quando
+      docker stats --no-stream --format '{{.Name}} {{.MemUsage}}' | grep fotos            # RAM com o ML trabalhando
+      journalctl -u fotos-ml-importacao -n 15 --no-pager                                 # no fim: "janela feita"
+      ```
+      Confira no Immich: rostos em "Pessoas", a busca por texto ("praia") e Utilitários → Duplicatas.
+- [ ] I7. O backup das 04:05 cifra o acervo inteiro na primeira noite (até 6 h). No dia seguinte: `journalctl -u
+      fotos-backup -n 5` e o ensaio do B4 de novo, com `--amostra 200`.
+- [ ] I8. Apagar a chave `importacao-google` no Immich e os `.zip` do Mac só depois do I7 (o Google continua com
+      tudo até a 10.8).

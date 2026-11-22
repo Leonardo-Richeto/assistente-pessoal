@@ -69,10 +69,13 @@ docker run -d --name "$CONTAINER" -e POSTGRES_PASSWORD=ensaio -e POSTGRES_USER=p
 for _ in $(seq 1 60); do docker exec "$CONTAINER" pg_isready -U postgres >/dev/null 2>&1 && break; sleep 2; done
 docker exec "$CONTAINER" pg_isready -U postgres >/dev/null 2>&1 || falha "o Postgres do ensaio não ficou pronto."
 sleep 3
-# Como na restauração da documentação do Immich: o dump zera o search_path, e o sed o devolve.
+# Como o restoreDatabaseBackup do Immich v3.4.2 (database-backup.service.ts): o dump é um pg_dump do banco immich
+# (--clean --if-exists, sem \connect) e volta direto nele; um dump de cluster (pg_dumpall, versões antigas) volta
+# pelo banco postgres.
+# grep -c lê tudo (com -q, o gunzip levaria SIGPIPE e o pipefail daria falso).
+if [ "$(gunzip -c "$DUMP" | grep -c '^\\connect' || true)" -gt 0 ]; then banco_alvo=postgres; else banco_alvo=immich; fi
 gunzip -c "$DUMP" \
-  | sed "s/SELECT pg_catalog.set_config('search_path', '', false);/SELECT pg_catalog.set_config('search_path', 'public, pg_catalog', true);/g" \
-  | docker exec -i "$CONTAINER" psql -q -v ON_ERROR_STOP=0 -U postgres -d postgres >"$ENSAIO/restauracao.log" 2>&1 \
+  | docker exec -i "$CONTAINER" psql -q -v ON_ERROR_STOP=0 -U postgres -d "$banco_alvo" >"$ENSAIO/restauracao.log" 2>&1 \
   || falha "psql falhou."
 # "já existe" é esperado (o dump recria o papel postgres e o banco); qualquer outro ERROR reprova.
 erros_psql="$(grep -E 'ERROR' "$ENSAIO/restauracao.log" | grep -vcE 'already exists' || true)"
