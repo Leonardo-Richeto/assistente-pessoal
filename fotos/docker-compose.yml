@@ -1,4 +1,4 @@
-# Fotos e vídeos (Ficha 17, PLANO Fase 10): Immich só na rede de casa, sem Tailscale e sem Funnel. Projeto
+# Fotos e vídeos (Ficha 17, PLANO Fase 10): Immich na rede de casa (fora dela, pela rota de casa na tailnet), sem nó Tailscale e sem Funnel. Projeto
 # próprio, fora do compose do assistente, do Paperless e do cofre. Banco e fila ficam na rede interna, sem saída.
 # Roteiro: docs/IMPLANTACAO.md, "Fotos (10)".
 # Base: o docker-compose.yml oficial do Immich v3.4.2 (github.com/immich-app/immich/releases).

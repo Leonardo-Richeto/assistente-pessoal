@@ -1572,10 +1572,11 @@ Leonardo cola o texto na próxima vez que precisar mexer no Projeto (não é urg
 
 1. **Duas contas:** Leonardo (administrador) e Nathalia, cada um com a própria biblioteca. Um vê a foto do outro só
    em álbum que o dono compartilhar pelo app.
-2. **Só na rede de casa** (mudança de 2026-11-22, decisão 10). O Immich responde no IP do i7 na rede local e no
-   loopback; não tem nó Tailscale nem Funnel e não responde pela interface do Tailscale do i7. O app do iPhone usa
-   `http://<IP do i7>:2283` e não precisa de VPN. Fora de casa, o Immich não abre; as fotos novas sobem quando o
-   iPhone volta ao Wi-Fi. A porta da rede de casa só liga depois que o administrador existe.
+2. **Rede de casa e, fora dela, a rota de casa pela tailnet** (texto de 2026-11-28; antes "só na rede de casa").
+   O Immich responde no IP do i7 na rede local e no loopback, sem nó Tailscale próprio e sem Funnel. O app do iPhone
+   usa `http://<IP do i7>:2283`. Fora de casa, o Leonardo liga o Tailscale do aparelho à mão: o i7 anuncia a rede de
+   casa (subnet router do host) e o mesmo endereço abre o acervo. Sem "VPN On Demand"; nada na internet. O backup
+   automático continua só no Wi-Fi de casa. A porta da rede de casa só liga depois que o administrador existe.
 3. **Entrada do Google Fotos:** Google Takeout importado pelo `immich-go`, que lê os `.json` do Takeout e mantém
    data, local e álbum de cada foto.
 4. **Entrada do iPhone:** app do Immich, backup automático das fotos novas, só no Wi-Fi.
@@ -1609,7 +1610,7 @@ Leonardo cola o texto na próxima vez que precisar mexer no Projeto (não é urg
 
 - Não apaga foto sozinho, nem a repetida.
 - Não manda foto para nuvem nenhuma.
-- Não abre o Immich na internet nem na tailnet.
+- Não abre o Immich na internet. Na tailnet, só pela rota da rede de casa (regra 2), sem nó nem Funnel próprio.
 - Não deixa o ML ligado o tempo todo.
 
 ### Cenário de teste
@@ -1617,8 +1618,10 @@ Leonardo cola o texto na próxima vez que precisar mexer no Projeto (não é urg
 1. Enviar a mesma foto duas vezes: a segunda é recusada e a biblioteca tem uma.
 2. Enviar uma foto com o ML parado: ela aparece com miniatura; no domingo, ganha rosto e busca.
 3. Login da Nathalia não mostra foto do Leonardo fora de álbum compartilhado.
-4. O Immich responde no IP de casa e no loopback; pelo IP do Tailscale do i7 e pela internet, não.
+4. O Immich responde no IP de casa e no loopback; pelo IP do Tailscale do i7 (100.x) e pela internet, não.
 5. Restaurar o backup no Mac: mesma contagem de fotos e álbuns.
+6. Fora do Wi-Fi de casa, com o Tailscale do aparelho ligado, `http://<IP do i7>:2283` abre o acervo; com ele
+   desligado, não abre.
 
 ### Decisões do Leonardo (2026-11-22)
 
@@ -1636,14 +1639,16 @@ Leonardo cola o texto na próxima vez que precisar mexer no Projeto (não é urg
    2026-11-22). Muda só se alguém não conseguir ver um vídeo.
 10. Sem VPN ligada nos aparelhos: o Tailscale fica só no i7, onde é necessário (Funnel da Anthropic e cofre). O
     Immich vai para a rede de casa ("como todos os outros"); o cofre continua na tailnet, com a cópia offline do app
-    (Leonardo, 2026-11-22). Sem "VPN On Demand".
+    (Leonardo, 2026-11-22). Sem "VPN On Demand". **Revista em 2026-11-28:** o Tailscale passa a existir no Mac e
+    no iPhone, ligado à mão fora de casa, para alcançar a rede de casa pela rota do i7 (regra 2).
 11. Backup: o nosso backup copia o dump do banco que o Immich faz às 02:00; o backup Yucca do Immich fica desligado
     (Leonardo, 2026-11-22).
 
 ### Mudança proposta da regra 2: acervo fora de casa (2026-11-22)
 
 - **Status:** aprovada (Leonardo, 2026-11-22: opção A e texto). Implementar depois da 10.6, não agora (Leonardo,
-  2026-11-22).
+  2026-11-22). **Implementada em 2026-11-28** (Leonardo aprovou no chat) de outro jeito: pela rota da rede de casa
+  que o Tailscale do host do i7 anuncia, não pela interface do Tailscale. O texto em vigor é o da regra 2.
 - **Texto novo da regra 2:** o Immich responde na rede de casa, no loopback e na interface do Tailscale do i7. Fora de
   casa, o Leonardo liga o Tailscale do iPhone à mão para ver o acervo e desliga depois. Sem "VPN On Demand" e sem
   Funnel: nada na internet. O backup automático continua só no Wi-Fi de casa.
